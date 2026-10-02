@@ -11,13 +11,21 @@ import {
   Text,
   ScrollView,
   Pressable,
+  Image,
+  Alert,
   useColorScheme,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, FileText, ArrowUpRight } from 'lucide-react-native';
+import { Plus, FileText, ArrowUpRight, Zap, ChevronRight, Search, Sparkles } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { FeatureIcon } from '../../design/icons';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
+import { DocumentRepository } from '../../data/repositories/DocumentRepository';
+import { WorkspaceRepository } from '../../data/repositories/WorkspaceRepository';
+import { FeatureUsageRepository } from '../../data/repositories/FeatureUsageRepository';
+import { AdaptiveWorkspaceEngine } from '../../domain/workspace/AdaptiveWorkspaceEngine';
+import { FeatureCapability } from '../../domain/features/FeatureRegistry';
 import { formatMoney } from '../../domain/money/Money';
 
 interface RecentDocument {
@@ -41,6 +49,8 @@ export default function HomeScreen() {
   const [currency, setCurrency] = useState<string>('USD');
   const [documentLocale, setDocumentLocale] = useState<string>('en-US');
   const [recents, setRecents] = useState<RecentDocument[]>([]);
+  const [adaptiveActions, setAdaptiveActions] = useState<FeatureCapability[]>([]);
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean>(true);
 
   const loadData = useCallback(async () => {
     try {
@@ -54,33 +64,27 @@ export default function HomeScreen() {
 
       if (profile) {
         setCurrency(profile.default_currency);
-        setDocumentLocale(profile.default_document_locale);
+        setDocumentLocale(profile.default_document_locale || 'en-US');
       }
 
-      // 2. Fetch outstanding balance: total of issued invoices minus payments
-      const invTotalRow = await db.getFirstAsync<{ sum_total: number }>(
-        "SELECT COALESCE(SUM(total_minor), 0) AS sum_total FROM documents WHERE doc_type = 'invoice' AND lifecycle_status = 'issued';"
+      // 2. Fetch authoritative business metrics from canonical domain/repository layer
+      const metrics = await DocumentRepository.getHomeDashboardMetricsAsync();
+      setOutstandingMinor(metrics.outstandingMinor);
+      setPaidThisMonthMinor(metrics.paidThisMonthMinor);
+
+      // 3. Fetch adaptive workspace preferences & local usage signals
+      const [workspacePrefs, usageHistory] = await Promise.all([
+        WorkspaceRepository.getPreferencesAsync(),
+        FeatureUsageRepository.getAllUsageAsync(),
+      ]);
+      setOnboardingCompleted(workspacePrefs.onboardingCompleted);
+
+      const prioritized = AdaptiveWorkspaceEngine.getPrioritizedQuickActions(
+        workspacePrefs,
+        usageHistory,
+        4
       );
-      const paymentsRow = await db.getFirstAsync<{ sum_paid: number }>(
-        'SELECT COALESCE(SUM(amount_minor), 0) AS sum_paid FROM payments;'
-      );
-
-      const totalInvoiced = BigInt(invTotalRow?.sum_total || 0);
-      const totalPaid = BigInt(paymentsRow?.sum_paid || 0);
-      const outstanding = totalInvoiced > totalPaid ? totalInvoiced - totalPaid : 0n;
-
-      setOutstandingMinor(outstanding);
-
-      // 3. Fetch paid this month
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
-      const monthPaymentsRow = await db.getFirstAsync<{ sum_paid: number }>(
-        'SELECT COALESCE(SUM(amount_minor), 0) AS sum_paid FROM payments WHERE payment_date >= ?;',
-        [startOfMonth.getTime()]
-      );
-      setPaidThisMonthMinor(BigInt(monthPaymentsRow?.sum_paid || 0));
+      setAdaptiveActions(prioritized);
 
       // 4. Fetch recent documents
       const recentDocs = await db.getAllAsync<RecentDocument>(
@@ -98,6 +102,19 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const handleActionPress = async (action: FeatureCapability) => {
+    await FeatureUsageRepository.recordUsageAsync(action.id);
+    if (action.availability === 'ready' && action.route) {
+      router.push(action.route as any);
+    } else {
+      Alert.alert(
+        `${action.name} (${action.roadmapPhase || 'Roadmap'})`,
+        `${action.description}\n\nThis capability is planned for ${action.roadmapPhase || 'an upcoming release'}.`,
+        [{ text: 'Got it' }]
+      );
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -111,30 +128,25 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.appTitle, { color: theme.textPrimary }]}>Billframe</Text>
-            <Text style={[styles.appSubtitle, { color: theme.textSecondary }]}>Invoice & Estimate</Text>
-          </View>
-
-          {/* Primary Action Buttons */}
-          <View style={styles.actionRow}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.primaryButton,
-                { backgroundColor: theme.brandAnchor, opacity: pressed ? 0.9 : 1 },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Create new invoice"
-              onPress={() => router.push({ pathname: '/document/edit', params: { type: 'invoice' } })}
-            >
-              <Plus color={theme.surface} size={18} strokeWidth={2.5} />
-              <Text style={[styles.primaryButtonText, { color: theme.surface }]}>New Invoice</Text>
-            </Pressable>
+          {/* Header with Approved Brand Mark & Instant Search */}
+          <View style={styles.headerRow}>
+            <View style={styles.headerBrand}>
+              <View style={styles.brandMarkBadge}>
+                <Image
+                  source={require('../../../assets/brand/billframe-mark.png')}
+                  style={styles.brandMarkSmall}
+                  resizeMode="contain"
+                />
+              </View>
+              <View>
+                <Text style={[styles.appTitle, { color: theme.textPrimary }]}>Billframe</Text>
+                <Text style={[styles.appSubtitle, { color: theme.textSecondary }]}>Business Workspace</Text>
+              </View>
+            </View>
 
             <Pressable
               style={({ pressed }) => [
-                styles.secondaryButton,
+                styles.searchHeaderBtn,
                 {
                   backgroundColor: theme.surface,
                   borderColor: theme.borderSubtle,
@@ -142,16 +154,104 @@ export default function HomeScreen() {
                 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel="Create new estimate"
-              onPress={() => router.push({ pathname: '/document/edit', params: { type: 'estimate' } })}
+              accessibilityLabel="Search Billframe"
+              onPress={() => router.push('/search' as any)}
             >
-              <Plus color={theme.textPrimary} size={18} strokeWidth={2.5} />
-              <Text style={[styles.secondaryButtonText, { color: theme.textPrimary }]}>New Estimate</Text>
+              <Search color={theme.textSecondary} size={16} />
+              <Text style={[styles.searchHeaderText, { color: theme.textMuted }]}>Search</Text>
             </Pressable>
           </View>
 
+          {/* Onboarding Banner (if not yet configured) */}
+          {!onboardingCompleted && (
+            <Pressable
+              style={[
+                styles.onboardingBanner,
+                { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Set up your business workspace"
+              onPress={() => router.push('/onboarding' as any)}
+            >
+              <Sparkles color={theme.brandAnchor} size={18} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.onboardingTitle, { color: theme.textPrimary }]}>
+                  Customize Billframe (2 min)
+                </Text>
+                <Text style={[styles.onboardingSubtitle, { color: theme.textSecondary }]}>
+                  Set up your business type, GST & personalized workspace
+                </Text>
+              </View>
+              <ChevronRight color={theme.textMuted} size={16} />
+            </Pressable>
+          )}
+
+          {/* Quick Bill Action Banner (Instant Walk-in Cash Bill) */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.quickBillCard,
+              {
+                backgroundColor: theme.surface,
+                borderColor: theme.borderSubtle,
+                opacity: pressed ? 0.9 : 1,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="30-second Quick Bill"
+            onPress={() => {
+              FeatureUsageRepository.recordUsageAsync('quick_bill');
+              router.push('/quick-bill' as any);
+            }}
+          >
+            <View style={styles.quickBillLeft}>
+              <View style={[styles.quickBillIcon, { backgroundColor: theme.brandAnchor }]}>
+                <Zap color={theme.surface} size={16} fill={theme.surface} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.quickBillTitle, { color: theme.textPrimary }]}>Quick Bill (30s)</Text>
+                <Text style={[styles.quickBillSubtitle, { color: theme.textSecondary }]}>
+                  Single item + customer → instant bill & receipt
+                </Text>
+              </View>
+            </View>
+            <ChevronRight color={theme.textMuted} size={18} />
+          </Pressable>
+
+          {/* Adaptive Workspace Quick Actions */}
+          <View style={styles.adaptiveActionGrid}>
+            {adaptiveActions.map((action) => (
+              <Pressable
+                key={action.id}
+                style={({ pressed }) => [
+                  styles.adaptiveActionBtn,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.borderSubtle,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={action.name}
+                onPress={() => handleActionPress(action)}
+              >
+                <FeatureIcon name={action.icon} size="sm" color={theme.textPrimary} />
+                <Text
+                  style={[styles.adaptiveActionText, { color: theme.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  {action.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
           {/* Financial Summary */}
-          <View style={[styles.summaryContainer, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+          <Pressable
+            style={[styles.summaryContainer, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}
+            accessibilityRole="button"
+            accessibilityLabel="View full financial reports"
+            onPress={() => router.push('/reports/index' as any)}
+          >
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Outstanding</Text>
               <Text style={[styles.summaryAmount, { color: theme.textPrimary }]}>
@@ -167,7 +267,7 @@ export default function HomeScreen() {
                 {formatMoney({ amountMinor: paidThisMonthMinor, currency }, documentLocale)}
               </Text>
             </View>
-          </View>
+          </Pressable>
 
           {/* Recent Documents Section */}
           <View style={styles.sectionHeader}>
@@ -265,19 +365,124 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MAX_CONTENT_WIDTH,
   },
-  header: {
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  headerBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  brandMarkBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#0B0B0D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  brandMarkSmall: {
+    width: 26,
+    height: 26,
+  },
+  searchHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    gap: spacing.xs,
+  },
+  searchHeaderText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  onboardingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  onboardingTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  onboardingSubtitle: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  adaptiveActionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
     marginBottom: spacing.lg,
   },
+  adaptiveActionBtn: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    height: 44,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  adaptiveActionText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   appTitle: {
-    fontSize: typography.screenTitle.fontSize,
-    lineHeight: typography.screenTitle.lineHeight,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: typography.screenTitle.fontWeight,
     letterSpacing: -0.3,
   },
   appSubtitle: {
-    fontSize: typography.supporting.fontSize,
-    lineHeight: typography.supporting.lineHeight,
-    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 1,
+  },
+  quickBillCard: {
+    borderWidth: 1,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  quickBillLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
+  },
+  quickBillIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickBillTitle: {
+    fontSize: typography.bodyMedium.fontSize,
+    fontWeight: '700',
+  },
+  quickBillSubtitle: {
+    fontSize: typography.caption.fontSize,
+    marginTop: 1,
   },
   actionRow: {
     flexDirection: 'row',

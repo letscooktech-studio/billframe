@@ -12,6 +12,12 @@ module.exports = {
     ],
   },
   moduleNameMapper: {
+    '^react-native$': '<rootDir>/tests/mocks/react-native.ts',
     '^expo-sqlite$': '<rootDir>/tests/mocks/expo-sqlite.ts',
+    '^expo-print$': '<rootDir>/tests/mocks/expo-print.ts',
+    '^expo-sharing$': '<rootDir>/tests/mocks/expo-sharing.ts',
+    '^expo-crypto$': '<rootDir>/tests/mocks/expo-crypto.ts',
+    '^expo-file-system$': '<rootDir>/tests/mocks/expo-file-system.ts',
+    '^expo-secure-store$': '<rootDir>/tests/mocks/expo-secure-store.ts',
   },
 };

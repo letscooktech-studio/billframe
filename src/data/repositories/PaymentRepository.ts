@@ -6,6 +6,7 @@
 import * as SQLite from 'expo-sqlite';
 import { DatabaseManager } from '../database/DatabaseManager';
 import { DocumentRepository } from './DocumentRepository';
+import { AuditEventRepository } from './AuditEventRepository';
 import { formatDocumentNumber } from '../../domain/numbering/SequenceEngine';
 
 export interface PaymentRecord {
@@ -17,7 +18,37 @@ export interface PaymentRecord {
   payment_method: string;
   reference: string | null;
   notes: string | null;
+  status: 'pending' | 'completed' | 'failed' | 'refunded' | 'reversed';
+  provider: 'manual' | 'direct_upi' | 'razorpay' | 'cashfree' | 'stripe' | 'other';
+  provider_payment_id: string | null;
+  provider_order_id: string | null;
+  verification_state: 'manual_confirmed' | 'unverified' | 'verified_webhook' | 'verified_api' | 'failed_verification';
+  verified_at: number | null;
+  settlement_state: 'settled' | 'unsettled' | 'not_applicable';
+  refund_state: 'none' | 'partial' | 'full';
+  refunded_amount_minor: number;
+  source: 'manual_entry' | 'quick_bill' | 'invoice_payment' | 'direct_qr' | 'external_import';
   created_at: number;
+  updated_at: number;
+}
+
+export interface RecordPaymentInput {
+  invoiceId: string;
+  amountMinor: bigint;
+  paymentMethod: string;
+  reference?: string | null;
+  notes?: string | null;
+  paymentDate?: number;
+  status?: 'pending' | 'completed' | 'failed' | 'refunded' | 'reversed';
+  provider?: 'manual' | 'direct_upi' | 'razorpay' | 'cashfree' | 'stripe' | 'other';
+  providerPaymentId?: string | null;
+  providerOrderId?: string | null;
+  verificationState?: 'manual_confirmed' | 'unverified' | 'verified_webhook' | 'verified_api' | 'failed_verification';
+  verifiedAt?: number | null;
+  settlementState?: 'settled' | 'unsettled' | 'not_applicable';
+  refundState?: 'none' | 'partial' | 'full';
+  refundedAmountMinor?: bigint;
+  source?: 'manual_entry' | 'quick_bill' | 'invoice_payment' | 'direct_qr' | 'external_import';
 }
 
 export interface ReceiptRecord {
@@ -38,22 +69,9 @@ export class PaymentRepository {
   }
 
   /**
-   * Records a manual payment against an invoice.
-   * Atomically:
-   * 1. Validates invoice exists and is issued.
-   * 2. Asserts payment amount > 0 and amount <= remaining balance (rejects overpayment).
-   * 3. Inserts payment entry.
-   * 4. Allocates next monotonic receipt number (e.g. RCP-0001).
-   * 5. Freezes receipt snapshot.
+   * Records a payment against an invoice with overpayment guard and atomic receipt issuance.
    */
-  static async recordPayment(input: {
-    invoiceId: string;
-    amountMinor: bigint;
-    paymentMethod: string;
-    reference?: string | null;
-    notes?: string | null;
-    paymentDate?: number;
-  }): Promise<{ payment: PaymentRecord; receipt: ReceiptRecord }> {
+  static async recordPayment(input: RecordPaymentInput): Promise<{ payment: PaymentRecord; receipt: ReceiptRecord }> {
     const db = await this.getDb();
     const invoice = await DocumentRepository.getById(input.invoiceId);
     if (!invoice) throw new Error(`Invoice not found for id ${input.invoiceId}`);
@@ -77,14 +95,28 @@ export class PaymentRepository {
     const paymentId = `pay_${now}_${Math.random().toString(36).substring(2, 7)}`;
     const receiptId = `rec_${now}_${Math.random().toString(36).substring(2, 7)}`;
 
+    const status = input.status || 'completed';
+    const provider = input.provider || 'manual';
+    const providerPaymentId = input.providerPaymentId || null;
+    const providerOrderId = input.providerOrderId || null;
+    const verificationState = input.verificationState || 'manual_confirmed';
+    const verifiedAt = input.verifiedAt || (verificationState === 'manual_confirmed' ? now : null);
+    const settlementState = input.settlementState || 'settled';
+    const refundState = input.refundState || 'none';
+    const refundedAmountMinor = input.refundedAmountMinor ? Number(input.refundedAmountMinor) : 0;
+    const source = input.source || 'manual_entry';
+
     let createdPayment!: PaymentRecord;
     let createdReceipt!: ReceiptRecord;
 
     await db.withTransactionAsync(async () => {
-      // 1. Insert payment record
+      // 1. Insert payment record with forward-compatible verification and provider fields
       await db.runAsync(
-        `INSERT INTO payments (id, invoice_id, amount_minor, currency, payment_date, payment_method, reference, notes, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO payments (
+          id, invoice_id, amount_minor, currency, payment_date, payment_method, reference, notes,
+          status, provider, provider_payment_id, provider_order_id, verification_state, verified_at,
+          settlement_state, refund_state, refunded_amount_minor, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           paymentId,
           invoice.id,
@@ -94,6 +126,17 @@ export class PaymentRepository {
           input.paymentMethod,
           input.reference?.trim() || null,
           input.notes?.trim() || null,
+          status,
+          provider,
+          providerPaymentId,
+          providerOrderId,
+          verificationState,
+          verifiedAt,
+          settlementState,
+          refundState,
+          refundedAmountMinor,
+          source,
+          now,
           now,
         ]
       );
@@ -179,6 +222,20 @@ export class PaymentRepository {
 
     createdPayment = (await db.getFirstAsync<PaymentRecord>('SELECT * FROM payments WHERE id = ?;', [paymentId]))!;
     createdReceipt = (await db.getFirstAsync<ReceiptRecord>('SELECT * FROM receipts WHERE id = ?;', [receiptId]))!;
+
+    await AuditEventRepository.logEvent({
+      businessProfileId: invoice.business_profile_id,
+      entityType: 'payment',
+      entityId: paymentId,
+      action: 'record_payment',
+      payload: {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.document_number,
+        amountMinor: Number(input.amountMinor),
+        paymentMethod: input.paymentMethod,
+        receiptNumber: createdReceipt.receipt_number,
+      },
+    });
 
     return { payment: createdPayment, receipt: createdReceipt };
   }

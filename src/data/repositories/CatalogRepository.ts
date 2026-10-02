@@ -24,6 +24,14 @@ export class CatalogRepository {
     return DatabaseManager.getDatabaseAsync();
   }
 
+  static async createItem(item: Parameters<typeof CatalogRepository.create>[0]) {
+    return this.create(item);
+  }
+
+  static async listAllItems(includeArchived: boolean = false) {
+    return this.search('', includeArchived);
+  }
+
   static async create(item: {
     id?: string;
     name: string;

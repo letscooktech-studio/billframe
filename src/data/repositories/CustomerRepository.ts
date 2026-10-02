@@ -33,6 +33,14 @@ export class CustomerRepository {
     return DatabaseManager.getDatabaseAsync();
   }
 
+  static async createCustomer(customer: Parameters<typeof CustomerRepository.create>[0]) {
+    return this.create(customer);
+  }
+
+  static async listAllCustomers(includeArchived: boolean = false) {
+    return this.search('', includeArchived);
+  }
+
   static async create(customer: {
     id?: string;
     name: string;

@@ -67,7 +67,7 @@ const PAYMENT_TERMS_PRESETS: { id: PaymentTermsPreset; label: string }[] = [
 
 export default function DocumentEditScreen() {
   const router = useRouter();
-  const searchParams = useLocalSearchParams<{ type?: string; id?: string }>();
+  const searchParams = useLocalSearchParams<{ type?: string; id?: string; customerId?: string }>();
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? colors.dark : colors.light;
 
@@ -179,11 +179,16 @@ export default function DocumentEditScreen() {
             }))
           );
         }
+      } else if (searchParams.customerId) {
+        const cust = await CustomerRepository.getById(searchParams.customerId);
+        if (cust) {
+          setCustomer(cust);
+        }
       }
       initialLoadDone.current = true;
     }
     loadInitial();
-  }, [existingId]);
+  }, [existingId, searchParams.customerId]);
 
   // Payment terms preset handler
   function handleSelectPaymentTerms(preset: PaymentTermsPreset) {

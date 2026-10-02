@@ -10,6 +10,8 @@ import { DEFAULT_SEQUENCE_CONFIGS } from '../../domain/numbering/SequenceEngine'
 
 import { InMemorySQLiteDatabase } from './InMemoryDatabase';
 
+import { MigrationRunner } from './migrations/MigrationRunner';
+
 export const DB_NAME = 'billframe.db';
 
 export class DatabaseManager {
@@ -50,7 +52,7 @@ export class DatabaseManager {
   }
 
   /**
-   * Initializes database pragmas, creates tables, and seeds initial business profile and sequences.
+   * Initializes database pragmas, creates tables, and runs sequential versioned migrations.
    */
   static async initDatabaseAsync(db: SQLite.SQLiteDatabase): Promise<void> {
     // 1. Enable WAL mode and Foreign Keys (native SQLite resilience)
@@ -61,32 +63,10 @@ export class DatabaseManager {
       // Non-fatal on web WASM fallback
     }
 
-    // 3. Execute baseline DDL
-    await db.execAsync(INITIAL_SCHEMA_SQL);
+    // 2. Execute sequential, checksum-verified, atomic migrations
+    await MigrationRunner.runMigrationsAsync(db);
 
-    // 3.1 Incremental migrations for existing databases
-    const incrementalColumns = [
-      'ALTER TABLE documents ADD COLUMN job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL;',
-      'ALTER TABLE documents ADD COLUMN po_number TEXT;',
-      'ALTER TABLE documents ADD COLUMN payment_terms_preset TEXT;',
-      'ALTER TABLE documents ADD COLUMN shipping_address TEXT;',
-      'ALTER TABLE documents ADD COLUMN payment_instructions TEXT;',
-      'ALTER TABLE documents ADD COLUMN internal_notes TEXT;',
-      'ALTER TABLE documents ADD COLUMN deposit_minor INTEGER NOT NULL DEFAULT 0;',
-      'ALTER TABLE documents ADD COLUMN signature_uri TEXT;',
-      'ALTER TABLE documents ADD COLUMN signature_date INTEGER;',
-      'ALTER TABLE document_items ADD COLUMN item_notes TEXT;',
-    ];
-
-    for (const ddl of incrementalColumns) {
-      try {
-        await db.execAsync(ddl);
-      } catch {
-        // Ignored if column already exists or on web fallback
-      }
-    }
-
-    // 4. Ensure at least one active default business profile exists
+    // 3. Ensure at least one active default business profile exists and has all sequences
     await this.seedDefaultBusinessProfileAsync(db);
   }
 
@@ -95,11 +75,10 @@ export class DatabaseManager {
    */
   private static async seedDefaultBusinessProfileAsync(db: SQLite.SQLiteDatabase): Promise<void> {
     const existing = await db.getFirstAsync<{ id: string }>('SELECT id FROM business_profiles LIMIT 1;');
+    const now = Date.now();
+    const defaultProfileId = existing?.id || 'default_business_profile';
 
     if (!existing) {
-      const now = Date.now();
-      const defaultProfileId = 'default_business_profile';
-
       await db.withTransactionAsync(async () => {
         // Insert initial profile
         await db.runAsync(
@@ -109,11 +88,10 @@ export class DatabaseManager {
           [defaultProfileId, 'My Business', 'US', DEFAULT_CURRENCY, 'en-US', 1, now, now]
         );
 
-        // Insert initial numbering sequences for invoice, estimate, and receipt
-        for (const docType of ['invoice', 'estimate', 'receipt'] as const) {
-          const cfg = DEFAULT_SEQUENCE_CONFIGS[docType];
+        // Insert initial numbering sequences
+        for (const [docType, cfg] of Object.entries(DEFAULT_SEQUENCE_CONFIGS)) {
           await db.runAsync(
-            `INSERT INTO number_sequences (
+            `INSERT OR IGNORE INTO number_sequences (
               id, business_profile_id, doc_type, prefix, next_sequence_number, suffix, padding, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
             [
@@ -129,6 +107,25 @@ export class DatabaseManager {
           );
         }
       });
+    } else {
+      // Ensure any newly added doc_types have sequence records
+      for (const [docType, cfg] of Object.entries(DEFAULT_SEQUENCE_CONFIGS)) {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO number_sequences (
+            id, business_profile_id, doc_type, prefix, next_sequence_number, suffix, padding, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+          [
+            `seq_${defaultProfileId}_${docType}`,
+            defaultProfileId,
+            docType,
+            cfg.prefix,
+            1,
+            cfg.suffix,
+            cfg.padding,
+            now,
+          ]
+        );
+      }
     }
   }
 

@@ -11,6 +11,8 @@ import { calculateDocument } from '../../domain/documents/DocumentCalculator';
 import { validateForIssuance } from '../../domain/documents/DocumentStateMachine';
 import { buildDocumentSnapshot } from '../../domain/documents/SnapshotBuilder';
 import { formatDocumentNumber } from '../../domain/numbering/SequenceEngine';
+import { AuditEventRepository } from './AuditEventRepository';
+import { calculateDocumentBalance } from '../../domain/accounting/BalanceEngine';
 import {
   DiscountType,
   DocumentCalculationOutput,
@@ -63,9 +65,11 @@ export interface DocumentItemRow {
   catalog_item_id: string | null;
   description: string;
   item_notes: string | null;
+  category?: string | null;
   quantity_scaled: number;
   unit_name: string;
   unit_price_minor: number;
+  internal_cost_minor?: number;
   line_total_minor: number;
   sort_order: number;
 }
@@ -234,18 +238,20 @@ export class DocumentRepository {
         const itemId = item.id.startsWith('item_') ? `ditem_${Date.now()}_${i}` : item.id;
         await db.runAsync(
           `INSERT INTO document_items (
-            id, document_id, catalog_item_id, description, item_notes, quantity_scaled, unit_name,
-            unit_price_minor, line_total_minor, sort_order
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            id, document_id, catalog_item_id, description, item_notes, category, quantity_scaled, unit_name,
+            unit_price_minor, internal_cost_minor, line_total_minor, sort_order
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           [
             itemId,
             id,
             null,
             item.description,
             item.itemNotes?.trim() || null,
+            item.category || null,
             Number(item.quantityScaled),
             item.unitName,
             Number(item.unitPriceMinor),
+            Number(item.internalCostMinor || 0n),
             Number(item.lineTotalMinor),
             i,
           ]
@@ -426,6 +432,19 @@ export class DocumentRepository {
 
     const issued = await this.getById(id);
     if (!issued) throw new Error(`Failed to reload issued document ${id}`);
+
+    await AuditEventRepository.logEvent({
+      businessProfileId: issued.business_profile_id,
+      entityType: 'document',
+      entityId: issued.id,
+      action: 'issue',
+      payload: {
+        documentNumber: issued.document_number,
+        docType: issued.doc_type,
+        totalMinor: issued.total_minor,
+      },
+    });
+
     return issued;
   }
 
@@ -440,6 +459,15 @@ export class DocumentRepository {
     );
     const updated = await this.getById(id);
     if (!updated) throw new Error(`Estimate not found: ${id}`);
+
+    await AuditEventRepository.logEvent({
+      businessProfileId: updated.business_profile_id,
+      entityType: 'document',
+      entityId: updated.id,
+      action: 'accept_estimate',
+      payload: { documentNumber: updated.document_number },
+    });
+
     return updated;
   }
 
@@ -455,6 +483,15 @@ export class DocumentRepository {
     );
     const updated = await this.getById(id);
     if (!updated) throw new Error(`Estimate not found: ${id}`);
+
+    await AuditEventRepository.logEvent({
+      businessProfileId: updated.business_profile_id,
+      entityType: 'document',
+      entityId: updated.id,
+      action: 'accept_estimate_with_signature',
+      payload: { documentNumber: updated.document_number },
+    });
+
     return updated;
   }
 
@@ -469,6 +506,15 @@ export class DocumentRepository {
     );
     const updated = await this.getById(id);
     if (!updated) throw new Error(`Estimate not found: ${id}`);
+
+    await AuditEventRepository.logEvent({
+      businessProfileId: updated.business_profile_id,
+      entityType: 'document',
+      entityId: updated.id,
+      action: 'reject_estimate',
+      payload: { documentNumber: updated.document_number },
+    });
+
     return updated;
   }
 
@@ -517,6 +563,18 @@ export class DocumentRepository {
         unitName: i.unit_name,
         unitPriceMinor: BigInt(i.unit_price_minor),
       })),
+    });
+
+    await AuditEventRepository.logEvent({
+      businessProfileId: newInvoice.business_profile_id,
+      entityType: 'document',
+      entityId: newInvoice.id,
+      action: 'convert_estimate_to_invoice',
+      payload: {
+        estimateId: estimate.id,
+        estimateNumber: estimate.document_number,
+        invoiceId: newInvoice.id,
+      },
     });
 
     return newInvoice;
@@ -584,23 +642,31 @@ export class DocumentRepository {
       [id]
     );
 
-    // Payments are authoritative for paid totals and balance
-    const paymentsRow = await db.getFirstAsync<{ sum_paid: number }>(
-      'SELECT COALESCE(SUM(amount_minor), 0) AS sum_paid FROM payments WHERE invoice_id = ?;',
+    // Authoritative balance calculation via canonical BalanceEngine
+    const paymentRows = await db.getAllAsync<{
+      amount_minor: number;
+      status?: string | null;
+      refund_state?: string | null;
+      refunded_amount_minor?: number | null;
+    }>(
+      'SELECT amount_minor, status, refund_state, refunded_amount_minor FROM payments WHERE invoice_id = ?;',
       [id]
     );
 
-    const totalPaid = paymentsRow?.sum_paid || 0;
-    const deposit = doc.deposit_minor || 0;
-    const totalCredits = totalPaid + deposit;
-    const balance = Math.max(0, doc.total_minor - totalCredits);
+    const balanceResult = calculateDocumentBalance({
+      grandTotalMinor: BigInt(doc.total_minor || 0),
+      depositMinor: BigInt(doc.deposit_minor || 0),
+      payments: paymentRows.map((p) => ({
+        amountMinor: BigInt(p.amount_minor),
+        status: p.status,
+        refundState: p.refund_state,
+        refundedAmountMinor: p.refunded_amount_minor ? BigInt(p.refunded_amount_minor) : 0n,
+      })),
+    });
 
-    let paymentStatus: 'unpaid' | 'partially_paid' | 'paid' = 'unpaid';
-    if (totalCredits >= doc.total_minor && doc.total_minor > 0) {
-      paymentStatus = 'paid';
-    } else if (totalCredits > 0) {
-      paymentStatus = 'partially_paid';
-    }
+    const totalPaid = Number(balanceResult.validPaymentsMinor);
+    const balance = Number(balanceResult.balanceMinor);
+    const paymentStatus = balanceResult.paymentStatus;
 
     const now = Date.now();
     const isOverdue = Boolean(
@@ -618,14 +684,114 @@ export class DocumentRepository {
   }
 
   /**
+   * Authoritative calculation of home dashboard overview metrics.
+   * Canonical formula:
+   * balance = document total - valid deposits applied - successful payment allocations + applicable refunds/reversals.
+   *
+   * Only issued invoices with remaining balance > 0 contribute to outstanding.
+   */
+  static async getHomeDashboardMetricsAsync(): Promise<{
+    outstandingMinor: bigint;
+    paidThisMonthMinor: bigint;
+    overdueInvoicesCount: number;
+    overdueMinor: bigint;
+  }> {
+    const db = await this.getDb();
+
+    // 1. Fetch all issued, unarchived invoices
+    const issuedInvoices = await db.getAllAsync<{
+      id: string;
+      total_minor: number;
+      deposit_minor: number;
+      due_date: number | null;
+    }>(
+      `SELECT id, total_minor, deposit_minor, due_date
+       FROM documents
+       WHERE doc_type = 'invoice'
+         AND lifecycle_status = 'issued'
+         AND is_archived = 0;`
+    );
+
+    const now = Date.now();
+    let outstandingMinor = 0n;
+    let overdueMinor = 0n;
+    let overdueCount = 0;
+
+    for (const inv of issuedInvoices) {
+      const paymentRows = await db.getAllAsync<{
+        amount_minor: number;
+        status?: string | null;
+        refund_state?: string | null;
+        refunded_amount_minor?: number | null;
+      }>(
+        'SELECT amount_minor, status, refund_state, refunded_amount_minor FROM payments WHERE invoice_id = ?;',
+        [inv.id]
+      );
+
+      const bal = calculateDocumentBalance({
+        grandTotalMinor: BigInt(inv.total_minor),
+        depositMinor: BigInt(inv.deposit_minor || 0),
+        payments: paymentRows.map((p) => ({
+          amountMinor: BigInt(p.amount_minor),
+          status: p.status,
+          refundState: p.refund_state,
+          refundedAmountMinor: p.refunded_amount_minor ? BigInt(p.refunded_amount_minor) : 0n,
+        })),
+      });
+
+      if (bal.balanceMinor > 0n) {
+        outstandingMinor += bal.balanceMinor;
+        if (inv.due_date && now > inv.due_date) {
+          overdueMinor += bal.balanceMinor;
+          overdueCount += 1;
+        }
+      }
+    }
+
+    // 2. Paid this month: sum of completed, unrefunded payments recorded in current calendar month
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const monthPayments = await db.getFirstAsync<{ sum_paid: number }>(
+      `SELECT COALESCE(SUM(amount_minor - COALESCE(refunded_amount_minor, 0)), 0) AS sum_paid
+       FROM payments
+       WHERE payment_date >= ?
+         AND (status IS NULL OR status = 'completed')
+         AND (refund_state IS NULL OR refund_state != 'full');`,
+      [startOfMonth.getTime()]
+    );
+
+    const paidThisMonthMinor = BigInt(monthPayments?.sum_paid || 0);
+
+    return {
+      outstandingMinor,
+      paidThisMonthMinor,
+      overdueInvoicesCount: overdueCount,
+      overdueMinor,
+    };
+  }
+
+  /**
    * Voids an issued document. Preserves record for legal and audit compliance.
    */
   static async voidDocument(id: string): Promise<void> {
     const db = await this.getDb();
+    const doc = await this.getById(id);
     await db.runAsync("UPDATE documents SET lifecycle_status = 'void', updated_at = ? WHERE id = ?;", [
       Date.now(),
       id,
     ]);
+
+    if (doc) {
+      await AuditEventRepository.logEvent({
+        businessProfileId: doc.business_profile_id,
+        entityType: 'document',
+        entityId: doc.id,
+        action: 'void',
+        payload: { documentNumber: doc.document_number, docType: doc.doc_type },
+      });
+    }
   }
 
   /**

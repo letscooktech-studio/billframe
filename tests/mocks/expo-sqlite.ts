@@ -15,6 +15,15 @@ export interface MockDbState {
   document_snapshots: any[];
   payments: any[];
   receipts: any[];
+  expenses: any[];
+  time_entries: any[];
+  estimate_revisions: any[];
+  audit_events: any[];
+  migration_history: any[];
+  workspace_preferences: any[];
+  feature_usage: any[];
+  countries: any[];
+  subdivisions: any[];
 }
 
 export class MockSQLiteDatabase {
@@ -29,6 +38,15 @@ export class MockSQLiteDatabase {
     document_snapshots: [],
     payments: [],
     receipts: [],
+    expenses: [],
+    time_entries: [],
+    estimate_revisions: [],
+    audit_events: [],
+    migration_history: [],
+    workspace_preferences: [],
+    feature_usage: [],
+    countries: [],
+    subdivisions: [],
   };
 
   reset() {
@@ -43,6 +61,15 @@ export class MockSQLiteDatabase {
       document_snapshots: [],
       payments: [],
       receipts: [],
+      expenses: [],
+      time_entries: [],
+      estimate_revisions: [],
+      audit_events: [],
+      migration_history: [],
+      workspace_preferences: [],
+      feature_usage: [],
+      countries: [],
+      subdivisions: [],
     };
   }
 
@@ -83,43 +110,73 @@ export class MockSQLiteDatabase {
 
     // 2. Business Profiles Update
     if (s.startsWith('UPDATE business_profiles SET')) {
-      const [name, legalName, taxId, email, phone, addr1, city, stateVal, postal, country, curr, notes, terms, updated_at, id] = params;
+      const id = params[params.length - 1];
       const p = this.state.business_profiles.find((b) => b.id === id);
       if (p) {
-        Object.assign(p, {
-          name,
-          legal_name: legalName,
-          tax_id: taxId,
-          email,
-          phone,
-          address_line1: addr1,
-          city,
-          state: stateVal,
-          postal_code: postal,
-          country,
-          default_currency: curr,
-          default_notes: notes,
-          default_payment_terms: terms,
-          updated_at,
-        });
+        if (params.length >= 20) {
+          const [name, legalName, taxId, email, phone, addr1, city, stateVal, postal, country, countryIso2, subCode, subName, phoneIso2, phoneE164, curr, notes, terms, updated_at] = params;
+          Object.assign(p, {
+            name,
+            legal_name: legalName,
+            tax_id: taxId,
+            email,
+            phone,
+            address_line1: addr1,
+            city,
+            state: stateVal,
+            postal_code: postal,
+            country,
+            country_iso2: countryIso2,
+            subdivision_code: subCode,
+            subdivision_name: subName,
+            phone_country_iso2: phoneIso2,
+            phone_e164: phoneE164,
+            default_currency: curr,
+            default_notes: notes,
+            default_payment_terms: terms,
+            updated_at,
+          });
+        } else {
+          const [name, legalName, taxId, email, phone, addr1, city, stateVal, postal, country, curr, notes, terms, updated_at] = params;
+          Object.assign(p, {
+            name,
+            legal_name: legalName,
+            tax_id: taxId,
+            email,
+            phone,
+            address_line1: addr1,
+            city,
+            state: stateVal,
+            postal_code: postal,
+            country,
+            default_currency: curr,
+            default_notes: notes,
+            default_payment_terms: terms,
+            updated_at,
+          });
+        }
       }
       return { lastInsertRowId: 1, changes: 1 };
     }
 
     // 3. Number Sequences Insert
-    if (s.startsWith('INSERT INTO number_sequences')) {
+    if (s.startsWith('INSERT INTO number_sequences') || s.startsWith('INSERT OR IGNORE INTO number_sequences')) {
       const [id, business_profile_id, doc_type, prefix, next_sequence_number, suffix, padding, updated_at] = params;
-      this.state.number_sequences.push({
-        id,
-        business_profile_id,
-        doc_type,
-        prefix,
-        next_sequence_number,
-        suffix,
-        padding,
-        updated_at,
-      });
-      return { lastInsertRowId: 1, changes: 1 };
+      const exists = this.state.number_sequences.find((n) => n.business_profile_id === business_profile_id && n.doc_type === doc_type);
+      if (!exists) {
+        this.state.number_sequences.push({
+          id,
+          business_profile_id,
+          doc_type,
+          prefix,
+          next_sequence_number,
+          suffix,
+          padding,
+          updated_at,
+        });
+        return { lastInsertRowId: 1, changes: 1 };
+      }
+      return { lastInsertRowId: 0, changes: 0 };
     }
 
     // 4. Number Sequences Update
@@ -145,21 +202,28 @@ export class MockSQLiteDatabase {
 
     // 5. Customers Insert
     if (s.startsWith('INSERT INTO customers')) {
-      const [id, name, business_name, email, phone, billing_address, shipping_address, country, tax_id, notes, is_archived, created_at, updated_at] = params;
+      // CustomerRepository.create uses 12 params (is_archived is literal 0 in SQL).
+      // BackupManager restore uses 13 params (is_archived is a bound param).
+      let id: string, name: string, business_name: any, email: any, phone: any,
+          billing_address: any, shipping_address: any, country: any, tax_id: any,
+          notes: any, is_archived: number, created_at: number, updated_at: number;
+
+      if (params.length === 12) {
+        // Create path: no is_archived param
+        [id, name, business_name, email, phone, billing_address, shipping_address,
+          country, tax_id, notes, created_at, updated_at] = params;
+        is_archived = 0;
+      } else {
+        // Restore path: is_archived is bound
+        [id, name, business_name, email, phone, billing_address, shipping_address,
+          country, tax_id, notes, is_archived, created_at, updated_at] = params;
+        is_archived = is_archived || 0;
+      }
+
       this.state.customers.push({
-        id,
-        name,
-        business_name,
-        email,
-        phone,
-        billing_address,
-        shipping_address,
-        country,
-        tax_id,
-        notes,
-        is_archived: is_archived || 0,
-        created_at,
-        updated_at,
+        id, name, business_name, email, phone,
+        billing_address, shipping_address, country, tax_id, notes,
+        is_archived, created_at, updated_at,
       });
       return { lastInsertRowId: 1, changes: 1 };
     }
@@ -187,19 +251,37 @@ export class MockSQLiteDatabase {
 
     // 7. Catalog Items Insert
     if (s.startsWith('INSERT INTO catalog_items')) {
-      const [id, name, description, unit_price_minor, currency, unit_name, default_tax_rate_bp, is_archived, created_at, updated_at] = params;
-      this.state.catalog_items.push({
-        id,
-        name,
-        description,
-        unit_price_minor,
-        currency,
-        unit_name,
-        default_tax_rate_bp,
-        is_archived: is_archived || 0,
-        created_at,
-        updated_at,
-      });
+      if (params.length === 9) {
+        // Path A: CatalogRepository.create() binds 9 parameters; is_archived is SQL literal 0
+        const [id, name, description, unit_price_minor, currency, unit_name, default_tax_rate_bp, created_at, updated_at] = params;
+        this.state.catalog_items.push({
+          id,
+          name,
+          description,
+          unit_price_minor,
+          currency,
+          unit_name,
+          default_tax_rate_bp,
+          is_archived: 0,
+          created_at,
+          updated_at,
+        });
+      } else {
+        // Path B: BackupManager restore binds all 10 parameters
+        const [id, name, description, unit_price_minor, currency, unit_name, default_tax_rate_bp, is_archived, created_at, updated_at] = params;
+        this.state.catalog_items.push({
+          id,
+          name,
+          description,
+          unit_price_minor,
+          currency,
+          unit_name,
+          default_tax_rate_bp,
+          is_archived: Number(is_archived) || 0,
+          created_at,
+          updated_at,
+        });
+      }
       return { lastInsertRowId: 1, changes: 1 };
     }
 
@@ -250,53 +332,104 @@ export class MockSQLiteDatabase {
 
     // 9. Documents Upsert
     if (s.startsWith('INSERT INTO documents')) {
-      const [
-        id, business_profile_id, job_id, doc_type, sequence_number, document_number, customer_id,
-        lifecycle_status, issue_date, due_date, currency, subtotal_minor, discount_minor,
-        discount_type, discount_value, tax_minor, tax_type, tax_rate_bp, tax_label,
-        total_minor, deposit_minor, po_number, payment_terms_preset, shipping_address,
-        payment_instructions, notes, terms, internal_notes, signature_uri, signature_date,
-        parent_document_id, is_archived, created_at, updated_at,
-      ] = params;
+      let docData: any;
+      if (params.length === 33) {
+        // Path A: DocumentRepository.saveDraft() binds 33 parameters (is_archived is SQL literal 0)
+        const [
+          id, business_profile_id, job_id, doc_type, sequence_number, document_number, customer_id,
+          lifecycle_status, issue_date, due_date, currency, subtotal_minor, discount_minor,
+          discount_type, discount_value, tax_minor, tax_type, tax_rate_bp, tax_label,
+          total_minor, deposit_minor, po_number, payment_terms_preset, shipping_address,
+          payment_instructions, notes, terms, internal_notes, signature_uri, signature_date,
+          parent_document_id, created_at, updated_at,
+        ] = params;
 
-      const existingIndex = this.state.documents.findIndex((d) => d.id === id);
-      const docData = {
-        id,
-        business_profile_id,
-        job_id: job_id || null,
-        doc_type,
-        sequence_number,
-        document_number,
-        customer_id,
-        lifecycle_status,
-        issue_date,
-        due_date,
-        currency,
-        subtotal_minor,
-        discount_minor,
-        discount_type,
-        discount_value,
-        tax_minor,
-        tax_type,
-        tax_rate_bp,
-        tax_label,
-        total_minor,
-        deposit_minor: deposit_minor || 0,
-        po_number: po_number || null,
-        payment_terms_preset: payment_terms_preset || null,
-        shipping_address: shipping_address || null,
-        payment_instructions: payment_instructions || null,
-        notes,
-        terms,
-        internal_notes: internal_notes || null,
-        signature_uri: signature_uri || null,
-        signature_date: signature_date || null,
-        parent_document_id,
-        is_archived: is_archived || 0,
-        created_at,
-        updated_at,
-      };
+        docData = {
+          id,
+          business_profile_id,
+          job_id: job_id || null,
+          doc_type,
+          sequence_number,
+          document_number,
+          customer_id,
+          lifecycle_status,
+          issue_date,
+          due_date,
+          currency,
+          subtotal_minor,
+          discount_minor,
+          discount_type,
+          discount_value,
+          tax_minor,
+          tax_type,
+          tax_rate_bp,
+          tax_label,
+          total_minor,
+          deposit_minor: deposit_minor || 0,
+          po_number: po_number || null,
+          payment_terms_preset: payment_terms_preset || null,
+          shipping_address: shipping_address || null,
+          payment_instructions: payment_instructions || null,
+          notes,
+          terms,
+          internal_notes: internal_notes || null,
+          signature_uri: signature_uri || null,
+          signature_date: signature_date || null,
+          parent_document_id,
+          is_archived: 0,
+          created_at,
+          updated_at,
+        };
+      } else {
+        // Path B: BackupManager restore binds all 34 parameters
+        const [
+          id, business_profile_id, job_id, doc_type, sequence_number, document_number, customer_id,
+          lifecycle_status, issue_date, due_date, currency, subtotal_minor, discount_minor,
+          discount_type, discount_value, tax_minor, tax_type, tax_rate_bp, tax_label,
+          total_minor, deposit_minor, po_number, payment_terms_preset, shipping_address,
+          payment_instructions, notes, terms, internal_notes, signature_uri, signature_date,
+          parent_document_id, is_archived, created_at, updated_at,
+        ] = params;
 
+        docData = {
+          id,
+          business_profile_id,
+          job_id: job_id || null,
+          doc_type,
+          sequence_number,
+          document_number,
+          customer_id,
+          lifecycle_status,
+          issue_date,
+          due_date,
+          currency,
+          subtotal_minor,
+          discount_minor,
+          discount_type,
+          discount_value,
+          tax_minor,
+          tax_type,
+          tax_rate_bp,
+          tax_label,
+          total_minor,
+          deposit_minor: deposit_minor || 0,
+          po_number: po_number || null,
+          payment_terms_preset: payment_terms_preset || null,
+          shipping_address: shipping_address || null,
+          payment_instructions: payment_instructions || null,
+          notes,
+          terms,
+          internal_notes: internal_notes || null,
+          signature_uri: signature_uri || null,
+          signature_date: signature_date || null,
+          parent_document_id,
+          is_archived: Number(is_archived) || 0,
+          created_at,
+          updated_at,
+        };
+      }
+
+      const existingIndex = this.state.documents.findIndex((d) => d.id === docData.id);
       if (existingIndex >= 0) {
         this.state.documents[existingIndex] = {
           ...this.state.documents[existingIndex],
@@ -363,16 +496,25 @@ export class MockSQLiteDatabase {
 
     // 14. Document Items Insert
     if (s.startsWith('INSERT INTO document_items')) {
-      const [id, document_id, catalog_item_id, description, item_notes, quantity_scaled, unit_name, unit_price_minor, line_total_minor, sort_order] = params;
+      let id, document_id, catalog_item_id, description, item_notes, category, quantity_scaled, unit_name, unit_price_minor, internal_cost_minor, line_total_minor, sort_order;
+      if (params.length >= 12) {
+        [id, document_id, catalog_item_id, description, item_notes, category, quantity_scaled, unit_name, unit_price_minor, internal_cost_minor, line_total_minor, sort_order] = params;
+      } else {
+        [id, document_id, catalog_item_id, description, item_notes, quantity_scaled, unit_name, unit_price_minor, line_total_minor, sort_order] = params;
+        category = null;
+        internal_cost_minor = 0;
+      }
       this.state.document_items.push({
         id,
         document_id,
         catalog_item_id,
         description,
         item_notes: item_notes || null,
+        category: category || null,
         quantity_scaled,
         unit_name,
         unit_price_minor,
+        internal_cost_minor: internal_cost_minor || 0,
         line_total_minor,
         sort_order,
       });
@@ -393,18 +535,66 @@ export class MockSQLiteDatabase {
 
     // 16. Payments Insert
     if (s.startsWith('INSERT INTO payments')) {
-      const [id, invoice_id, amount_minor, currency, payment_date, payment_method, reference, notes, created_at] = params;
-      this.state.payments.push({
-        id,
-        invoice_id,
-        amount_minor,
-        currency,
-        payment_date,
-        payment_method,
-        reference,
-        notes,
-        created_at,
-      });
+      if (params.length === 20) {
+        const [
+          id, invoice_id, amount_minor, currency, payment_date, payment_method, reference, notes,
+          status, provider, provider_payment_id, provider_order_id, verification_state, verified_at,
+          settlement_state, refund_state, refunded_amount_minor, source, created_at, updated_at
+        ] = params;
+        this.state.payments.push({
+          id,
+          invoice_id,
+          amount_minor,
+          currency,
+          payment_date,
+          payment_method,
+          reference,
+          notes,
+          status,
+          provider,
+          provider_payment_id,
+          provider_order_id,
+          verification_state,
+          verified_at,
+          settlement_state,
+          refund_state,
+          refunded_amount_minor,
+          source,
+          created_at,
+          updated_at,
+        });
+      } else {
+        const [id, invoice_id, amount_minor, currency, payment_date, payment_method, reference, notes, created_at] = params;
+        this.state.payments.push({
+          id,
+          invoice_id,
+          amount_minor,
+          currency,
+          payment_date,
+          payment_method,
+          reference,
+          notes,
+          status: 'completed',
+          provider: 'manual',
+          provider_payment_id: null,
+          provider_order_id: null,
+          verification_state: 'manual_confirmed',
+          verified_at: payment_date,
+          settlement_state: 'settled',
+          refund_state: 'none',
+          refunded_amount_minor: 0,
+          source: 'manual_entry',
+          created_at,
+          updated_at: created_at,
+        });
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 16.1 Migration History Insert
+    if (s.startsWith('INSERT INTO migration_history')) {
+      const [version, name, checksum, applied_at] = params;
+      this.state.migration_history.push({ version, name, checksum, applied_at });
       return { lastInsertRowId: 1, changes: 1 };
     }
 
@@ -423,6 +613,172 @@ export class MockSQLiteDatabase {
         created_at,
       });
       return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 18. Expenses Insert
+    if (s.startsWith('INSERT INTO expenses')) {
+      const [id, business_profile_id, job_id, customer_id, category, description, amount_minor, currency, expense_date, receipt_image_uri, is_billable, is_billed, billed_invoice_id, created_at, updated_at] = params;
+      this.state.expenses.push({
+        id,
+        business_profile_id,
+        job_id: job_id || null,
+        customer_id: customer_id || null,
+        category,
+        description,
+        amount_minor,
+        currency,
+        expense_date,
+        receipt_image_uri: receipt_image_uri || null,
+        is_billable: is_billable || 0,
+        is_billed: is_billed || 0,
+        billed_invoice_id: billed_invoice_id || null,
+        created_at,
+        updated_at,
+      });
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 19. Expenses Delete
+    if (s.startsWith('DELETE FROM expenses WHERE id = ?;')) {
+      const [id] = params;
+      this.state.expenses = this.state.expenses.filter((e) => e.id !== id);
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+
+    // 20. Time Entries Insert
+    if (s.startsWith('INSERT INTO time_entries')) {
+      const [id, business_profile_id, job_id, customer_id, worker_name, description, hours_scaled, hourly_rate_minor, internal_cost_rate_minor, entry_date, is_billed, billed_invoice_id, created_at, updated_at] = params;
+      this.state.time_entries.push({
+        id,
+        business_profile_id,
+        job_id: job_id || null,
+        customer_id: customer_id || null,
+        worker_name,
+        description,
+        hours_scaled,
+        hourly_rate_minor,
+        internal_cost_rate_minor,
+        entry_date,
+        is_billed: is_billed || 0,
+        billed_invoice_id: billed_invoice_id || null,
+        created_at,
+        updated_at,
+      });
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 21. Time Entries Delete
+    if (s.startsWith('DELETE FROM time_entries WHERE id = ?;')) {
+      const [id] = params;
+      this.state.time_entries = this.state.time_entries.filter((t) => t.id !== id);
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+
+    // 22. Estimate Revisions Insert
+    if (s.startsWith('INSERT INTO estimate_revisions')) {
+      const [id, estimate_id, revision_number, snapshot_json, change_notes, created_at] = params;
+      this.state.estimate_revisions.push({
+        id,
+        estimate_id,
+        revision_number,
+        snapshot_json,
+        change_notes: change_notes || null,
+        created_at,
+      });
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 23. Audit Events Insert
+    if (s.startsWith('INSERT INTO audit_events')) {
+      const [id, business_profile_id, entity_type, entity_id, action, actor, payload_json, created_at] = params;
+      this.state.audit_events.push({
+        id,
+        business_profile_id,
+        entity_type,
+        entity_id,
+        action,
+        actor,
+        payload_json,
+        created_at,
+      });
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 24. Workspace Preferences Upsert
+    if (s.startsWith('INSERT INTO workspace_preferences')) {
+      const [
+        id, business_profile_id, business_type, sales_type,
+        is_gst_registered, track_inventory, track_jobs,
+        partial_payments, recurring_billing, adaptive_enabled,
+        layout_locked, primary_modules_json, onboarding_completed,
+        created_at, updated_at
+      ] = params;
+
+      const idx = this.state.workspace_preferences.findIndex((w) => w.id === id);
+      const record = {
+        id, business_profile_id, business_type, sales_type,
+        is_gst_registered, track_inventory, track_jobs,
+        partial_payments, recurring_billing, adaptive_enabled,
+        layout_locked, primary_modules_json, onboarding_completed,
+        created_at, updated_at
+      };
+      if (idx >= 0) {
+        this.state.workspace_preferences[idx] = record;
+      } else {
+        this.state.workspace_preferences.push(record);
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 25. Feature Usage Upsert
+    if (s.startsWith('INSERT INTO feature_usage')) {
+      const [feature_key, last_used_at, business_id] = params;
+      const existing = this.state.feature_usage.find((f) => f.feature_key === feature_key);
+      const isDismiss = s.includes('dismiss_count = dismiss_count + 1');
+      if (existing) {
+        if (isDismiss) {
+          existing.dismiss_count += 1;
+        } else {
+          existing.use_count += 1;
+        }
+        existing.last_used_at = last_used_at;
+        if (business_id) existing.business_id = business_id;
+      } else {
+        this.state.feature_usage.push({
+          feature_key,
+          use_count: isDismiss ? 0 : 1,
+          last_used_at,
+          dismiss_count: isDismiss ? 1 : 0,
+          business_id: business_id || null,
+        });
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 26. Countries Upsert
+    if (s.includes('INTO countries')) {
+      const [iso2, iso3, name, calling_code, currency_code, currency_symbol, default_locale, subdivision_type, tax_system_name, active, metadata_version] = params;
+      const idx = this.state.countries.findIndex((c) => c.iso2 === iso2);
+      const rec = { iso2, iso3, name, calling_code, currency_code, currency_symbol, default_locale, subdivision_type, tax_system_name, active, metadata_version };
+      if (idx >= 0) this.state.countries[idx] = rec;
+      else this.state.countries.push(rec);
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 27. Subdivisions Upsert
+    if (s.includes('INTO subdivisions')) {
+      const [code, country_iso2, name, type, parent_code, active, metadata_version] = params;
+      const idx = this.state.subdivisions.findIndex((sub) => sub.code === code);
+      const rec = { code, country_iso2, name, type, parent_code, active, metadata_version };
+      if (idx >= 0) this.state.subdivisions[idx] = rec;
+      else this.state.subdivisions.push(rec);
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 26. Delete feature usage
+    if (s.startsWith('DELETE FROM feature_usage')) {
+      this.state.feature_usage = [];
+      return { lastInsertRowId: 0, changes: 1 };
     }
 
     return { lastInsertRowId: 0, changes: 0 };
@@ -502,6 +858,33 @@ export class MockSQLiteDatabase {
       return (this.state.jobs.find((j) => j.id === id) as T) || null;
     }
 
+    // Single expense
+    if (s.startsWith('SELECT * FROM expenses WHERE id = ?;')) {
+      const [id] = params;
+      return (this.state.expenses.find((e) => e.id === id) as T) || null;
+    }
+
+    // Total expenses for job
+    if (s.includes('SUM(amount_minor)') && s.includes('FROM expenses WHERE job_id = ?')) {
+      const [jobId] = params;
+      const sum = this.state.expenses
+        .filter((e) => e.job_id === jobId)
+        .reduce((acc, curr) => acc + curr.amount_minor, 0);
+      return { total_expenses: sum } as T;
+    }
+
+    // Total all expenses
+    if (s.includes('SUM(amount_minor)') && s.includes('FROM expenses') && !s.includes('WHERE')) {
+      const sum = this.state.expenses.reduce((acc, curr) => acc + curr.amount_minor, 0);
+      return { total_expenses: sum } as T;
+    }
+
+    // Single time entry
+    if (s.startsWith('SELECT * FROM time_entries WHERE id = ?;')) {
+      const [id] = params;
+      return (this.state.time_entries.find((t) => t.id === id) as T) || null;
+    }
+
     // Job count
     if (s.includes('FROM jobs WHERE business_profile_id = ?')) {
       const [profileId] = params;
@@ -509,11 +892,44 @@ export class MockSQLiteDatabase {
       return ({ cnt } as unknown as T);
     }
 
+    // Monthly payments sum
+    if (s.includes('FROM payments') && s.includes('payment_date >= ?')) {
+      const [since] = params;
+      const sum_paid = this.state.payments
+        .filter((p) => p.payment_date >= since && (!p.status || p.status === 'completed') && (!p.refund_state || p.refund_state !== 'full'))
+        .reduce((acc, p) => acc + (p.amount_minor || 0) - (p.refunded_amount_minor || 0), 0);
+      return ({ sum_paid } as unknown as T);
+    }
+
+    // Workspace preferences
+    if (s.includes('FROM workspace_preferences WHERE business_profile_id = ?')) {
+      const [profileId] = params;
+      return (this.state.workspace_preferences.find((w) => w.business_profile_id === profileId) as T) || null;
+    }
+
     return null;
   }
 
   async getAllAsync<T>(sql: string, params: any[] = []): Promise<T[]> {
     const s = sql.trim();
+
+    // PRAGMA table_info check
+    if (s.startsWith('PRAGMA table_info')) {
+      return [] as T[];
+    }
+
+    // Migration history
+    if (s.includes('FROM migration_history')) {
+      return this.state.migration_history.slice().sort((a, b) => a.version - b.version) as T[];
+    }
+
+    // Feature usage
+    if (s.includes('FROM feature_usage')) {
+      if (params.length > 0) {
+        return this.state.feature_usage.filter((f) => f.business_id === params[0] || !f.business_id) as T[];
+      }
+      return this.state.feature_usage.slice() as T[];
+    }
 
     // Document Items
     if (s.includes('FROM document_items WHERE document_id = ?')) {
@@ -549,21 +965,49 @@ export class MockSQLiteDatabase {
       return this.state.catalog_items.filter((c) => c.is_archived === 0) as T[];
     }
 
+    // Expenses for job
+    if (s.includes('FROM expenses WHERE job_id = ?')) {
+      const [jobId] = params;
+      return this.state.expenses
+        .filter((e) => e.job_id === jobId)
+        .sort((a, b) => b.expense_date - a.expense_date) as T[];
+    }
+
+    // All expenses
+    if (s.includes('FROM expenses')) {
+      return this.state.expenses
+        .sort((a, b) => b.expense_date - a.expense_date) as T[];
+    }
+
+    // Time entries for job
+    if (s.includes('FROM time_entries WHERE job_id = ?')) {
+      const [jobId] = params;
+      return this.state.time_entries
+        .filter((t) => t.job_id === jobId)
+        .sort((a, b) => b.entry_date - a.entry_date) as T[];
+    }
+
+    // All time entries
+    if (s.includes('FROM time_entries')) {
+      return this.state.time_entries
+        .sort((a, b) => b.entry_date - a.entry_date) as T[];
+    }
+
+    // Estimate revisions
+    if (s.includes('FROM estimate_revisions WHERE estimate_id = ?')) {
+      const [estimateId] = params;
+      return this.state.estimate_revisions
+        .filter((r) => r.estimate_id === estimateId)
+        .sort((a, b) => b.revision_number - a.revision_number) as T[];
+    }
+
     // Number sequences
     if (s.includes('FROM number_sequences WHERE business_profile_id = ?')) {
       const [profileId] = params;
       return this.state.number_sequences.filter((n) => n.business_profile_id === profileId) as T[];
     }
 
-    // Jobs for customer
-    if (s.includes('FROM jobs WHERE customer_id = ?')) {
-      const [custId] = params;
-      return this.state.jobs
-        .filter((j) => j.customer_id === custId)
-        .sort((a, b) => b.created_at - a.created_at) as T[];
-    }
-
-    // Jobs with summary join
+    // Jobs with summary join (must precede FROM documents check because it contains a subquery FROM documents)
     if (s.includes('FROM jobs j') && s.includes('JOIN customers c')) {
       const status = params.length > 0 ? params[0] : null;
       let matched = this.state.jobs;
@@ -590,6 +1034,54 @@ export class MockSQLiteDatabase {
           balance_minor: Math.max(0, totalInvoiced - totalPaid),
         };
       }) as T[];
+    }
+
+    // Documents query with optional customer join
+    if (s.includes('FROM documents')) {
+      let docs = this.state.documents.filter((d) => d.is_archived === 0);
+      if (s.includes("doc_type = 'invoice'")) {
+        docs = docs.filter((d) => d.doc_type === 'invoice');
+      }
+      if (s.includes("lifecycle_status = 'issued'")) {
+        docs = docs.filter((d) => d.lifecycle_status === 'issued');
+      }
+      return docs
+        .map((d) => {
+          const cust = this.state.customers.find((c) => c.id === d.customer_id);
+          const paymentsForDoc = this.state.payments.filter((p) => p.invoice_id === d.id);
+          const totalPaid = paymentsForDoc.reduce((acc, p) => acc + (p.amount_minor || 0), 0);
+          return {
+            ...d,
+            customer_name: cust?.name || null,
+            total_paid_minor: totalPaid,
+          };
+        })
+        .sort((a, b) => (b.issue_date || 0) - (a.issue_date || 0)) as T[];
+    }
+
+    // Jobs for customer
+    if (s.includes('FROM jobs WHERE customer_id = ?')) {
+      const [custId] = params;
+      return this.state.jobs
+        .filter((j) => j.customer_id === custId)
+        .sort((a, b) => b.created_at - a.created_at) as T[];
+    }
+
+    // Audit events for entity
+    if (s.includes('FROM audit_events WHERE entity_type = ? AND entity_id = ?')) {
+      const [entityType, entityId] = params;
+      return this.state.audit_events
+        .filter((a) => a.entity_type === entityType && a.entity_id === entityId)
+        .sort((a, b) => a.created_at - b.created_at) as T[];
+    }
+
+    // All recent audit events
+    if (s.includes('FROM audit_events')) {
+      const limit = params.length > 0 ? Number(params[0]) : 50;
+      return this.state.audit_events
+        .slice()
+        .sort((a, b) => b.created_at - a.created_at)
+        .slice(0, limit) as T[];
     }
 
     return [];

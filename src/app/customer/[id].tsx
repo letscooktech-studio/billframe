@@ -245,7 +245,7 @@ export default function CustomerDetailScreen() {
           <View style={styles.quickActionRow}>
             <Pressable
               style={[styles.actionBtn, { backgroundColor: theme.brandAnchor }]}
-              onPress={() => router.push({ pathname: '/document/edit', params: { type: 'invoice' } })}
+              onPress={() => router.push({ pathname: '/document/edit', params: { type: 'invoice', customerId: customer.id } })}
               accessibilityRole="button"
             >
               <Plus color={theme.surface} size={16} strokeWidth={2.5} />
@@ -254,7 +254,7 @@ export default function CustomerDetailScreen() {
 
             <Pressable
               style={[styles.actionBtnSecondary, { borderColor: theme.borderSubtle, backgroundColor: theme.surface }]}
-              onPress={() => router.push({ pathname: '/document/edit', params: { type: 'estimate' } })}
+              onPress={() => router.push({ pathname: '/document/edit', params: { type: 'estimate', customerId: customer.id } })}
               accessibilityRole="button"
             >
               <Plus color={theme.textPrimary} size={16} strokeWidth={2.5} />

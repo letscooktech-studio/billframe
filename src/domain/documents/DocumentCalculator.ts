@@ -6,6 +6,7 @@
 
 import { Money, roundHalfUp } from '../money/Money';
 import { calculateTax } from '../tax/TaxEngine';
+import { calculateDocumentBalance } from '../accounting/BalanceEngine';
 import {
   DocumentCalculationInput,
   DocumentCalculationOutput,
@@ -63,6 +64,7 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
 
   // 1. Calculate each line item total
   let subtotalMinor = 0n;
+  let totalInternalCostMinor = 0n;
   const calculatedItems: LineItemCalculation[] = [];
 
   for (let i = 0; i < input.items.length; i++) {
@@ -70,7 +72,13 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
     const rawLineMinor = item.unitPriceMinor * item.quantityScaled;
     const lineTotalMinor = roundHalfUp(rawLineMinor, QUANTITY_SCALE);
 
+    const costUnitPrice = item.internalCostMinor && item.internalCostMinor > 0n ? item.internalCostMinor : 0n;
+    const rawCostMinor = costUnitPrice * item.quantityScaled;
+    const itemCostMinor = roundHalfUp(rawCostMinor, QUANTITY_SCALE);
+    const itemProfitMinor = lineTotalMinor > itemCostMinor ? lineTotalMinor - itemCostMinor : 0n;
+
     subtotalMinor += lineTotalMinor;
+    totalInternalCostMinor += itemCostMinor;
 
     calculatedItems.push({
       id: item.id || `item_${i + 1}`,
@@ -80,6 +88,9 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
       unitName: item.unitName || 'item',
       unitPriceMinor: item.unitPriceMinor,
       lineTotalMinor,
+      internalCostMinor: itemCostMinor,
+      profitMinor: itemProfitMinor,
+      category: item.category || null,
     });
   }
 
@@ -111,31 +122,32 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
   const tax = taxResult.taxAmount;
   const grandTotal = taxResult.grandTotal;
 
-  // 5. Apply deposits and payments
-  const depositMinor = input.depositMinor && input.depositMinor > 0n ? input.depositMinor : 0n;
-  const deposit: Money = { amountMinor: depositMinor, currency };
+  // 5. Apply deposits and payments via canonical BalanceEngine
+  const balanceResult = calculateDocumentBalance({
+    grandTotalMinor: grandTotal.amountMinor,
+    depositMinor: input.depositMinor,
+    payments: [{ amountMinor: input.totalPaymentsMinor > 0n ? input.totalPaymentsMinor : 0n, status: 'completed' }],
+  });
 
-  const paidMinor = input.totalPaymentsMinor > 0n ? input.totalPaymentsMinor : 0n;
-  const paid: Money = { amountMinor: paidMinor, currency };
+  const deposit: Money = { amountMinor: balanceResult.depositMinor, currency };
+  const paid: Money = { amountMinor: balanceResult.validPaymentsMinor, currency };
+  const balance: Money = { amountMinor: balanceResult.balanceMinor, currency };
 
-  const totalCreditsMinor = paidMinor + depositMinor;
-  const balanceMinor = grandTotal.amountMinor > totalCreditsMinor ? grandTotal.amountMinor - totalCreditsMinor : 0n;
-  const balance: Money = { amountMinor: balanceMinor, currency };
+  // 6. Private Contractor Profitability
+  const totalInternalCost: Money = { amountMinor: totalInternalCostMinor, currency };
+  const grossProfitMinor = grandTotal.amountMinor > totalInternalCostMinor ? grandTotal.amountMinor - totalInternalCostMinor : 0n;
+  const grossProfit: Money = { amountMinor: grossProfitMinor, currency };
+  const marginBasisPoints = grandTotal.amountMinor > 0n ? Number((grossProfitMinor * 10000n) / grandTotal.amountMinor) : 0;
 
-  // 6. Derive payment status from payments and deposit
-  let paymentStatus: PaymentStatus = 'unpaid';
-  if (totalCreditsMinor >= grandTotal.amountMinor && grandTotal.amountMinor > 0n) {
-    paymentStatus = 'paid';
-  } else if (totalCreditsMinor > 0n) {
-    paymentStatus = 'partially_paid';
-  }
+  // 7. Payment status from canonical balance result
+  const paymentStatus: PaymentStatus = balanceResult.paymentStatus;
 
-  // 7. Derive overdue status
+  // 8. Derive overdue status
   const currentTs = input.currentTimestamp || Date.now();
   const isOverdue = Boolean(
     input.dueDateTimestamp &&
       currentTs > input.dueDateTimestamp &&
-      balanceMinor > 0n &&
+      balanceResult.balanceMinor > 0n &&
       input.lifecycleStatus === 'issued'
   );
 
@@ -150,6 +162,9 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
     deposit,
     paid,
     balance,
+    totalInternalCost,
+    grossProfit,
+    marginBasisPoints,
     paymentStatus,
     isOverdue,
   };

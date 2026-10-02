@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Billframe: Invoice & Estimate",
+    "name": "Billframe",
     "slug": "billframe",
     "version": "1.0.0",
     "orientation": "default",
@@ -13,9 +13,11 @@
     },
     "android": {
       "package": "com.letscooktech.billframe",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#111111"
+        "backgroundColor": "#0B0B0D",
+        "monochromeImage": "./assets/monochrome-icon.png"
       }
     },
     "web": {

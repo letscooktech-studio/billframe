@@ -37,10 +37,13 @@ import {
   Copy,
   PenTool,
   Shield,
+  Share2,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { DocumentRepository, FullDocument } from '../../data/repositories/DocumentRepository';
 import { PaymentRepository, PaymentRecord, ReceiptRecord } from '../../data/repositories/PaymentRepository';
+import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
+import { PdfService } from '../../services/pdf/PdfService';
 import { createMoney, formatMoney } from '../../domain/money/Money';
 import { quantityScaledToString } from '../../features/items/ItemEditorModal';
 import { PaymentRecordModal } from '../../features/payments/PaymentRecordModal';
@@ -161,6 +164,23 @@ export default function DocumentDetailScreen() {
       Alert.alert('Error', err.message || 'Failed to accept estimate with signature.');
     } finally {
       isSubmittingRef.current = false;
+      setIsOperating(false);
+    }
+  }
+
+  async function handleSharePdf() {
+    if (!doc) return;
+    setIsOperating(true);
+    try {
+      const biz = await BusinessProfileRepository.getActiveProfile();
+      if (!biz) {
+        Alert.alert('Profile Needed', 'Please complete your business profile in Settings before exporting PDF.');
+        return;
+      }
+      await PdfService.shareDocumentPdfAsync(doc, biz, 'standard');
+    } catch (err: any) {
+      Alert.alert('PDF Export Failed', err.message || 'Could not compile PDF.');
+    } finally {
       setIsOperating(false);
     }
   }
@@ -311,24 +331,34 @@ export default function DocumentDetailScreen() {
             {isInvoice ? 'Invoice' : 'Estimate'}
           </Text>
         </View>
-        {isDraft ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {isDraft && (
+            <Pressable
+              style={styles.editButton}
+              onPress={() =>
+                router.push({
+                  pathname: '/document/edit',
+                  params: { type: doc.doc_type, id: doc.id },
+                })
+              }
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Edit draft"
+            >
+              <Edit2 color={theme.brandAnchor} size={20} />
+            </Pressable>
+          )}
           <Pressable
-            style={styles.editButton}
-            onPress={() =>
-              router.push({
-                pathname: '/document/edit',
-                params: { type: doc.doc_type, id: doc.id },
-              })
-            }
+            style={[styles.editButton, isDraft ? { marginLeft: 8 } : null]}
+            onPress={handleSharePdf}
+            disabled={isOperating}
             hitSlop={12}
             accessibilityRole="button"
-            accessibilityLabel="Edit draft"
+            accessibilityLabel="Share PDF document"
           >
-            <Edit2 color={theme.brandAnchor} size={20} />
+            <Share2 color={theme.brandAnchor} size={20} />
           </Pressable>
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -474,8 +504,21 @@ export default function DocumentDetailScreen() {
                 ) : null}
               </View>
               {doc.customer_name ? (
-                <View style={styles.customerBlock}>
-                  <Text style={[styles.customerName, { color: theme.textPrimary }]}>{doc.customer_name}</Text>
+                <Pressable
+                  style={({ pressed }) => [styles.customerBlock, pressed && { opacity: 0.8 }]}
+                  onPress={() => {
+                    if (doc.customer_id) {
+                      router.push({ pathname: '/customer/[id]', params: { id: doc.customer_id } });
+                    }
+                  }}
+                  disabled={!doc.customer_id}
+                  accessibilityRole={doc.customer_id ? 'button' : undefined}
+                  accessibilityLabel={doc.customer_id ? `View customer ${doc.customer_name}` : undefined}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={[styles.customerName, { color: theme.textPrimary }]}>{doc.customer_name}</Text>
+                    {doc.customer_id && <ChevronRight size={16} color={theme.textMuted} />}
+                  </View>
                   {doc.customer_business_name && (
                     <Text style={[styles.customerBusiness, { color: theme.textSecondary }]}>
                       {doc.customer_business_name}
@@ -500,7 +543,7 @@ export default function DocumentDetailScreen() {
                       <Text style={[styles.customerAddress, { color: theme.textPrimary }]}>{doc.shipping_address}</Text>
                     </View>
                   ) : null}
-                </View>
+                </Pressable>
               ) : (
                 <Text style={[styles.noCustomerText, { color: theme.textMuted }]}>No customer assigned</Text>
               )}
@@ -835,6 +878,20 @@ export default function DocumentDetailScreen() {
                     styles.secondaryActionBtn,
                     { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
                   ]}
+                  onPress={handleSharePdf}
+                  disabled={isOperating}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share estimate PDF"
+                >
+                  <Share2 color={theme.textPrimary} size={18} />
+                  <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Share Estimate PDF</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.secondaryActionBtn,
+                    { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
+                  ]}
                   onPress={handleDuplicate}
                   disabled={isOperating}
                   accessibilityRole="button"
@@ -860,6 +917,20 @@ export default function DocumentDetailScreen() {
                 >
                   <ArrowRightLeft color={theme.surface} size={18} />
                   <Text style={[styles.primaryActionText, { color: theme.surface }]}>Convert to Invoice</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.secondaryActionBtn,
+                    { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
+                  ]}
+                  onPress={handleSharePdf}
+                  disabled={isOperating}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share estimate PDF"
+                >
+                  <Share2 color={theme.textPrimary} size={18} />
+                  <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Share Estimate PDF</Text>
                 </Pressable>
 
                 <Pressable
@@ -897,6 +968,20 @@ export default function DocumentDetailScreen() {
                     <Text style={[styles.primaryActionText, { color: theme.surface }]}>Record Payment</Text>
                   </Pressable>
                 )}
+
+                <Pressable
+                  style={[
+                    styles.secondaryActionBtn,
+                    { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
+                  ]}
+                  onPress={handleSharePdf}
+                  disabled={isOperating}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share invoice PDF"
+                >
+                  <Share2 color={theme.textPrimary} size={18} />
+                  <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Share Invoice PDF</Text>
+                </Pressable>
 
                 <Pressable
                   style={[

@@ -17,6 +17,7 @@ import {
   Pressable,
   useColorScheme,
   BackHandler,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,9 +29,12 @@ import {
   CreditCard,
   Hash,
   ChevronRight,
+  Share2,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { PaymentRepository, ReceiptRecord } from '../../data/repositories/PaymentRepository';
+import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
+import { PdfService } from '../../services/pdf/PdfService';
 import { createMoney, formatMoney } from '../../domain/money/Money';
 
 export default function ReceiptDetailScreen() {
@@ -42,6 +46,7 @@ export default function ReceiptDetailScreen() {
   const [receipt, setReceipt] = useState<ReceiptRecord | null>(null);
   const [snapshot, setSnapshot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isSharing, setIsSharing] = useState(false);
 
   // Android hardware back handler
   useEffect(() => {
@@ -70,6 +75,23 @@ export default function ReceiptDetailScreen() {
     }
     loadReceipt();
   }, [id]);
+
+  async function handleShareReceiptPdf() {
+    if (!receipt) return;
+    setIsSharing(true);
+    try {
+      const biz = await BusinessProfileRepository.getActiveProfile();
+      if (!biz) {
+        Alert.alert('Profile Needed', 'Please complete your business profile before sharing.');
+        return;
+      }
+      await PdfService.shareReceiptPdfAsync(receipt, biz);
+    } catch (err: any) {
+      Alert.alert('Share Failed', err.message || 'Could not export receipt PDF.');
+    } finally {
+      setIsSharing(false);
+    }
+  }
 
   if (loading || !receipt || !snapshot) {
     return (
@@ -102,7 +124,16 @@ export default function ReceiptDetailScreen() {
           <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>{receipt.receipt_number}</Text>
           <Text style={[styles.topBarSubtitle, { color: theme.textSecondary }]}>Payment receipt</Text>
         </View>
-        <View style={{ width: 44 }} />
+        <Pressable
+          style={styles.backButton}
+          onPress={handleShareReceiptPdf}
+          disabled={isSharing}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Share receipt PDF"
+        >
+          <Share2 color={theme.brandAnchor} size={20} />
+        </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -230,6 +261,23 @@ export default function ReceiptDetailScreen() {
               </>
             )}
           </View>
+
+          {/* Action Button */}
+          <Pressable
+            style={[
+              styles.shareActionBtn,
+              { backgroundColor: theme.brandAnchor, opacity: isSharing ? 0.6 : 1 },
+            ]}
+            onPress={handleShareReceiptPdf}
+            disabled={isSharing}
+            accessibilityRole="button"
+            accessibilityLabel="Share official PDF receipt"
+          >
+            <Share2 color={theme.surface} size={18} />
+            <Text style={[styles.shareActionText, { color: theme.surface }]}>
+              {isSharing ? 'Generating PDF...' : 'Share Receipt PDF'}
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -407,5 +455,19 @@ const styles = StyleSheet.create({
     fontSize: typography.caption.fontSize,
     lineHeight: 18,
     marginTop: 4,
+  },
+  shareActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    width: '100%',
+    height: 48,
+    borderRadius: radii.md,
+    marginTop: spacing.xl,
+  },
+  shareActionText: {
+    fontSize: typography.bodyMedium.fontSize,
+    fontWeight: '600',
   },
 });

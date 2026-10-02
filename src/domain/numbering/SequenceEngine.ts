@@ -26,6 +26,26 @@ export const DEFAULT_SEQUENCE_CONFIGS: Record<string, Omit<NumberSequenceConfig,
     suffix: '',
     padding: 4,
   },
+  credit_note: {
+    prefix: 'CRN-',
+    suffix: '',
+    padding: 4,
+  },
+  proforma: {
+    prefix: 'PRO-',
+    suffix: '',
+    padding: 4,
+  },
+  delivery_note: {
+    prefix: 'DEL-',
+    suffix: '',
+    padding: 4,
+  },
+  work_order: {
+    prefix: 'WO-',
+    suffix: '',
+    padding: 4,
+  },
 };
 
 /**

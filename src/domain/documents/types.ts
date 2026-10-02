@@ -10,7 +10,14 @@ import { TaxType } from '../tax/TaxEngine';
  */
 export const QUANTITY_SCALE = 10_000n;
 
-export type DocumentType = 'invoice' | 'estimate' | 'receipt';
+export type DocumentType =
+  | 'invoice'
+  | 'estimate'
+  | 'receipt'
+  | 'credit_note'
+  | 'proforma'
+  | 'delivery_note'
+  | 'work_order';
 
 /**
  * Orthogonal document lifecycle statuses
@@ -49,6 +56,9 @@ export interface LineItemCalculation {
   readonly unitName: string;
   readonly unitPriceMinor: bigint;
   readonly lineTotalMinor: bigint;
+  readonly internalCostMinor: bigint;
+  readonly profitMinor: bigint;
+  readonly category?: string | null;
 }
 
 export interface LineItemInput {
@@ -58,6 +68,8 @@ export interface LineItemInput {
   readonly quantityScaled: bigint;
   readonly unitName?: string;
   readonly unitPriceMinor: bigint;
+  readonly internalCostMinor?: bigint;
+  readonly category?: string | null;
 }
 
 export interface DocumentCalculationInput {
@@ -86,6 +98,9 @@ export interface DocumentCalculationOutput {
   readonly deposit: Money;
   readonly paid: Money;
   readonly balance: Money;
+  readonly totalInternalCost: Money;
+  readonly grossProfit: Money;
+  readonly marginBasisPoints: number; // e.g. 2500 bp = 25.00%
   readonly paymentStatus: PaymentStatus;
   readonly isOverdue: boolean;
 }
