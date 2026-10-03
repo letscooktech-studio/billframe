@@ -62,6 +62,7 @@ import { SignatureModal } from '../../features/signature/SignatureModal';
 import { CustomerStatementModal } from '../../features/statements/CustomerStatementModal';
 import { TaxExplainabilityEngine } from '../../domain/tax/TaxExplainability';
 import { TaxExplanationModal } from '../../features/tax/TaxExplanationModal';
+import { showAlert } from '../../utils/alert';
 
 export default function DocumentDetailScreen() {
   const router = useRouter();
@@ -207,10 +208,10 @@ export default function DocumentDetailScreen() {
       if (updated) {
         setFxRateTick((prev) => prev + 1);
       } else {
-        Alert.alert('Offline Mode', 'Could not reach live market rate servers. Using ECB official reference rate.');
+        showAlert('Offline Mode', 'Could not reach live market rate servers. Using ECB official reference rate.');
       }
     } catch {
-      Alert.alert('Network Error', 'Unable to fetch real-time market rates right now.');
+      showAlert('Network Error', 'Unable to fetch real-time market rates right now.');
     } finally {
       setIsRefreshingFx(false);
     }
@@ -272,7 +273,7 @@ export default function DocumentDetailScreen() {
       await DocumentRepository.issueDocument(doc!.id);
       await loadData();
     } catch (err: any) {
-      Alert.alert('Issuance Failed', err.message || 'Document could not be issued.');
+      showAlert('Issuance Failed', err.message || 'Document could not be issued.');
     } finally {
       isSubmittingRef.current = false;
       setIsOperating(false);
@@ -287,7 +288,7 @@ export default function DocumentDetailScreen() {
       await DocumentRepository.acceptEstimate(doc!.id);
       await loadData();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to accept estimate.');
+      showAlert('Error', err.message || 'Failed to accept estimate.');
     } finally {
       isSubmittingRef.current = false;
       setIsOperating(false);
@@ -302,7 +303,7 @@ export default function DocumentDetailScreen() {
       await DocumentRepository.acceptEstimateWithSignature(doc!.id, signatureUri);
       await loadData();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to accept estimate with signature.');
+      showAlert('Error', err.message || 'Failed to accept estimate with signature.');
     } finally {
       isSubmittingRef.current = false;
       setIsOperating(false);
@@ -315,12 +316,12 @@ export default function DocumentDetailScreen() {
     try {
       const biz = await BusinessProfileRepository.getActiveProfile();
       if (!biz) {
-        Alert.alert('Profile Needed', 'Please complete your business profile in Settings before exporting PDF.');
+        showAlert('Profile Needed', 'Please complete your business profile in Settings before exporting PDF.');
         return;
       }
       await PdfService.shareDocumentPdfAsync(doc, biz, 'standard');
     } catch (err: any) {
-      Alert.alert('PDF Export Failed', err.message || 'Could not compile PDF.');
+      showAlert('PDF Export Failed', err.message || 'Could not compile PDF.');
     } finally {
       setIsOperating(false);
     }
@@ -337,7 +338,7 @@ export default function DocumentDetailScreen() {
         params: { type: cloned.doc_type, id: cloned.id },
       });
     } catch (err: any) {
-      Alert.alert('Duplicate Failed', err.message || 'Failed to duplicate document.');
+      showAlert('Duplicate Failed', err.message || 'Failed to duplicate document.');
     } finally {
       isSubmittingRef.current = false;
       setIsOperating(false);
@@ -352,7 +353,7 @@ export default function DocumentDetailScreen() {
       await DocumentRepository.rejectEstimate(doc!.id);
       await loadData();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to reject estimate.');
+      showAlert('Error', err.message || 'Failed to reject estimate.');
     } finally {
       isSubmittingRef.current = false;
       setIsOperating(false);
@@ -370,7 +371,7 @@ export default function DocumentDetailScreen() {
         params: { type: 'invoice', id: newInvoice.id },
       });
     } catch (err: any) {
-      Alert.alert('Conversion Failed', err.message || 'Failed to convert estimate to invoice.');
+      showAlert('Conversion Failed', err.message || 'Failed to convert estimate to invoice.');
     } finally {
       isSubmittingRef.current = false;
       setIsOperating(false);
@@ -379,7 +380,7 @@ export default function DocumentDetailScreen() {
 
   async function handleVoid() {
     if (isSubmittingRef.current) return;
-    Alert.alert(
+    showAlert(
       'Void Document',
       'Are you sure you want to void this issued document? This cannot be undone and will remain in records for compliance.',
       [
@@ -395,7 +396,7 @@ export default function DocumentDetailScreen() {
               await DocumentRepository.voidDocument(doc!.id);
               await loadData();
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to void document.');
+              showAlert('Error', err.message || 'Failed to void document.');
             } finally {
               isSubmittingRef.current = false;
               setIsOperating(false);
@@ -408,7 +409,7 @@ export default function DocumentDetailScreen() {
 
   async function handleDeleteDraft() {
     if (isSubmittingRef.current) return;
-    Alert.alert(
+    showAlert(
       'Delete Draft',
       'Are you sure you want to delete this draft?',
       [
@@ -424,7 +425,7 @@ export default function DocumentDetailScreen() {
               await DocumentRepository.deleteDraft(doc!.id);
               router.back();
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete draft.');
+              showAlert('Error', err.message || 'Failed to delete draft.');
             } finally {
               isSubmittingRef.current = false;
               setIsOperating(false);
@@ -1063,7 +1064,7 @@ export default function DocumentDetailScreen() {
                         <Pressable
                           style={[styles.flexButton, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
                           onPress={() => {
-                            Alert.alert('UPI ID', effectiveVpa, [{ text: 'OK' }]);
+                            showAlert('UPI ID', effectiveVpa, [{ text: 'OK' }]);
                           }}
                           accessibilityRole="button"
                           accessibilityLabel="View UPI ID"

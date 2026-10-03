@@ -31,6 +31,7 @@ import { ExchangeRateEngine } from '../domain/money/ExchangeRateEngine';
 import { UpiQrCode } from '../components/common/UpiQrCode';
 import { parseDecimalStringToMoney, moneyToDecimalString, createMoney } from '../domain/money/Money';
 import { CustomerPickerModal } from '../features/customers/CustomerPickerModal';
+import { showAlert } from '../utils/alert';
 
 export default function QuickBillScreen() {
   const router = useRouter();
@@ -45,6 +46,7 @@ export default function QuickBillScreen() {
   const [isPaidNow, setIsPaidNow] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer' | 'upi' | 'card'>('upi');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
 
@@ -103,10 +105,10 @@ export default function QuickBillScreen() {
       if (updated) {
         setFxRateTick((prev) => prev + 1);
       } else {
-        Alert.alert('Offline Mode', 'Could not reach live market rate servers. Using ECB official reference rate.');
+        showAlert('Offline Mode', 'Could not reach live market rate servers. Using ECB official reference rate.');
       }
     } catch {
-      Alert.alert('Network Error', 'Unable to fetch real-time market rates right now.');
+      showAlert('Network Error', 'Unable to fetch real-time market rates right now.');
     } finally {
       setIsRefreshingFx(false);
     }
@@ -171,9 +173,9 @@ export default function QuickBillScreen() {
       setCustomPayeeVpa('');
       setCustomPayeeName('');
       setIsEditingPayee(false);
-      Alert.alert('UPI ID Saved', `Saved ${val.normalizedVpa} to your business profile.`);
+      showAlert('UPI ID Saved', `Saved ${val.normalizedVpa} to your business profile.`);
     } catch (err: any) {
-      Alert.alert('Save Failed', err.message || 'Could not save profile.');
+      showAlert('Save Failed', err.message || 'Could not save profile.');
     } finally {
       setIsSavingProfileVpa(false);
     }
@@ -200,8 +202,13 @@ export default function QuickBillScreen() {
     setInlineVpaError(null);
   };
 
-  const executeIssueBill = async (targetCustomer: CustomerRecord, parsedAmountMinor: bigint) => {
+  const executeIssueBill = async (
+    targetCustomer: CustomerRecord,
+    parsedAmountMinor: bigint,
+    itemDescription: string
+  ) => {
     setLoading(true);
+    setErrorMessage(null);
     try {
       // 2. Create and autosave draft invoice
       const draft = await DocumentRepository.saveDraft({
@@ -211,7 +218,7 @@ export default function QuickBillScreen() {
         issueDate: Date.now(),
         items: [
           {
-            description: description.trim(),
+            description: itemDescription,
             quantityScaled: 10000n, // 1.0 item
             unitName: 'item',
             unitPriceMinor: parsedAmountMinor,
@@ -236,44 +243,47 @@ export default function QuickBillScreen() {
       // 5. Navigate directly to view the issued document
       router.replace(`/document/${issuedInvoice.id}` as any);
     } catch (err: any) {
-      Alert.alert('Error Creating Bill', err.message || 'An unexpected error occurred.');
+      const msg = err.message || 'An unexpected error occurred while creating the bill.';
+      setErrorMessage(msg);
+      showAlert('Error Creating Bill', msg);
       setLoading(false);
     }
   };
 
   const handleIssueQuickBill = async () => {
-    const custName = customer?.name || quickCustomerName.trim();
-    if (!custName) {
-      Alert.alert('Customer Required', 'Please select a customer or type a customer name.');
-      return;
-    }
+    setErrorMessage(null);
 
-    if (!description.trim()) {
-      Alert.alert('Description Required', 'Please enter a brief description for this bill.');
-      return;
-    }
+    // 1. Resolve customer: use selected, typed, or auto-default to 'Walk-in Customer'
+    const custName = (customer?.name || quickCustomerName.trim()) || 'Walk-in Customer';
+
+    // 2. Resolve line item description: use typed or auto-default to 'Quick Bill'
+    const itemDescription = description.trim() || 'Quick Bill';
 
     let parsedAmountMinor = 0n;
     try {
-      const money = parseDecimalStringToMoney(amountStr.trim(), currency);
+      const money = parseDecimalStringToMoney(amountStr.trim() || '0', currency);
       parsedAmountMinor = money.amountMinor;
       if (parsedAmountMinor <= 0n) {
         throw new Error();
       }
     } catch {
-      Alert.alert('Invalid Amount', 'Please enter a valid billing amount greater than zero.');
+      const msg = 'Please enter a valid billing amount greater than zero.';
+      setErrorMessage(msg);
+      showAlert('Invalid Amount', msg);
       return;
     }
 
-    // 1. Resolve or create customer
+    // 3. Resolve or create customer record
     let targetCustomer = customer;
     if (!targetCustomer) {
       try {
-        targetCustomer = await CustomerRepository.createCustomer({
+        targetCustomer = await CustomerRepository.create({
           name: custName,
         });
       } catch (err: any) {
-        Alert.alert('Customer Error', err.message || 'Could not create customer record.');
+        const msg = err.message || 'Could not create customer record.';
+        setErrorMessage(msg);
+        showAlert('Customer Error', msg);
         return;
       }
     }
@@ -281,9 +291,9 @@ export default function QuickBillScreen() {
     // Cross-Currency UPI Warning & Confirmation (per NPCI regulations)
     if (isPaidNow && paymentMethod === 'upi' && currency !== 'INR' && quickUpiResult?.inrAmountMinor) {
       const inrAmountFormatted = moneyToDecimalString(createMoney(quickUpiResult.inrAmountMinor, 'INR'));
-      Alert.alert(
+      showAlert(
         'Confirm Cross-Currency UPI',
-        `You are billing ${amountStr} ${currency}. UPI apps (GPay, PhonePe, Paytm, BHIM) strictly transact in Indian Rupees (INR).\n\nAt the current live market exchange rate, this charges ₹${inrAmountFormatted} INR.\n\nAre you sure you want to proceed with this payment?`,
+        `You are billing ${amountStr} ${currency}. UPI apps strictly transact in Indian Rupees (INR).\n\nAt the current live market exchange rate, this charges ₹${inrAmountFormatted} INR.\n\nAre you sure you want to proceed with this payment?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -295,14 +305,14 @@ export default function QuickBillScreen() {
           },
           {
             text: `Keep ${currency} & Issue`,
-            onPress: () => executeIssueBill(targetCustomer!, parsedAmountMinor),
+            onPress: () => executeIssueBill(targetCustomer!, parsedAmountMinor, itemDescription),
           },
         ]
       );
       return;
     }
 
-    await executeIssueBill(targetCustomer, parsedAmountMinor);
+    await executeIssueBill(targetCustomer, parsedAmountMinor, itemDescription);
   };
 
   return (
@@ -790,7 +800,7 @@ export default function QuickBillScreen() {
                           { backgroundColor: theme.surface, borderColor: theme.borderSubtle },
                         ]}
                         onPress={() => {
-                          Alert.alert('UPI ID', effectiveVpa, [{ text: 'OK' }]);
+                          showAlert('UPI ID', effectiveVpa, [{ text: 'OK' }]);
                         }}
                         accessibilityRole="button"
                         accessibilityLabel="View UPI ID"
@@ -806,6 +816,14 @@ export default function QuickBillScreen() {
               </View>
             )}
           </View>
+
+          {/* Validation & Execution Error Banner */}
+          {errorMessage && (
+            <View style={[styles.errorBanner, { backgroundColor: theme.surfaceSecondary, borderColor: theme.statusDanger, marginBottom: spacing.md }]}>
+              <AlertCircle size={16} color={theme.statusDanger} />
+              <Text style={[styles.errorBannerText, { color: theme.statusDanger }]}>{errorMessage}</Text>
+            </View>
+          )}
 
           {/* Issue Button */}
           <Pressable

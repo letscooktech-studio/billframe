@@ -68,6 +68,7 @@ import {
 } from '../../features/items/ItemEditorModal';
 import { TaxExplainabilityEngine } from '../../domain/tax/TaxExplainability';
 import { TaxExplanationModal } from '../../features/tax/TaxExplanationModal';
+import { showAlert } from '../../utils/alert';
 
 const COMMON_CURRENCIES = [
   { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
@@ -531,11 +532,9 @@ export default function DocumentEditScreen() {
     const effectiveName = (customer?.name || inlineCustomerName).trim();
 
     if (!effectiveName) {
-      setServerErrorMessage(`Client or business name is required before issuing this official ${docType}.`);
-      Alert.alert(
-        'Client Name Required',
-        `Please enter or select a client/customer name before issuing this official ${docType}.`
-      );
+      const msg = `Client or business name is required before issuing this official ${docType}.`;
+      setServerErrorMessage(msg);
+      showAlert('Client Name Required', msg);
       return;
     }
 
@@ -553,7 +552,7 @@ export default function DocumentEditScreen() {
       } catch (err: any) {
         const msg = err.message || 'Failed to create customer record';
         setServerErrorMessage(msg);
-        Alert.alert('Customer Creation Error', msg);
+        showAlert('Customer Creation Error', msg);
         return;
       }
     }
@@ -584,11 +583,9 @@ export default function DocumentEditScreen() {
     }
 
     if (activeItems.length === 0) {
-      setServerErrorMessage(`At least one product or service line item with a price is required.`);
-      Alert.alert(
-        'Line Item Required',
-        `Please add at least one line item (service or product) with a price before issuing this ${docType}.`
-      );
+      const msg = `Please add at least one line item (service or product) with a price before issuing this ${docType}.`;
+      setServerErrorMessage(msg);
+      showAlert('Line Item Required', msg);
       return;
     }
 
@@ -598,19 +595,19 @@ export default function DocumentEditScreen() {
       if (!itm.description?.trim()) {
         const msg = `Line item #${i + 1} is missing a description.`;
         setServerErrorMessage(msg);
-        Alert.alert('Incomplete Item', msg);
+        showAlert('Incomplete Item', msg);
         return;
       }
       if (itm.quantityScaled <= 0n) {
         const msg = `Line item #${i + 1} ("${itm.description}") must have a quantity greater than zero.`;
         setServerErrorMessage(msg);
-        Alert.alert('Invalid Quantity', msg);
+        showAlert('Invalid Quantity', msg);
         return;
       }
       if (itm.unitPriceMinor < 0n) {
         const msg = `Line item #${i + 1} ("${itm.description}") cannot have a negative unit price.`;
         setServerErrorMessage(msg);
-        Alert.alert('Invalid Price', msg);
+        showAlert('Invalid Price', msg);
         return;
       }
     }
@@ -649,7 +646,7 @@ export default function DocumentEditScreen() {
     } catch (err: any) {
       const msg = err.message || 'Failed to issue document';
       setServerErrorMessage(msg);
-      Alert.alert('Unable to Issue Document', msg);
+      showAlert('Unable to Issue Document', msg);
       setIsIssuing(false);
       isSubmittingRef.current = false;
     }
@@ -728,7 +725,7 @@ export default function DocumentEditScreen() {
         depositMinor: calculatedDepositMinor,
       });
       setSaveStatus('saved');
-      Alert.alert(
+      showAlert(
         'Draft Saved',
         `Your ${docType === 'invoice' ? 'invoice' : 'estimate'} draft was saved successfully.`,
         [
@@ -743,7 +740,7 @@ export default function DocumentEditScreen() {
       setSaveStatus('unsaved');
       const msg = err.message || 'Failed to save draft';
       setServerErrorMessage(msg);
-      Alert.alert('Save Failed', msg);
+      showAlert('Save Failed', msg);
     } finally {
       setIsSavingManual(false);
     }
@@ -1711,6 +1708,14 @@ export default function DocumentEditScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Validation / Execution Error Banner right above action buttons */}
+            {serverErrorMessage && (
+              <View style={[styles.errorBanner, { backgroundColor: theme.surfaceSecondary, borderColor: theme.statusDanger, marginBottom: spacing.md }]}>
+                <AlertCircle color={theme.statusDanger} size={18} />
+                <Text style={[styles.errorBannerText, { color: theme.statusDanger }]}>{serverErrorMessage}</Text>
+              </View>
+            )}
 
             {/* 8. Action Buttons (Save Draft + Issue Official Document) */}
             <View style={styles.bottomButtonsRow}>
