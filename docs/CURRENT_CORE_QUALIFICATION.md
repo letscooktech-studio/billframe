@@ -59,7 +59,7 @@
 | **Exit Code** | 0 |
 | **Build Time** | 2 minutes |
 | **Actionable Tasks** | 59 executed, 431 up-to-date |
-| **APK Location** | `android/app/build/outputs/apk/debug/app-debug.apk` |
+| **APK Location** | `android/app/build/outputs/apk/debug/app-debug.apk`<br>`Billframe-Latest.apk` (project root) |
 | **Result** | ✅ PASS |
 
 **Note:** System default `JAVA_HOME` points to JRE 1.8 which fails Gradle. JDK 17 (Eclipse Adoptium) must be used. `JAVA_HOME` must be set explicitly per session or globally. Tracked for developer environment doc.
