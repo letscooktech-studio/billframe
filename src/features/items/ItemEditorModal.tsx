@@ -170,10 +170,15 @@ export function ItemEditorModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
       >
         <View style={[styles.sheetContainer, { backgroundColor: theme.surface }]}>
+          {/* Grab Handle */}
+          <View style={styles.handleContainer}>
+            <View style={[styles.handleBar, { backgroundColor: theme.borderSubtle }]} />
+          </View>
+
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.borderSubtle }]}>
             <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
@@ -310,7 +315,7 @@ export function ItemEditorModal({
                         style={[
                           styles.unitPresetText,
                           {
-                            color: isSelected ? theme.surface : theme.textSecondary,
+                            color: isSelected ? theme.brandAnchorText : theme.textSecondary,
                             fontWeight: isSelected ? '600' : '400',
                           },
                         ]}
@@ -402,7 +407,7 @@ export function ItemEditorModal({
                   accessibilityRole="button"
                   accessibilityLabel="Save line item"
                 >
-                  <Text style={[styles.saveBtnText, { color: theme.surface }]}>
+                  <Text style={[styles.saveBtnText, { color: theme.brandAnchorText }]}>
                     {item ? 'Update Item' : 'Add Item'}
                   </Text>
                 </Pressable>
@@ -423,9 +428,19 @@ const styles = StyleSheet.create({
   },
   sheetContainer: {
     maxHeight: '90%',
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
     paddingBottom: spacing.xxl,
+  },
+  handleContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  handleBar: {
+    width: 38,
+    height: 4,
+    borderRadius: radii.full,
   },
   header: {
     flexDirection: 'row',

@@ -87,7 +87,7 @@ describe('PDF Template Engine & Security Boundary', () => {
     ],
   };
 
-  it('renders standard, compact, and modern templates cleanly', () => {
+  it('renders standard, compact, modern, executive, and minimal templates cleanly', () => {
     const standardHtml = PdfService.generateDocumentHtml(mockDocument, mockBusiness, 'standard');
     expect(standardHtml).toContain('Acme Carpentry LLC');
     expect(standardHtml).toContain('INV-0101');
@@ -103,10 +103,28 @@ describe('PDF Template Engine & Security Boundary', () => {
     const modernHtml = PdfService.generateDocumentHtml(mockDocument, mockBusiness, 'modern');
     expect(modernHtml).toContain('INV-0101');
     expect(modernHtml).toContain('Jobsite 7B, North Ridge');
+
+    const execHtml = PdfService.generateDocumentHtml(mockDocument, mockBusiness, 'executive');
+    expect(execHtml).toContain('Acme Carpentry LLC');
+    expect(execHtml).toContain('INV-0101');
+    expect(execHtml).toContain('$540.00');
+    expect(execHtml).toContain('$240.00');
+
+    const minHtml = PdfService.generateDocumentHtml(mockDocument, mockBusiness, 'minimal');
+    expect(minHtml).toContain('Acme Carpentry LLC');
+    expect(minHtml).toContain('INV-0101');
+    expect(minHtml).toContain('$540.00');
+    expect(minHtml).toContain('$240.00');
   });
 
   it('CRITICAL PRIVACY TEST: strictly protects internal contractor costs and notes from rendering on PDF', () => {
-    const templates: ('standard' | 'compact' | 'modern')[] = ['standard', 'compact', 'modern'];
+    const templates: ('standard' | 'compact' | 'modern' | 'executive' | 'minimal')[] = [
+      'standard',
+      'compact',
+      'modern',
+      'executive',
+      'minimal',
+    ];
 
     for (const t of templates) {
       const html = PdfService.generateDocumentHtml(mockDocument, mockBusiness, t);
@@ -151,5 +169,61 @@ describe('PDF Template Engine & Security Boundary', () => {
     expect(receiptHtml).toContain('$200.00');
     expect(receiptHtml).toContain('WIRE-TX-9981');
     expect(receiptHtml).toContain('$240.00');
+  });
+
+  it('renders direct offline UPI QR code on INR invoices when merchant VPA is present', () => {
+    const indianBusiness: BusinessProfile = {
+      ...mockBusiness,
+      country: 'IN',
+      country_iso2: 'IN',
+      default_currency: 'INR',
+      upi_vpa: 'techcraft@okaxis',
+      legal_name: 'TechCraft Solutions Pvt Ltd',
+    };
+
+    const inrInvoice: FullDocument = {
+      ...mockDocument,
+      currency: 'INR',
+      balance_minor: 150000, // ₹1,500.00
+      total_minor: 150000,
+      subtotal_minor: 150000,
+    };
+
+    const html = PdfService.generateDocumentHtml(inrInvoice, indianBusiness, 'standard');
+    expect(html).toContain('Scan &amp; Pay via UPI (0% Fee)');
+    expect(html).toContain('techcraft@okaxis');
+    expect(html).toContain('<svg');
+    expect(html).toContain('viewBox');
+  });
+
+  it('renders direct offline UPI QR code on foreign USD invoices with INR conversion when merchant VPA is present', () => {
+    const indianBusiness: BusinessProfile = {
+      ...mockBusiness,
+      country: 'IN',
+      country_iso2: 'IN',
+      default_currency: 'INR',
+      upi_vpa: 'techcraft@okaxis',
+      legal_name: 'TechCraft Solutions Pvt Ltd',
+    };
+
+    const usdInvoice: FullDocument = {
+      ...mockDocument,
+      currency: 'USD',
+      balance_minor: 10000, // $100.00
+      total_minor: 10000,
+      subtotal_minor: 10000,
+    };
+
+    const standardHtml = PdfService.generateDocumentHtml(usdInvoice, indianBusiness, 'standard');
+    expect(standardHtml).toContain('Scan &amp; Pay via UPI (0% Fee)');
+    expect(standardHtml).toContain('techcraft@okaxis');
+    expect(standardHtml).toContain('Pay: ₹');
+    expect(standardHtml).toContain('<svg');
+
+    const execHtml = PdfService.generateDocumentHtml(usdInvoice, indianBusiness, 'executive');
+    expect(execHtml).toContain('Instant Settlement');
+    expect(execHtml).toContain('techcraft@okaxis');
+    expect(execHtml).toContain('Scan to pay ₹');
+    expect(execHtml).toContain('<svg');
   });
 });

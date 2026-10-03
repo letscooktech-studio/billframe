@@ -14,6 +14,7 @@ import {
   FlatList,
   Modal,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   useColorScheme,
 } from 'react-native';
@@ -24,6 +25,7 @@ import { CustomerRepository, CustomerRecord } from '../../data/repositories/Cust
 interface CustomerPickerModalProps {
   visible: boolean;
   selectedCustomerId?: string | null;
+  initialQuickAdd?: boolean;
   onSelectCustomer: (customer: CustomerRecord) => void;
   onClose: () => void;
 }
@@ -31,6 +33,7 @@ interface CustomerPickerModalProps {
 export function CustomerPickerModal({
   visible,
   selectedCustomerId,
+  initialQuickAdd = false,
   onSelectCustomer,
   onClose,
 }: CustomerPickerModalProps) {
@@ -51,10 +54,10 @@ export function CustomerPickerModal({
   useEffect(() => {
     if (visible) {
       loadCustomers(searchQuery);
-      setIsCreatingQuick(false);
+      setIsCreatingQuick(Boolean(initialQuickAdd));
       setQuickError(null);
     }
-  }, [visible, searchQuery]);
+  }, [visible, searchQuery, initialQuickAdd]);
 
   async function loadCustomers(query: string) {
     const list = await CustomerRepository.search(query);
@@ -85,10 +88,15 @@ export function CustomerPickerModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
       >
         <View style={[styles.sheetContainer, { backgroundColor: theme.surface }]}>
+          {/* Grab Handle */}
+          <View style={styles.handleContainer}>
+            <View style={[styles.handleBar, { backgroundColor: theme.borderSubtle }]} />
+          </View>
+
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.borderSubtle }]}>
             <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
@@ -105,7 +113,11 @@ export function CustomerPickerModal({
           </View>
 
           {isCreatingQuick ? (
-            <View style={styles.formContainer}>
+            <ScrollView
+              contentContainerStyle={styles.formContainer}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               {quickError && <Text style={[styles.errorText, { color: theme.statusDanger }]}>{quickError}</Text>}
 
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Full Name *</Text>
@@ -164,10 +176,10 @@ export function CustomerPickerModal({
                   style={[styles.saveBtn, { backgroundColor: theme.brandAnchor }]}
                   onPress={handleQuickAdd}
                 >
-                  <Text style={[styles.saveBtnText, { color: theme.surface }]}>Save & Select</Text>
+                  <Text style={[styles.saveBtnText, { color: theme.brandAnchorText }]}>Save & Select</Text>
                 </Pressable>
               </View>
-            </View>
+            </ScrollView>
           ) : (
             <>
               {/* Search bar + Quick Add button */}
@@ -188,7 +200,7 @@ export function CustomerPickerModal({
                   accessibilityRole="button"
                   accessibilityLabel="Quick add new customer"
                 >
-                  <Plus color={theme.surface} size={18} strokeWidth={2.5} />
+                  <Plus color={theme.brandAnchorText} size={18} strokeWidth={2.5} />
                 </Pressable>
               </View>
 
@@ -237,7 +249,7 @@ export function CustomerPickerModal({
                       style={[styles.createFirstBtn, { backgroundColor: theme.brandAnchor }]}
                       onPress={() => setIsCreatingQuick(true)}
                     >
-                      <Text style={[styles.createFirstBtnText, { color: theme.surface }]}>Add Customer</Text>
+                      <Text style={[styles.createFirstBtnText, { color: theme.brandAnchorText }]}>Add Customer</Text>
                     </Pressable>
                   </View>
                 }
@@ -257,10 +269,20 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    maxHeight: '85%',
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
+    maxHeight: '88%',
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
     paddingBottom: spacing.xxl,
+  },
+  handleContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  handleBar: {
+    width: 38,
+    height: 4,
+    borderRadius: radii.full,
   },
   header: {
     flexDirection: 'row',

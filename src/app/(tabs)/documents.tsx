@@ -4,7 +4,7 @@
  * Supports real-time text search, type filters, and lifecycle filters.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,14 +12,21 @@ import {
   FlatList,
   TextInput,
   Pressable,
+  Platform,
   useColorScheme,
+  Modal,
+  Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, FileText, Plus, ChevronRight } from 'lucide-react-native';
+import { Search, FileText, Plus, ChevronRight, QrCode, Zap, FilePlus2, X } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
+import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
+import { BusinessProfile } from '../../domain/profile/types';
 import { formatMoney } from '../../domain/money/Money';
+import { DocumentUpiModal } from '../../features/payments/DocumentUpiModal';
+import { PaymentRecordModal } from '../../features/payments/PaymentRecordModal';
 
 interface DocumentListItem {
   id: string;
@@ -27,6 +34,7 @@ interface DocumentListItem {
   document_number: string;
   customer_name: string;
   total_minor: number;
+  balance_minor?: number;
   currency: string;
   lifecycle_status: string;
   issue_date: number;
@@ -42,51 +50,124 @@ export default function DocumentsScreen() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [locale, setLocale] = useState('en-US');
+  const [profile, setProfile] = useState<BusinessProfile | null>(null);
+  const [upiDoc, setUpiDoc] = useState<DocumentListItem | null>(null);
+  const [recordPaymentDoc, setRecordPaymentDoc] = useState<DocumentListItem | null>(null);
+  const [showCreateSheet, setShowCreateSheet] = useState(false);
 
   const loadDocuments = useCallback(async () => {
     try {
+      const activeProfile = await BusinessProfileRepository.getActiveProfile();
+      setProfile(activeProfile);
+      if (activeProfile?.default_document_locale) {
+        setLocale(activeProfile.default_document_locale);
+      }
+
       const db = await DatabaseManager.getDatabaseAsync();
 
-      const profile = await db.getFirstAsync<{ default_document_locale: string }>(
-        'SELECT default_document_locale FROM business_profiles WHERE is_active = 1 LIMIT 1;'
-      );
-      if (profile?.default_document_locale) {
-        setLocale(profile.default_document_locale);
+      let items: DocumentListItem[] = [];
+
+      if (selectedType === 'receipt') {
+        try {
+          let rQuery = `
+            SELECT r.id, 'receipt' AS doc_type, r.receipt_number AS document_number,
+                   COALESCE(c.name, 'Customer') AS customer_name,
+                   COALESCE(p.amount_minor, 0) AS total_minor,
+                   0 AS balance_minor,
+                   COALESCE(d.currency, 'INR') AS currency,
+                   'paid' AS lifecycle_status,
+                   r.issue_date
+            FROM receipts r
+            LEFT JOIN payments p ON r.payment_id = p.id
+            LEFT JOIN documents d ON r.invoice_id = d.id
+            LEFT JOIN customers c ON d.customer_id = c.id
+          `;
+          const rParams: any[] = [];
+          if (searchQuery.trim()) {
+            rQuery += ' WHERE (r.receipt_number LIKE ? OR c.name LIKE ? OR p.reference LIKE ?)';
+            const wild = `%${searchQuery.trim()}%`;
+            rParams.push(wild, wild, wild);
+          }
+          rQuery += ' ORDER BY r.issue_date DESC';
+          items = await db.getAllAsync<DocumentListItem>(rQuery, rParams);
+        } catch {
+          items = [];
+        }
+      } else {
+        let query = `
+          SELECT d.id, d.doc_type, d.document_number, COALESCE(c.name, 'No customer') AS customer_name,
+                 d.total_minor, d.balance_minor, d.currency, d.lifecycle_status, d.issue_date
+          FROM documents d
+          LEFT JOIN customers c ON d.customer_id = c.id
+          WHERE d.is_archived = 0
+        `;
+        const params: any[] = [];
+
+        if (selectedType !== 'all') {
+          query += ' AND d.doc_type = ?';
+          params.push(selectedType);
+        }
+
+        if (selectedStatus !== 'all') {
+          query += ' AND d.lifecycle_status = ?';
+          params.push(selectedStatus);
+        }
+
+        if (searchQuery.trim()) {
+          query += ' AND (d.document_number LIKE ? OR c.name LIKE ? OR d.notes LIKE ?)';
+          const wild = `%${searchQuery.trim()}%`;
+          params.push(wild, wild, wild);
+        }
+
+        query += ' ORDER BY d.created_at DESC';
+        const docItems = await db.getAllAsync<DocumentListItem>(query, params);
+
+        if (selectedType === 'all' && (selectedStatus === 'all' || selectedStatus === 'issued')) {
+          try {
+            let rQuery = `
+              SELECT r.id, 'receipt' AS doc_type, r.receipt_number AS document_number,
+                     COALESCE(c.name, 'Customer') AS customer_name,
+                     COALESCE(p.amount_minor, 0) AS total_minor,
+                     0 AS balance_minor,
+                     COALESCE(d.currency, 'INR') AS currency,
+                     'paid' AS lifecycle_status,
+                     r.issue_date
+              FROM receipts r
+              LEFT JOIN payments p ON r.payment_id = p.id
+              LEFT JOIN documents d ON r.invoice_id = d.id
+              LEFT JOIN customers c ON d.customer_id = c.id
+            `;
+            const rParams: any[] = [];
+            if (searchQuery.trim()) {
+              rQuery += ' WHERE (r.receipt_number LIKE ? OR c.name LIKE ? OR p.reference LIKE ?)';
+              const wild = `%${searchQuery.trim()}%`;
+              rParams.push(wild, wild, wild);
+            }
+            rQuery += ' ORDER BY r.issue_date DESC';
+            const receiptItems = await db.getAllAsync<DocumentListItem>(rQuery, rParams);
+            items = [...docItems, ...receiptItems].sort((a, b) => b.issue_date - a.issue_date);
+          } catch {
+            items = docItems;
+          }
+        } else {
+          items = docItems;
+        }
       }
 
-      let query = `
-        SELECT d.id, d.doc_type, d.document_number, COALESCE(c.name, 'No customer') AS customer_name,
-               d.total_minor, d.currency, d.lifecycle_status, d.issue_date
-        FROM documents d
-        LEFT JOIN customers c ON d.customer_id = c.id
-        WHERE d.is_archived = 0
-      `;
-      const params: any[] = [];
-
+      // Strict client-side filter guarantee: NEVER show mismatched categories
       if (selectedType !== 'all') {
-        query += ' AND d.doc_type = ?';
-        params.push(selectedType);
+        items = items.filter((d) => d.doc_type === selectedType);
       }
 
-      if (selectedStatus !== 'all') {
-        query += ' AND d.lifecycle_status = ?';
-        params.push(selectedStatus);
-      }
-
-      if (searchQuery.trim()) {
-        query += ' AND (d.document_number LIKE ? OR c.name LIKE ? OR d.notes LIKE ?)';
-        const wild = `%${searchQuery.trim()}%`;
-        params.push(wild, wild, wild);
-      }
-
-      query += ' ORDER BY d.created_at DESC;';
-
-      const items = await db.getAllAsync<DocumentListItem>(query, params);
       setDocuments(items);
     } catch {
-      // Non-blocking
+      setDocuments([]);
     }
   }, [searchQuery, selectedType, selectedStatus]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   useFocusEffect(
     useCallback(() => {
@@ -96,8 +177,15 @@ export default function DocumentsScreen() {
 
   const renderItem = ({ item }: { item: DocumentListItem }) => {
     const isIssued = item.lifecycle_status === 'issued';
+    const isPaid = item.lifecycle_status === 'paid';
     const isVoid = item.lifecycle_status === 'void';
-    const statusColor = isIssued ? theme.statusIssued : isVoid ? theme.statusDanger : theme.statusDraft;
+    const statusColor = isPaid
+      ? theme.statusSuccess
+      : isIssued
+      ? theme.statusIssued
+      : isVoid
+      ? theme.statusDanger
+      : theme.statusDraft;
 
     return (
       <Pressable
@@ -109,8 +197,14 @@ export default function DocumentsScreen() {
             opacity: pressed ? 0.8 : 1,
           },
         ]}
-        onPress={() => router.push(`/document/${item.id}`)}
-        accessibilityRole="button"
+        onPress={() => {
+          if (item.doc_type === 'receipt') {
+            router.push(`/receipt/${item.id}`);
+          } else {
+            router.push(`/document/${item.id}`);
+          }
+        }}
+        accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
         accessibilityLabel={`${item.document_number}, ${item.customer_name}, ${item.lifecycle_status}`}
       >
         <View style={styles.rowMain}>
@@ -129,9 +223,32 @@ export default function DocumentsScreen() {
           </View>
 
           <View style={styles.rowRight}>
-            <Text style={[styles.docAmount, { color: theme.textPrimary }]}>
-              {formatMoney({ amountMinor: BigInt(item.total_minor), currency: item.currency }, locale)}
-            </Text>
+            <View style={styles.amountActionRow}>
+              {item.doc_type === 'invoice' && item.lifecycle_status === 'issued' && (
+                <Pressable
+                  style={[
+                    styles.qrCollectBtn,
+                    {
+                      backgroundColor: theme.surfaceSecondary,
+                      borderColor: theme.borderSubtle,
+                    },
+                  ]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setUpiDoc(item);
+                  }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Collect ${item.document_number} with UPI QR`}
+                >
+                  <QrCode size={13} color={theme.brandAnchor} />
+                  <Text style={[styles.qrCollectText, { color: theme.brandAnchor }]}>Pay QR</Text>
+                </Pressable>
+              )}
+              <Text style={[styles.docAmount, { color: theme.textPrimary }]}>
+                {formatMoney({ amountMinor: BigInt(item.total_minor), currency: item.currency }, locale)}
+              </Text>
+            </View>
             <View style={styles.statusRow}>
               <Text style={[styles.statusText, { color: statusColor }]}>{item.lifecycle_status.toUpperCase()}</Text>
               <ChevronRight color={theme.textMuted} size={16} />
@@ -152,9 +269,17 @@ export default function DocumentsScreen() {
             style={[styles.createBtn, { backgroundColor: theme.brandAnchor }]}
             accessibilityRole="button"
             accessibilityLabel="Create document"
-            onPress={() => router.push({ pathname: '/document/edit', params: { type: 'invoice' } })}
+            onPress={() => {
+              if (selectedType === 'estimate') {
+                router.push({ pathname: '/document/edit', params: { type: 'estimate' } });
+              } else if (selectedType === 'invoice') {
+                router.push({ pathname: '/document/edit', params: { type: 'invoice' } });
+              } else {
+                setShowCreateSheet(true);
+              }
+            }}
           >
-            <Plus color={theme.surface} size={18} strokeWidth={2.5} />
+            <Plus color={theme.brandAnchorText} size={18} strokeWidth={2.5} />
           </Pressable>
         </View>
 
@@ -191,7 +316,7 @@ export default function DocumentsScreen() {
                 <Text
                   style={[
                     styles.filterPillText,
-                    { color: isSelected ? theme.surface : theme.textPrimary },
+                    { color: isSelected ? theme.brandAnchorText : theme.textPrimary },
                   ]}
                 >
                   {type === 'all' ? 'All' : type === 'invoice' ? 'Invoices' : type === 'estimate' ? 'Estimates' : 'Receipts'}
@@ -204,11 +329,81 @@ export default function DocumentsScreen() {
         {/* Documents List or Empty State */}
         {documents.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <FileText color={theme.textMuted} size={40} strokeWidth={1.5} />
-            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No documents found</Text>
-            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-              {searchQuery ? 'Try adjusting your search query.' : 'Create an invoice or estimate to get started.'}
+            <FileText color={theme.textMuted} size={48} strokeWidth={1.5} />
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+              {searchQuery
+                ? 'No documents found'
+                : selectedType === 'invoice'
+                ? 'No invoices yet'
+                : selectedType === 'estimate'
+                ? 'No estimates yet'
+                : selectedType === 'receipt'
+                ? 'No receipts yet'
+                : 'No documents yet'}
             </Text>
+            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+              {searchQuery
+                ? 'Try adjusting your search query.'
+                : selectedType === 'invoice'
+                ? 'Create a professional invoice or issue a 30s quick counter bill.'
+                : selectedType === 'estimate'
+                ? 'Create a quotation or cost estimate to send to your client.'
+                : selectedType === 'receipt'
+                ? 'Receipts are automatically generated when recording payments or settling quick bills.'
+                : 'Create an invoice or estimate to get started.'}
+            </Text>
+
+            {!searchQuery && (
+              <View style={styles.emptyActionsRow}>
+                {(selectedType === 'all' || selectedType === 'invoice') && (
+                  <Pressable
+                    style={[styles.emptyActionBtn, { backgroundColor: theme.brandAnchor }]}
+                    onPress={() => router.push({ pathname: '/document/edit', params: { type: 'invoice' } })}
+                    accessibilityRole="button"
+                    accessibilityLabel="Create new invoice"
+                  >
+                    <Plus size={15} color={theme.brandAnchorText} strokeWidth={2.5} />
+                    <Text style={[styles.emptyActionBtnText, { color: theme.brandAnchorText }]}>+ New Invoice</Text>
+                  </Pressable>
+                )}
+
+                {(selectedType === 'all' || selectedType === 'estimate') && (
+                  <Pressable
+                    style={[
+                      styles.emptyActionBtn,
+                      selectedType === 'estimate'
+                        ? { backgroundColor: theme.brandAnchor }
+                        : { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle, borderWidth: 1 },
+                    ]}
+                    onPress={() => router.push({ pathname: '/document/edit', params: { type: 'estimate' } })}
+                    accessibilityRole="button"
+                    accessibilityLabel="Create new estimate"
+                  >
+                    <FileText size={15} color={selectedType === 'estimate' ? theme.brandAnchorText : theme.textPrimary} />
+                    <Text
+                      style={[
+                        styles.emptyActionBtnText,
+                        { color: selectedType === 'estimate' ? theme.brandAnchorText : theme.textPrimary },
+                      ]}
+                    >
+                      + New Estimate
+                    </Text>
+                  </Pressable>
+                )}
+
+                {(selectedType === 'all' || selectedType === 'invoice') && (
+                  <Pressable
+                    style={[styles.emptyActionBtn, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle, borderWidth: 1 }]}
+                    onPress={() => router.push('/quick-bill')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open Quick Bill"
+                  >
+                    <Zap size={15} color={theme.brandAnchor} />
+                    <Text style={[styles.emptyActionBtnText, { color: theme.textPrimary }]}>⚡ Quick Bill</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
           </View>
         ) : (
           <FlatList
@@ -219,6 +414,139 @@ export default function DocumentsScreen() {
             showsVerticalScrollIndicator={false}
           />
         )}
+
+        {/* Instant UPI QR Collect Modal */}
+        <DocumentUpiModal
+          visible={!!upiDoc}
+          document={upiDoc}
+          profile={profile}
+          locale={locale}
+          onClose={() => setUpiDoc(null)}
+          onRecordPayment={(item) => {
+            const found = documents.find((d) => d.id === item.id) || null;
+            setRecordPaymentDoc(found);
+          }}
+        />
+
+        {/* Payment Record Modal */}
+        {recordPaymentDoc && (
+          <PaymentRecordModal
+            visible={!!recordPaymentDoc}
+            invoiceId={recordPaymentDoc.id}
+            invoiceNumber={recordPaymentDoc.document_number}
+            currency={recordPaymentDoc.currency}
+            totalMinor={recordPaymentDoc.total_minor}
+            balanceMinor={recordPaymentDoc.balance_minor ?? recordPaymentDoc.total_minor}
+            documentLocale={locale}
+            initialMethod="upi"
+            initialProvider="direct_upi"
+            initialSource="direct_qr"
+            onPaymentRecorded={() => {
+              setRecordPaymentDoc(null);
+              loadDocuments();
+            }}
+            onClose={() => setRecordPaymentDoc(null)}
+          />
+        )}
+
+        {/* Create Document Bottom Sheet Modal */}
+        <Modal
+          visible={showCreateSheet}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowCreateSheet(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setShowCreateSheet(false)}
+              accessibilityLabel="Dismiss creation sheet"
+            />
+            <View style={[styles.createModalSheet, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              <View style={styles.createModalHeader}>
+                <Text style={[styles.createModalTitle, { color: theme.textPrimary }]}>Create Document</Text>
+                <Pressable onPress={() => setShowCreateSheet(false)} hitSlop={12} accessibilityLabel="Close creation sheet">
+                  <X size={20} color={theme.textMuted} />
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.createOptionRow,
+                  { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle },
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => {
+                  setShowCreateSheet(false);
+                  router.push({ pathname: '/document/edit', params: { type: 'invoice' } });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Create New Invoice"
+              >
+                <View style={[styles.createOptionIcon, { backgroundColor: theme.brandAnchor + '18' }]}>
+                  <FileText size={20} color={theme.brandAnchor} />
+                </View>
+                <View style={styles.createOptionTextWrap}>
+                  <Text style={[styles.createOptionName, { color: theme.textPrimary }]}>New Invoice</Text>
+                  <Text style={[styles.createOptionDesc, { color: theme.textSecondary }]}>
+                    Official tax invoice with itemized pricing & payment terms
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={theme.textMuted} />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.createOptionRow,
+                  { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle },
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => {
+                  setShowCreateSheet(false);
+                  router.push({ pathname: '/document/edit', params: { type: 'estimate' } });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Create New Estimate"
+              >
+                <View style={[styles.createOptionIcon, { backgroundColor: theme.brandAnchor + '18' }]}>
+                  <FilePlus2 size={20} color={theme.brandAnchor} />
+                </View>
+                <View style={styles.createOptionTextWrap}>
+                  <Text style={[styles.createOptionName, { color: theme.textPrimary }]}>New Estimate</Text>
+                  <Text style={[styles.createOptionDesc, { color: theme.textSecondary }]}>
+                    Quotation or proposal for client approval & conversion
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={theme.textMuted} />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.createOptionRow,
+                  { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle },
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => {
+                  setShowCreateSheet(false);
+                  router.push('/quick-bill');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Open 30-second Quick Bill"
+              >
+                <View style={[styles.createOptionIcon, { backgroundColor: theme.brandAnchor + '18' }]}>
+                  <Zap size={20} color={theme.brandAnchor} fill={theme.brandAnchor} />
+                </View>
+                <View style={styles.createOptionTextWrap}>
+                  <Text style={[styles.createOptionName, { color: theme.textPrimary }]}>30s Quick Bill</Text>
+                  <Text style={[styles.createOptionDesc, { color: theme.textSecondary }]}>
+                    Counter sale / instant billing with direct live UPI QR
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={theme.textMuted} />
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -326,6 +654,24 @@ const styles = StyleSheet.create({
   rowRight: {
     alignItems: 'flex-end',
   },
+  amountActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  qrCollectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  qrCollectText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
   docAmount: {
     fontSize: typography.bodyMedium.fontSize,
     fontWeight: typography.bodyMedium.fontWeight,
@@ -357,5 +703,79 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: typography.body.fontSize,
     textAlign: 'center',
+  },
+  emptyActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  emptyActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 42,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.sm,
+  },
+  emptyActionBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  createModalSheet: {
+    width: '100%',
+    maxWidth: MAX_CONTENT_WIDTH,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+  },
+  createModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  createModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  createOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    gap: spacing.md,
+  },
+  createOptionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  createOptionTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  createOptionName: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  createOptionDesc: {
+    fontSize: 12,
   },
 });

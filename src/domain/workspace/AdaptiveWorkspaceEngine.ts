@@ -76,14 +76,14 @@ export const DEFAULT_WORKSPACE_PREFERENCES: Omit<WorkspacePreferences, 'id' | 'b
 };
 
 export const BUSINESS_TYPE_PRESET_ACTIONS: Record<BusinessType, string[]> = {
-  freelancer: ['create_invoice', 'quick_bill', 'customers', 'expenses', 'recurring_invoices'],
-  contractor: ['create_estimate', 'create_invoice', 'expenses', 'jobs_management', 'technician_timesheets'],
-  retail: ['quick_bill', 'create_invoice', 'customers', 'inventory_ledger', 'barcode_scanner'],
-  service: ['create_invoice', 'create_estimate', 'customers', 'jobs_management', 'expenses'],
-  agency: ['create_estimate', 'create_invoice', 'customers', 'expenses', 'recurring_invoices'],
-  wholesale: ['create_invoice', 'quick_bill', 'customers', 'inventory_ledger', 'delivery_challan'],
-  professional: ['create_invoice', 'customers', 'expenses', 'create_estimate', 'technician_timesheets'],
-  other: ['create_invoice', 'quick_bill', 'customers', 'expenses', 'reports'],
+  freelancer: ['create_invoice', 'create_estimate', 'collections_workspace', 'expenses', 'catalog_items', 'reports'],
+  contractor: ['create_estimate', 'create_invoice', 'expenses', 'collections_workspace', 'catalog_items', 'reports'],
+  retail: ['quick_bill', 'create_invoice', 'catalog_items', 'customers', 'reports', 'expenses'],
+  service: ['create_invoice', 'create_estimate', 'customers', 'collections_workspace', 'expenses', 'catalog_items'],
+  agency: ['create_estimate', 'create_invoice', 'customers', 'collections_workspace', 'expenses', 'reports'],
+  wholesale: ['create_invoice', 'quick_bill', 'catalog_items', 'customers', 'collections_workspace', 'reports'],
+  professional: ['create_invoice', 'create_estimate', 'customers', 'collections_workspace', 'expenses', 'reports'],
+  other: ['create_invoice', 'quick_bill', 'customers', 'expenses', 'catalog_items', 'reports'],
 };
 
 export class AdaptiveWorkspaceEngine {
@@ -174,12 +174,13 @@ export class AdaptiveWorkspaceEngine {
 
       const resolved = explicitIds
         .map((id) => FeatureRegistry.getById(id))
-        .filter((c): c is FeatureCapability => Boolean(c));
+        .filter((c): c is FeatureCapability => Boolean(c && c.availability === 'ready' && c.route));
 
       return resolved.slice(0, limit);
     }
 
-    const scored = this.scoreCapabilities(preferences, usageRecords);
+    const scored = this.scoreCapabilities(preferences, usageRecords)
+      .filter((s) => s.capability.availability === 'ready' && Boolean(s.capability.route));
     return scored.slice(0, limit).map((s) => s.capability);
   }
 

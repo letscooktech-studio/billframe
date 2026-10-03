@@ -24,6 +24,14 @@ export interface MockDbState {
   feature_usage: any[];
   countries: any[];
   subdivisions: any[];
+  document_tax_snapshots: any[];
+  payment_provider_connections: any[];
+  credit_notes: any[];
+  customer_advances: any[];
+  credit_allocations: any[];
+  payment_refunds: any[];
+  reminder_events: any[];
+  invoice_collection_metadata: any[];
 }
 
 export class MockSQLiteDatabase {
@@ -47,6 +55,14 @@ export class MockSQLiteDatabase {
     feature_usage: [],
     countries: [],
     subdivisions: [],
+    document_tax_snapshots: [],
+    payment_provider_connections: [],
+    credit_notes: [],
+    customer_advances: [],
+    credit_allocations: [],
+    payment_refunds: [],
+    reminder_events: [],
+    invoice_collection_metadata: [],
   };
 
   reset() {
@@ -70,6 +86,14 @@ export class MockSQLiteDatabase {
       feature_usage: [],
       countries: [],
       subdivisions: [],
+      document_tax_snapshots: [],
+      payment_provider_connections: [],
+      credit_notes: [],
+      customer_advances: [],
+      credit_allocations: [],
+      payment_refunds: [],
+      reminder_events: [],
+      invoice_collection_metadata: [],
     };
   }
 
@@ -113,7 +137,31 @@ export class MockSQLiteDatabase {
       const id = params[params.length - 1];
       const p = this.state.business_profiles.find((b) => b.id === id);
       if (p) {
-        if (params.length >= 20) {
+        if (params.length >= 21) {
+          const [name, legalName, taxId, email, phone, addr1, city, stateVal, postal, country, countryIso2, subCode, subName, phoneIso2, phoneE164, upiVpa, curr, notes, terms, updated_at] = params;
+          Object.assign(p, {
+            name,
+            legal_name: legalName,
+            tax_id: taxId,
+            email,
+            phone,
+            address_line1: addr1,
+            city,
+            state: stateVal,
+            postal_code: postal,
+            country,
+            country_iso2: countryIso2,
+            subdivision_code: subCode,
+            subdivision_name: subName,
+            phone_country_iso2: phoneIso2,
+            phone_e164: phoneE164,
+            upi_vpa: upiVpa,
+            default_currency: curr,
+            default_notes: notes,
+            default_payment_terms: terms,
+            updated_at,
+          });
+        } else if (params.length >= 19) {
           const [name, legalName, taxId, email, phone, addr1, city, stateVal, postal, country, countryIso2, subCode, subName, phoneIso2, phoneE164, curr, notes, terms, updated_at] = params;
           Object.assign(p, {
             name,
@@ -175,6 +223,10 @@ export class MockSQLiteDatabase {
           updated_at,
         });
         return { lastInsertRowId: 1, changes: 1 };
+      } else if (s.includes('ON CONFLICT') || s.includes('DO UPDATE')) {
+        exists.next_sequence_number = next_sequence_number;
+        exists.updated_at = updated_at;
+        return { lastInsertRowId: 1, changes: 1 };
       }
       return { lastInsertRowId: 0, changes: 0 };
     }
@@ -185,6 +237,16 @@ export class MockSQLiteDatabase {
       const seq = this.state.number_sequences.find((x) => x.id === id);
       if (seq) {
         seq.next_sequence_number += 1;
+        seq.updated_at = updated_at;
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    if (s.startsWith('UPDATE number_sequences SET next_sequence_number = ?')) {
+      const [nextSeq, updated_at, id] = params;
+      const seq = this.state.number_sequences.find((x) => x.id === id);
+      if (seq) {
+        seq.next_sequence_number = Number(nextSeq);
         seq.updated_at = updated_at;
       }
       return { lastInsertRowId: 1, changes: 1 };
@@ -431,10 +493,14 @@ export class MockSQLiteDatabase {
 
       const existingIndex = this.state.documents.findIndex((d) => d.id === docData.id);
       if (existingIndex >= 0) {
+        const existing = this.state.documents[existingIndex];
         this.state.documents[existingIndex] = {
-          ...this.state.documents[existingIndex],
+          ...existing,
           ...docData,
-          created_at: this.state.documents[existingIndex].created_at,
+          sequence_number: existing.sequence_number ?? docData.sequence_number,
+          document_number: existing.sequence_number ? existing.document_number : docData.document_number,
+          lifecycle_status: existing.lifecycle_status !== 'draft' ? existing.lifecycle_status : docData.lifecycle_status,
+          created_at: existing.created_at,
         };
       } else {
         this.state.documents.push(docData);
@@ -444,13 +510,26 @@ export class MockSQLiteDatabase {
 
     // 10. Documents Update to Issued
     if (s.includes('UPDATE documents SET') && s.includes("lifecycle_status = 'issued'")) {
-      const [seqNum, finalDocNum, updated_at, id] = params;
+      const id = params[params.length - 1];
+      const hasBusinessProfile = s.includes('business_profile_id = ?');
+      const offset = hasBusinessProfile ? 1 : 0;
+      const seqNum = params[offset];
+      const finalDocNum = params[offset + 1];
+      const updated_at = params[params.length - 2];
       const doc = this.state.documents.find((d) => d.id === id);
       if (doc) {
+        if (hasBusinessProfile) {
+          doc.business_profile_id = params[0];
+        }
         doc.sequence_number = seqNum;
         doc.document_number = finalDocNum;
         doc.lifecycle_status = 'issued';
         doc.updated_at = updated_at;
+        if (s.includes('place_of_supply = ?')) {
+          doc.place_of_supply = params[offset + 2];
+          doc.supply_type = params[offset + 3];
+          doc.reverse_charge = params[offset + 4];
+        }
       }
       return { lastInsertRowId: 1, changes: 1 };
     }
@@ -529,6 +608,19 @@ export class MockSQLiteDatabase {
         this.state.document_snapshots[idx].snapshot_json = snapshot_json;
       } else {
         this.state.document_snapshots.push({ id, document_id, snapshot_json, created_at });
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 15.1 Document Tax Snapshots Upsert
+    if (s.startsWith('INSERT INTO document_tax_snapshots') || s.startsWith('INSERT OR REPLACE INTO document_tax_snapshots')) {
+      const [id, document_id, tax_pack_id, tax_pack_version, place_of_supply, supply_type, reverse_charge, tax_summary_json, created_at] = params;
+      const idx = this.state.document_tax_snapshots.findIndex((snap) => snap.document_id === document_id);
+      const rec = { id, document_id, tax_pack_id, tax_pack_version, place_of_supply, supply_type, reverse_charge, tax_summary_json, created_at };
+      if (idx >= 0) {
+        this.state.document_tax_snapshots[idx] = rec;
+      } else {
+        this.state.document_tax_snapshots.push(rec);
       }
       return { lastInsertRowId: 1, changes: 1 };
     }
@@ -775,6 +867,102 @@ export class MockSQLiteDatabase {
       return { lastInsertRowId: 1, changes: 1 };
     }
 
+    // 28. Payment Provider Connections Upsert
+    if (s.includes('INTO payment_provider_connections')) {
+      const busId = params[1];
+      const provider = params[2];
+      const idx = this.state.payment_provider_connections.findIndex(
+        (c) => c.business_profile_id === busId && c.provider === provider
+      );
+      let rec: any;
+      if (params.length >= 13) {
+        const [id, business_profile_id, prov, status, merchant_account_reference, is_active, is_testnet, key_id, capabilities_json, last_synced_at, metadata_json, created_at, updated_at] = params;
+        rec = { id, business_profile_id, provider: prov, status, merchant_account_reference, is_active, is_testnet, key_id, capabilities_json, last_synced_at, metadata_json, created_at, updated_at };
+      } else {
+        const [id, business_profile_id, prov, is_active, is_testnet, key_id, webhook_secret, metadata_json, created_at, updated_at] = params;
+        rec = { id, business_profile_id, provider: prov, status: is_testnet ? 'sandbox' : 'partner_approval_required', merchant_account_reference: null, is_active, is_testnet, key_id, capabilities_json: null, last_synced_at: null, metadata_json, created_at, updated_at };
+      }
+      if (idx >= 0) this.state.payment_provider_connections[idx] = rec;
+      else this.state.payment_provider_connections.push(rec);
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 29. Credit Notes Insert / Upsert
+    if (s.includes('INTO credit_notes')) {
+      const [id, business_profile_id, customer_id, original_invoice_id, credit_note_number, reason, credit_amount_minor, tax_amount_minor, currency, issue_date, status, snapshot_json, created_at, updated_at] = params;
+      const idx = this.state.credit_notes.findIndex((cn) => cn.id === id);
+      const rec = { id, business_profile_id, customer_id, original_invoice_id, credit_note_number, reason, credit_amount_minor, tax_amount_minor, currency, issue_date, status, snapshot_json, created_at, updated_at };
+      if (idx >= 0) this.state.credit_notes[idx] = rec;
+      else this.state.credit_notes.push(rec);
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 30. Customer Advances Insert / Upsert
+    if (s.includes('INTO customer_advances')) {
+      const [id, business_profile_id, customer_id, original_amount_minor, remaining_amount_minor, currency, payment_source, reference, notes, advance_date, status, created_at, updated_at] = params;
+      const idx = this.state.customer_advances.findIndex((ca) => ca.id === id);
+      const rec = { id, business_profile_id, customer_id, original_amount_minor, remaining_amount_minor, currency, payment_source, reference, notes, advance_date, status, created_at, updated_at };
+      if (idx >= 0) this.state.customer_advances[idx] = rec;
+      else this.state.customer_advances.push(rec);
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 31. Credit Allocations Insert
+    if (s.includes('INTO credit_allocations')) {
+      const [id, business_profile_id, customer_advance_id, credit_note_id, invoice_id, allocated_amount_minor, currency, allocated_at, notes] = params;
+      this.state.credit_allocations.push({ id, business_profile_id, customer_advance_id, credit_note_id, invoice_id, allocated_amount_minor, currency, allocated_at, notes });
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 32. Payment Refunds Insert / Upsert
+    if (s.includes('INTO payment_refunds')) {
+      const [id, business_profile_id, payment_id, invoice_id, refund_amount_minor, currency, reason, status, provider_refund_id, refund_date, created_at, updated_at] = params;
+      const idx = this.state.payment_refunds.findIndex((pr) => pr.id === id);
+      const rec = { id, business_profile_id, payment_id, invoice_id, refund_amount_minor, currency, reason, status, provider_refund_id, refund_date, created_at, updated_at };
+      if (idx >= 0) this.state.payment_refunds[idx] = rec;
+      else this.state.payment_refunds.push(rec);
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 33. Reminder Events Insert
+    if (s.includes('INTO reminder_events')) {
+      const [id, business_profile_id, invoice_id, customer_id, channel, template, status, is_automated, reminder_date, created_at] = params;
+      this.state.reminder_events.push({ id, business_profile_id, invoice_id, customer_id, channel, template, status, is_automated, reminder_date, created_at });
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 34. Invoice Collection Metadata Upsert
+    if (s.includes('INTO invoice_collection_metadata')) {
+      const [document_id, expected_payment_date, promise_to_pay_date, collection_notes, updated_at] = params;
+      const idx = this.state.invoice_collection_metadata.findIndex((m) => m.document_id === document_id);
+      const rec = { document_id, expected_payment_date, promise_to_pay_date, collection_notes, updated_at };
+      if (idx >= 0) this.state.invoice_collection_metadata[idx] = rec;
+      else this.state.invoice_collection_metadata.push(rec);
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 35. Payment Provider Connections Toggle/Update
+    if (s.startsWith('UPDATE payment_provider_connections SET')) {
+      const [is_active, updated_at, busId, provider] = params;
+      const conn = this.state.payment_provider_connections.find(
+        (c) => c.business_profile_id === busId && c.provider === provider
+      );
+      if (conn) {
+        conn.is_active = is_active;
+        conn.updated_at = updated_at;
+      }
+      return { lastInsertRowId: 0, changes: conn ? 1 : 0 };
+    }
+
+    // 36. Payment Provider Connections Delete
+    if (s.startsWith('DELETE FROM payment_provider_connections')) {
+      const [busId, provider] = params;
+      this.state.payment_provider_connections = this.state.payment_provider_connections.filter(
+        (c) => !(c.business_profile_id === busId && c.provider === provider)
+      );
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+
     // 26. Delete feature usage
     if (s.startsWith('DELETE FROM feature_usage')) {
       this.state.feature_usage = [];
@@ -825,6 +1013,12 @@ export class MockSQLiteDatabase {
       } as T;
     }
 
+    // Document Tax Snapshot
+    if (s.includes('FROM document_tax_snapshots WHERE document_id = ?')) {
+      const [docId] = params;
+      return (this.state.document_tax_snapshots.find((t) => t.document_id === docId) as T) || null;
+    }
+
     // Payments sum for invoice
     if (s.includes('SUM(amount_minor)') && s.includes('WHERE invoice_id = ?')) {
       const [invoiceId] = params;
@@ -834,10 +1028,42 @@ export class MockSQLiteDatabase {
       return { sum_paid: sum } as T;
     }
 
+    // Max sequence number for profile and doc_type
+    if (s.includes('SELECT MAX(sequence_number) AS max_seq FROM documents')) {
+      const [profileId, docType] = params;
+      const matching = this.state.documents.filter(
+        (d) => d.business_profile_id === profileId && d.doc_type === docType
+      );
+      const maxSeq = matching.reduce((max, d) => Math.max(max, d.sequence_number || 0), 0);
+      return ({ max_seq: maxSeq } as unknown as T);
+    }
+
+    // Document uniqueness collision check
+    if (s.includes('FROM documents WHERE business_profile_id = ? AND doc_type = ? AND document_number = ?')) {
+      const [profileId, docType, docNum, excludeId] = params;
+      const found = this.state.documents.find(
+        (d) => d.business_profile_id === profileId && d.doc_type === docType && d.document_number === docNum && d.id !== excludeId
+      );
+      return (found ? ({ id: found.id } as T) : null);
+    }
+
+    // Document ID lookup by document_number
+    if (s.includes('FROM documents WHERE document_number = ?')) {
+      const [docNum] = params;
+      const found = this.state.documents.find((d) => d.document_number === docNum);
+      return (found ? { id: found.id } : null) as T;
+    }
+
     // Single payment
     if (s.startsWith('SELECT * FROM payments WHERE id = ?;')) {
       const [id] = params;
       return (this.state.payments.find((p) => p.id === id) as T) || null;
+    }
+
+    // Single payment by provider_payment_id
+    if (s.includes('FROM payments WHERE provider_payment_id = ?')) {
+      const [providerPaymentId] = params;
+      return (this.state.payments.find((p) => p.provider_payment_id === providerPaymentId) as T) || null;
     }
 
     // Single receipt
@@ -907,6 +1133,38 @@ export class MockSQLiteDatabase {
       return (this.state.workspace_preferences.find((w) => w.business_profile_id === profileId) as T) || null;
     }
 
+    // Payment provider connection
+    if (s.includes('FROM payment_provider_connections WHERE business_profile_id = ? AND provider = ?')) {
+      const [busId, prov] = params;
+      return (this.state.payment_provider_connections.find(
+        (c) => c.business_profile_id === busId && c.provider === prov
+      ) as T) || null;
+    }
+
+    // Credit Note by ID
+    if (s.startsWith('SELECT * FROM credit_notes WHERE id = ?')) {
+      const [id] = params;
+      return (this.state.credit_notes.find((c) => c.id === id) as T) || null;
+    }
+
+    // Customer Advance by ID
+    if (s.startsWith('SELECT * FROM customer_advances WHERE id = ?')) {
+      const [id] = params;
+      return (this.state.customer_advances.find((a) => a.id === id) as T) || null;
+    }
+
+    // Payment Refund by ID
+    if (s.startsWith('SELECT * FROM payment_refunds WHERE id = ?')) {
+      const [id] = params;
+      return (this.state.payment_refunds.find((r) => r.id === id) as T) || null;
+    }
+
+    // Invoice Collection Metadata
+    if (s.includes('FROM invoice_collection_metadata WHERE document_id = ?')) {
+      const [docId] = params;
+      return (this.state.invoice_collection_metadata.find((m) => m.document_id === docId) as T) || null;
+    }
+
     return null;
   }
 
@@ -921,6 +1179,61 @@ export class MockSQLiteDatabase {
     // Migration history
     if (s.includes('FROM migration_history')) {
       return this.state.migration_history.slice().sort((a, b) => a.version - b.version) as T[];
+    }
+
+    // Credit Notes
+    if (s.includes('FROM credit_notes')) {
+      if (s.includes('WHERE original_invoice_id = ?')) {
+        return this.state.credit_notes.filter((c) => c.original_invoice_id === params[0]) as T[];
+      }
+      if (s.includes('WHERE customer_id = ?')) {
+        return this.state.credit_notes.filter((c) => c.customer_id === params[0]) as T[];
+      }
+      return this.state.credit_notes.slice() as T[];
+    }
+
+    // Customer Advances
+    if (s.includes('FROM customer_advances')) {
+      if (s.includes('WHERE customer_id = ?')) {
+        return this.state.customer_advances.filter((a) => a.customer_id === params[0]) as T[];
+      }
+      return this.state.customer_advances.slice() as T[];
+    }
+
+    // Credit Allocations
+    if (s.includes('FROM credit_allocations')) {
+      if (s.includes('WHERE invoice_id = ?')) {
+        return this.state.credit_allocations.filter((a) => a.invoice_id === params[0]) as T[];
+      }
+      if (s.includes('WHERE customer_advance_id = ?')) {
+        return this.state.credit_allocations.filter((a) => a.customer_advance_id === params[0]) as T[];
+      }
+      if (s.includes('WHERE credit_note_id = ?')) {
+        return this.state.credit_allocations.filter((a) => a.credit_note_id === params[0]) as T[];
+      }
+      return this.state.credit_allocations.slice() as T[];
+    }
+
+    // Payment Refunds
+    if (s.includes('FROM payment_refunds')) {
+      if (s.includes('WHERE invoice_id = ?')) {
+        return this.state.payment_refunds.filter((r) => r.invoice_id === params[0]) as T[];
+      }
+      if (s.includes('WHERE payment_id = ?')) {
+        return this.state.payment_refunds.filter((r) => r.payment_id === params[0]) as T[];
+      }
+      return this.state.payment_refunds.slice() as T[];
+    }
+
+    // Reminder Events
+    if (s.includes('FROM reminder_events')) {
+      if (s.includes('WHERE invoice_id = ?')) {
+        return this.state.reminder_events.filter((r) => r.invoice_id === params[0]) as T[];
+      }
+      if (s.includes('WHERE customer_id = ?')) {
+        return this.state.reminder_events.filter((r) => r.customer_id === params[0]) as T[];
+      }
+      return this.state.reminder_events.slice() as T[];
     }
 
     // Feature usage
@@ -953,6 +1266,26 @@ export class MockSQLiteDatabase {
       return this.state.receipts
         .filter((r) => r.invoice_id === invoiceId)
         .sort((a, b) => a.issue_date - b.issue_date) as T[];
+    }
+
+    // Receipts for documents listing
+    if (s.includes('FROM receipts')) {
+      return this.state.receipts.map((r) => {
+        const inv = this.state.documents.find((d) => d.id === r.invoice_id);
+        const cust = inv ? this.state.customers.find((c) => c.id === inv.customer_id) : null;
+        const pay = this.state.payments.find((p) => p.id === r.payment_id);
+        return {
+          id: r.id,
+          doc_type: 'receipt',
+          document_number: r.receipt_number,
+          customer_name: cust?.name || 'Customer',
+          total_minor: pay?.amount_minor || 0,
+          balance_minor: 0,
+          currency: inv?.currency || 'USD',
+          lifecycle_status: 'paid',
+          issue_date: r.issue_date,
+        };
+      }) as T[];
     }
 
     // Customers search
@@ -1041,9 +1374,19 @@ export class MockSQLiteDatabase {
       let docs = this.state.documents.filter((d) => d.is_archived === 0);
       if (s.includes("doc_type = 'invoice'")) {
         docs = docs.filter((d) => d.doc_type === 'invoice');
+      } else if (s.includes('doc_type = ?')) {
+        const typeParam = params.find((p) => typeof p === 'string' && ['invoice', 'estimate', 'receipt', 'credit_note', 'proforma', 'delivery_note', 'work_order'].includes(p));
+        if (typeParam) {
+          docs = docs.filter((d) => d.doc_type === typeParam);
+        }
       }
       if (s.includes("lifecycle_status = 'issued'")) {
         docs = docs.filter((d) => d.lifecycle_status === 'issued');
+      } else if (s.includes('lifecycle_status = ?')) {
+        const statusParam = params.find((p) => typeof p === 'string' && ['draft', 'issued', 'void', 'accepted', 'rejected', 'expired'].includes(p));
+        if (statusParam) {
+          docs = docs.filter((d) => d.lifecycle_status === statusParam);
+        }
       }
       return docs
         .map((d) => {
@@ -1082,6 +1425,14 @@ export class MockSQLiteDatabase {
         .slice()
         .sort((a, b) => b.created_at - a.created_at)
         .slice(0, limit) as T[];
+    }
+
+    // Payment provider connections
+    if (s.includes('FROM payment_provider_connections WHERE business_profile_id = ?')) {
+      const [busId] = params;
+      return (this.state.payment_provider_connections.filter(
+        (c) => c.business_profile_id === busId
+      ) as unknown as T[]);
     }
 
     return [];

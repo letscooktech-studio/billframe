@@ -390,14 +390,30 @@ interface ActionButtonProps {
 }
 
 function ActionButton({ label, sublabel, icon, onPress, loading, primary, destructive, theme }: ActionButtonProps) {
+  const isDark = theme.isDark ?? (theme.surface !== '#FFFFFF' && theme.surface !== '#FAFAFA');
   const bgColor = primary
     ? theme.brandAnchor
     : destructive
     ? theme.statusDanger
     : theme.surfaceSecondary;
-  const textColor = primary || destructive ? '#fff' : theme.textPrimary;
-  const subtextColor = primary || destructive ? 'rgba(255,255,255,0.75)' : theme.textSecondary;
+
+  const textColor = primary
+    ? theme.brandAnchorText
+    : destructive
+    ? '#FFFFFF'
+    : theme.textPrimary;
+
+  const subtextColor = primary
+    ? (theme.brandAnchorText === '#FFFFFF' ? 'rgba(255,255,255,0.85)' : '#475569')
+    : destructive
+    ? 'rgba(255,255,255,0.85)'
+    : theme.textSecondary;
+
   const borderColor = primary || destructive ? 'transparent' : theme.borderSubtle;
+
+  const renderedIcon = React.isValidElement(icon)
+    ? React.cloneElement(icon as React.ReactElement<any>, { color: textColor })
+    : icon;
 
   return (
     <Pressable
@@ -416,7 +432,7 @@ function ActionButton({ label, sublabel, icon, onPress, loading, primary, destru
       accessibilityLabel={label}
     >
       <View style={styles.actionButtonIcon}>
-        {loading ? <ActivityIndicator color={textColor} size="small" /> : icon}
+        {loading ? <ActivityIndicator color={textColor} size="small" /> : renderedIcon}
       </View>
       <View style={styles.actionButtonText}>
         <Text style={[styles.actionLabel, { color: textColor }]}>{label}</Text>

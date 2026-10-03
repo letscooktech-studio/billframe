@@ -113,7 +113,13 @@ export default function ReceiptDetailScreen() {
       <View style={[styles.topBar, { borderBottomColor: theme.borderSubtle, backgroundColor: theme.surface }]}>
         <Pressable
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/documents' as any);
+            }
+          }}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -273,8 +279,8 @@ export default function ReceiptDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Share official PDF receipt"
           >
-            <Share2 color={theme.surface} size={18} />
-            <Text style={[styles.shareActionText, { color: theme.surface }]}>
+            <Share2 color={theme.brandAnchorText} size={18} />
+            <Text style={[styles.shareActionText, { color: theme.brandAnchorText }]}>
               {isSharing ? 'Generating PDF...' : 'Share Receipt PDF'}
             </Text>
           </Pressable>

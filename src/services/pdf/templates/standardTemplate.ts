@@ -6,9 +6,11 @@
 
 import { FullDocument } from '../../../data/repositories/DocumentRepository';
 import { BusinessProfile } from '../../../domain/profile/types';
-import { formatMoney } from '../../../domain/money/Money';
+import { formatMoney, createMoney, moneyToDecimalString } from '../../../domain/money/Money';
 import { quantityScaledToString } from '../../../domain/documents/quantity';
 import { escapeHtml, formatDate, getBaseCss } from './commonStyles';
+import { DirectUpiEngine } from '../../../domain/payments/upi/DirectUpiEngine';
+import { QrCodeGenerator } from '../../../domain/payments/upi/QrCodeGenerator';
 
 export function renderStandardTemplate(
   doc: FullDocument,
@@ -91,6 +93,46 @@ export function renderStandardTemplate(
     statusBadge = '<span class="badge badge-unpaid">Payment Due</span>';
   } else if (doc.lifecycle_status === 'draft') {
     statusBadge = '<span class="badge badge-draft">Draft</span>';
+  }
+
+  let upiSection = '';
+  if (
+    doc.doc_type === 'invoice' &&
+    business.upi_vpa &&
+    (doc.balance_minor ?? doc.total_minor) > 0
+  ) {
+    try {
+      const balanceMinorBig = BigInt(doc.balance_minor ?? doc.total_minor);
+      const conversion = DirectUpiEngine.buildUpiUriWithCurrencyConversion({
+        vpa: business.upi_vpa,
+        payeeName: business.legal_name || business.name || 'Merchant',
+        sourceAmountMinor: balanceMinorBig,
+        sourceCurrency: currency,
+        transactionRef: doc.document_number,
+        transactionNote: `Invoice ${doc.document_number}`,
+      });
+      const qrSvg = QrCodeGenerator.generateSvg(conversion.upiUri, 110, { color: '#0f172a', backgroundColor: '#ffffff' });
+
+      const amountDisplay = conversion.isConverted
+        ? `<div style="font-size: 11px; color: #059669; font-weight: 700; margin-top: 2px;">Pay: ₹${moneyToDecimalString(createMoney(conversion.inrAmountMinor!, 'INR'))} INR <span style="font-size: 10px; color: #64748b; font-weight: normal;">(${escapeHtml(conversion.conversionSummary || '')})</span></div>`
+        : `<div style="font-size: 11px; color: #059669; font-weight: 700; margin-top: 2px;">Amount: ${balanceStr}</div>`;
+
+      upiSection = `
+        <div style="margin-top: 14px; margin-bottom: 14px; padding: 12px 14px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <div style="font-weight: 700; color: #0f172a; font-size: 12px; margin-bottom: 3px;">Scan &amp; Pay via UPI (0% Fee)</div>
+            <div style="font-size: 11px; color: #475569;">GPay, PhonePe, Paytm, BHIM, or any UPI app</div>
+            <div style="font-size: 11px; color: #0f172a; font-weight: 600; margin-top: 5px;">UPI ID: ${escapeHtml(business.upi_vpa)}</div>
+            ${amountDisplay}
+          </div>
+          <div style="background-color: #ffffff; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; display: inline-block;">
+            ${qrSvg}
+          </div>
+        </div>
+      `;
+    } catch {
+      // Non-blocking fallback
+    }
   }
 
   return `
@@ -287,6 +329,9 @@ export function renderStandardTemplate(
             </div>
           </div>
         </div>
+
+        <!-- Direct UPI QR Code Section -->
+        ${upiSection}
 
         <!-- Payment Instructions & Notes -->
         ${(doc.payment_instructions || doc.notes || doc.terms) ? `

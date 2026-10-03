@@ -9,7 +9,7 @@
  * and comprehensive TalkBack accessibility semantics.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -19,6 +19,9 @@ import {
   useColorScheme,
   Alert,
   BackHandler,
+  Share,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,17 +41,27 @@ import {
   PenTool,
   Shield,
   Share2,
+  QrCode,
+  RotateCcw,
+  Edit3,
+  AlertCircle,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { DocumentRepository, FullDocument } from '../../data/repositories/DocumentRepository';
 import { PaymentRepository, PaymentRecord, ReceiptRecord } from '../../data/repositories/PaymentRepository';
 import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
+import { BusinessProfile } from '../../domain/profile/types';
+import { DirectUpiEngine } from '../../domain/payments/upi/DirectUpiEngine';
+import { ExchangeRateEngine } from '../../domain/money/ExchangeRateEngine';
+import { UpiQrCode } from '../../components/common/UpiQrCode';
 import { PdfService } from '../../services/pdf/PdfService';
-import { createMoney, formatMoney } from '../../domain/money/Money';
+import { createMoney, formatMoney, moneyToDecimalString } from '../../domain/money/Money';
 import { quantityScaledToString } from '../../features/items/ItemEditorModal';
 import { PaymentRecordModal } from '../../features/payments/PaymentRecordModal';
 import { SignatureModal } from '../../features/signature/SignatureModal';
 import { CustomerStatementModal } from '../../features/statements/CustomerStatementModal';
+import { TaxExplainabilityEngine } from '../../domain/tax/TaxExplainability';
+import { TaxExplanationModal } from '../../features/tax/TaxExplanationModal';
 
 export default function DocumentDetailScreen() {
   const router = useRouter();
@@ -59,12 +72,32 @@ export default function DocumentDetailScreen() {
   const [doc, setDoc] = useState<FullDocument | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [receipts, setReceipts] = useState<ReceiptRecord[]>([]);
+  const [profile, setProfile] = useState<BusinessProfile | null>(null);
+  const [paymentInitialMethod, setPaymentInitialMethod] = useState<string | undefined>(undefined);
+  const [paymentInitialProvider, setPaymentInitialProvider] = useState<'manual' | 'direct_upi' | 'razorpay' | 'cashfree' | 'stripe' | 'other' | undefined>(undefined);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [showStatementModal, setShowStatementModal] = useState(false);
+  const [showTaxModal, setShowTaxModal] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOperating, setIsOperating] = useState(false);
+
+  // Payee / Vendor UPI customization & inline setup state
+  const [customPayeeVpa, setCustomPayeeVpa] = useState('');
+  const [customPayeeName, setCustomPayeeName] = useState('');
+  const [isEditingPayee, setIsEditingPayee] = useState(false);
+  const [inlineVpaInput, setInlineVpaInput] = useState('');
+  const [inlineNameInput, setInlineNameInput] = useState('');
+  const [inlineVpaError, setInlineVpaError] = useState<string | null>(null);
+  const [isSavingProfileVpa, setIsSavingProfileVpa] = useState(false);
+  const [isRefreshingFx, setIsRefreshingFx] = useState(false);
+  const [fxRateTick, setFxRateTick] = useState(0);
+
+  const taxExplanation = React.useMemo(() => {
+    if (!doc) return null;
+    return TaxExplainabilityEngine.explainFromDocument(doc);
+  }, [doc]);
 
   // Double-tap idempotency guard ref
   const isSubmittingRef = useRef(false);
@@ -85,11 +118,28 @@ export default function DocumentDetailScreen() {
       const documentData = await DocumentRepository.getById(id);
       setDoc(documentData);
 
+      const activeProfile = await BusinessProfileRepository.getActiveProfile();
+      setProfile(activeProfile);
+      if (activeProfile?.upi_vpa) {
+        setInlineVpaInput(activeProfile.upi_vpa);
+      }
+      if (activeProfile?.legal_name || activeProfile?.name) {
+        setInlineNameInput(activeProfile.legal_name || activeProfile.name);
+      }
+
       if (documentData && documentData.doc_type === 'invoice') {
         const payList = await PaymentRepository.getPaymentsForInvoice(id);
         const recList = await PaymentRepository.getReceiptsForInvoice(id);
         setPayments(payList);
         setReceipts(recList);
+
+        if (documentData.currency !== 'INR') {
+          ExchangeRateEngine.fetchLiveRatesAsync().then((updated) => {
+            if (updated) {
+              setFxRateTick((prev) => prev + 1);
+            }
+          });
+        }
       }
     } catch (err: any) {
       setActionError(err.message || 'Failed to load document');
@@ -98,11 +148,110 @@ export default function DocumentDetailScreen() {
     }
   }, [id]);
 
+  const handleSaveVpaToProfile = async () => {
+    const val = DirectUpiEngine.validateVpa(inlineVpaInput);
+    if (!val.isValid || !val.normalizedVpa) {
+      setInlineVpaError(val.error || 'Please enter a valid UPI ID (e.g. name@bank)');
+      return;
+    }
+    setInlineVpaError(null);
+    setIsSavingProfileVpa(true);
+    try {
+      const activeProf = profile || (await BusinessProfileRepository.getActiveProfile());
+      if (activeProf) {
+        await BusinessProfileRepository.updateProfile({
+          id: activeProf.id,
+          upi_vpa: val.normalizedVpa,
+          legal_name: inlineNameInput.trim() || activeProf.legal_name || activeProf.name,
+        });
+        const updated = await BusinessProfileRepository.getActiveProfile();
+        setProfile(updated);
+        setCustomPayeeVpa('');
+        setCustomPayeeName('');
+        setIsEditingPayee(false);
+      }
+    } catch (err: any) {
+      setInlineVpaError(err.message || 'Failed to save UPI ID to profile');
+    } finally {
+      setIsSavingProfileVpa(false);
+    }
+  };
+
+  const handleUseOnceCustomPayee = () => {
+    const val = DirectUpiEngine.validateVpa(inlineVpaInput);
+    if (!val.isValid || !val.normalizedVpa) {
+      setInlineVpaError(val.error || 'Please enter a valid UPI ID (e.g. vendor@bank)');
+      return;
+    }
+    setInlineVpaError(null);
+    setCustomPayeeVpa(val.normalizedVpa);
+    setCustomPayeeName(inlineNameInput.trim() || 'Vendor');
+    setIsEditingPayee(false);
+  };
+
+  const handleResetToProfileDefault = () => {
+    setCustomPayeeVpa('');
+    setCustomPayeeName('');
+    setIsEditingPayee(false);
+    setInlineVpaError(null);
+    if (profile?.upi_vpa) {
+      setInlineVpaInput(profile.upi_vpa);
+      setInlineNameInput(profile.legal_name || profile.name);
+    }
+  };
+
+  const handleRefreshLiveRate = async () => {
+    setIsRefreshingFx(true);
+    try {
+      const updated = await ExchangeRateEngine.fetchLiveRatesAsync(true);
+      if (updated) {
+        setFxRateTick((prev) => prev + 1);
+      } else {
+        Alert.alert('Offline Mode', 'Could not reach live market rate servers. Using ECB official reference rate.');
+      }
+    } catch {
+      Alert.alert('Network Error', 'Unable to fetch real-time market rates right now.');
+    } finally {
+      setIsRefreshingFx(false);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadData();
     }, [loadData])
   );
+
+  const isInvoice = doc?.doc_type === 'invoice';
+  const isEstimate = doc?.doc_type === 'estimate';
+  const isDraft = doc?.lifecycle_status === 'draft';
+  const isIssued = doc?.lifecycle_status === 'issued';
+  const isAccepted = doc?.lifecycle_status === 'accepted';
+  const isRejected = doc?.lifecycle_status === 'rejected';
+  const isVoid = doc?.lifecycle_status === 'void';
+
+  const effectiveVpa = (customPayeeVpa.trim() || profile?.upi_vpa || '').trim();
+  const effectivePayeeName = (customPayeeName.trim() || profile?.legal_name || profile?.name || 'Merchant').trim();
+
+  const upiConversion = useMemo(() => {
+    if (!doc || !isInvoice || !isIssued || (doc.balance_minor ?? 0) <= 0 || !effectiveVpa) {
+      return null;
+    }
+    try {
+      return DirectUpiEngine.buildUpiUriWithCurrencyConversion({
+        vpa: effectiveVpa,
+        payeeName: effectivePayeeName,
+        sourceAmountMinor: BigInt(doc.balance_minor),
+        sourceCurrency: doc.currency,
+        transactionRef: doc.document_number,
+        transactionNote: `Invoice ${doc.document_number}`,
+      });
+    } catch {
+      return null;
+    }
+  }, [doc, isInvoice, isIssued, effectiveVpa, effectivePayeeName, fxRateTick]);
+
+  const upiUri = upiConversion?.upiUri ?? null;
 
   if (loading || !doc) {
     return (
@@ -113,14 +262,6 @@ export default function DocumentDetailScreen() {
       </SafeAreaView>
     );
   }
-
-  const isInvoice = doc.doc_type === 'invoice';
-  const isEstimate = doc.doc_type === 'estimate';
-  const isDraft = doc.lifecycle_status === 'draft';
-  const isIssued = doc.lifecycle_status === 'issued';
-  const isAccepted = doc.lifecycle_status === 'accepted';
-  const isRejected = doc.lifecycle_status === 'rejected';
-  const isVoid = doc.lifecycle_status === 'void';
 
   // Lifecycle actions with double-tap protection
   async function handleIssue() {
@@ -301,6 +442,7 @@ export default function DocumentDetailScreen() {
   const discountMoney = createMoney(BigInt(doc.discount_minor), doc.currency);
   const taxMoney = createMoney(BigInt(doc.tax_minor), doc.currency);
 
+
   const statusColor = isIssued
     ? theme.statusIssued
     : isAccepted
@@ -318,7 +460,13 @@ export default function DocumentDetailScreen() {
       <View style={[styles.topBar, { borderBottomColor: theme.borderSubtle, backgroundColor: theme.surface }]}>
         <Pressable
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/documents' as any);
+            }
+          }}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -600,14 +748,26 @@ export default function DocumentDetailScreen() {
                 )}
 
                 {doc.tax_minor > 0 && (
-                  <View style={styles.breakdownRow}>
-                    <Text style={[styles.breakdownLabel, { color: theme.textSecondary }]}>
-                      {doc.tax_label} ({doc.tax_rate_bp / 100}%)
-                    </Text>
+                  <Pressable
+                    style={({ pressed }) => [styles.breakdownRow, pressed && { opacity: 0.7 }]}
+                    onPress={() => setShowTaxModal(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View tax explanation for ${doc.tax_label}`}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.breakdownLabel, { color: theme.textSecondary }]}>
+                        {doc.tax_label} ({doc.tax_rate_bp / 100}%)
+                      </Text>
+                      <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: radii.xs, backgroundColor: theme.brandAnchor + '18' }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: theme.brandAnchor }}>
+                          Why this rate?
+                        </Text>
+                      </View>
+                    </View>
                     <Text style={[styles.breakdownValue, { color: theme.textPrimary }]}>
                       {formatMoney(taxMoney)}
                     </Text>
-                  </View>
+                  </Pressable>
                 )}
 
                 <View style={[styles.grandDivider, { backgroundColor: theme.borderSubtle }]} />
@@ -638,6 +798,306 @@ export default function DocumentDetailScreen() {
                 )}
               </View>
             </View>
+
+            {/* Direct UPI Payment Section (Zero Fee) */}
+            {isInvoice && isIssued && doc.balance_minor > 0 && (
+              <>
+                <View style={[styles.hairlineDivider, { backgroundColor: theme.borderSubtle }]} />
+                <View style={[styles.sectionBlock, { backgroundColor: theme.surface, borderRadius: radii.md, borderWidth: 1, borderColor: theme.borderSubtle, padding: spacing.md }]}>
+                  {(!effectiveVpa || isEditingPayee) ? (
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <QrCode size={18} color={theme.brandAnchor} />
+                          <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginBottom: 0 }]}>
+                            {isEditingPayee ? 'Payee / Vendor UPI Override' : 'Configure Direct UPI'}
+                          </Text>
+                        </View>
+                        {isEditingPayee && (
+                          <Pressable onPress={() => setIsEditingPayee(false)} hitSlop={8}>
+                            <Text style={{ fontSize: 13, color: theme.textSecondary }}>Cancel</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: spacing.md }}>
+                        {isEditingPayee
+                          ? 'Enter a vendor, contractor, or alternate bank UPI ID to direct this payment.'
+                          : 'Enter your business UPI ID (PhonePe, Google Pay, Paytm, BHIM) to instantly generate dynamic balance QR.'}
+                      </Text>
+
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary, marginBottom: 4 }}>
+                        UPI ID (VPA) *
+                      </Text>
+                      <TextInput
+                        style={{
+                          backgroundColor: theme.surfaceSecondary,
+                          color: theme.textPrimary,
+                          borderColor: inlineVpaError ? theme.statusDanger : theme.borderSubtle,
+                          borderWidth: 1,
+                          borderRadius: radii.sm,
+                          paddingHorizontal: spacing.md,
+                          height: 44,
+                          fontSize: 14,
+                          marginBottom: spacing.sm,
+                        }}
+                        placeholder="e.g. merchant@icici or vendor@okhdfcbank"
+                        placeholderTextColor={theme.textMuted}
+                        value={inlineVpaInput}
+                        onChangeText={(val) => {
+                          setInlineVpaInput(val);
+                          if (inlineVpaError) setInlineVpaError(null);
+                        }}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary, marginBottom: 4 }}>
+                        Payee / Vendor Name
+                      </Text>
+                      <TextInput
+                        style={{
+                          backgroundColor: theme.surfaceSecondary,
+                          color: theme.textPrimary,
+                          borderColor: theme.borderSubtle,
+                          borderWidth: 1,
+                          borderRadius: radii.sm,
+                          paddingHorizontal: spacing.md,
+                          height: 44,
+                          fontSize: 14,
+                          marginBottom: spacing.sm,
+                        }}
+                        placeholder="e.g. Studio Agency or Contractor Name"
+                        placeholderTextColor={theme.textMuted}
+                        value={inlineNameInput}
+                        onChangeText={setInlineNameInput}
+                      />
+
+                      {inlineVpaError && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm }}>
+                          <AlertCircle size={14} color={theme.statusDanger} />
+                          <Text style={{ fontSize: 12, color: theme.statusDanger }}>{inlineVpaError}</Text>
+                        </View>
+                      )}
+
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing.xs }}>
+                        <Pressable
+                          style={[styles.flexButton, { backgroundColor: theme.brandAnchor }]}
+                          onPress={handleSaveVpaToProfile}
+                          disabled={isSavingProfileVpa}
+                        >
+                          {isSavingProfileVpa ? (
+                            <ActivityIndicator size="small" color={theme.brandAnchorText} />
+                          ) : (
+                            <Text style={[styles.secondaryActionText, { color: theme.brandAnchorText, fontSize: 12, fontWeight: '700' }]}>
+                              Save as Default & Show QR
+                            </Text>
+                          )}
+                        </Pressable>
+
+                        <Pressable
+                          style={[styles.flexButton, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                          onPress={handleUseOnceCustomPayee}
+                        >
+                          <Text style={[styles.secondaryActionText, { color: theme.textPrimary, fontSize: 12 }]}>
+                            Use Once for this Doc
+                          </Text>
+                        </Pressable>
+                      </View>
+
+                      {customPayeeVpa ? (
+                        <Pressable
+                          onPress={handleResetToProfileDefault}
+                          style={{ alignSelf: 'center', marginTop: spacing.sm, paddingVertical: 4 }}
+                        >
+                          <Text style={{ fontSize: 12, color: theme.brandAnchor, fontWeight: '600' }}>
+                            Reset to Profile Default ({profile?.upi_vpa || 'None'})
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ) : upiUri ? (
+                    <>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <QrCode size={18} color={theme.brandAnchor} />
+                          <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginBottom: 0 }]}>
+                            Direct UPI Payment
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Pressable
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: radii.xs,
+                              borderWidth: 1,
+                              borderColor: theme.borderSubtle,
+                              backgroundColor: theme.surfaceSecondary,
+                            }}
+                            onPress={() => {
+                              setInlineVpaInput(effectiveVpa);
+                              setInlineNameInput(effectivePayeeName);
+                              setIsEditingPayee(true);
+                            }}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Change or override payee UPI ID"
+                          >
+                            <Edit3 size={11} color={theme.textPrimary} />
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textPrimary }}>
+                              {customPayeeVpa ? 'Edit Vendor' : 'Change UPI'}
+                            </Text>
+                          </Pressable>
+                          <View style={{ backgroundColor: theme.surfaceSecondary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: theme.statusSuccess }}>0% FEE</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: spacing.md }}>
+                        Scan with Google Pay, PhonePe, Paytm, BHIM, or any UPI app
+                      </Text>
+
+                      {customPayeeVpa ? (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            backgroundColor: theme.surfaceSecondary,
+                            borderRadius: radii.xs,
+                            paddingHorizontal: spacing.sm,
+                            paddingVertical: 6,
+                            marginBottom: spacing.sm,
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#D97706' }}>
+                            Vendor / Custom Payee Active: {customPayeeVpa}
+                          </Text>
+                          <Pressable onPress={handleResetToProfileDefault} hitSlop={8}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: theme.brandAnchor }}>Reset</Text>
+                          </Pressable>
+                        </View>
+                      ) : null}
+
+                      <View style={{ alignItems: 'center', marginVertical: spacing.sm, padding: spacing.sm, backgroundColor: '#ffffff', borderRadius: radii.md, alignSelf: 'center' }}>
+                        <UpiQrCode value={upiUri} size={150} color="#000000" backgroundColor="#ffffff" />
+                      </View>
+
+                      {/* Regional / FX Conversion Banner */}
+                      {upiConversion?.isConverted && (
+                        <View
+                          style={{
+                            borderWidth: 1,
+                            borderColor: theme.brandAnchor,
+                            backgroundColor: theme.surfaceSecondary,
+                            borderRadius: radii.sm,
+                            padding: spacing.sm,
+                            marginVertical: spacing.xs,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 2 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.statusSuccess }}>
+                              Auto-Converted to INR: ₹{moneyToDecimalString(createMoney(upiConversion.inrAmountMinor!, 'INR'))}
+                            </Text>
+                            <Pressable
+                              onPress={handleRefreshLiveRate}
+                              disabled={isRefreshingFx}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: radii.xs,
+                                borderWidth: 1,
+                                borderColor: theme.borderSubtle,
+                              }}
+                              hitSlop={8}
+                              accessibilityLabel="Refresh real-time market exchange rate"
+                            >
+                              {isRefreshingFx ? (
+                                <ActivityIndicator size="small" color={theme.brandAnchor} />
+                              ) : (
+                                <>
+                                  <RotateCcw size={10} color={theme.textPrimary} />
+                                  <Text style={{ fontSize: 10, color: theme.textPrimary, fontWeight: '600' }}>Live Rate</Text>
+                                </>
+                              )}
+                            </Pressable>
+                          </View>
+                          <Text style={{ fontSize: 11, color: theme.textSecondary, textAlign: 'center', marginTop: 2 }}>
+                            {upiConversion.conversionSummary} ({upiConversion.exchangeRateLabel})
+                          </Text>
+                        </View>
+                      )}
+
+                      <View style={{ alignItems: 'center', marginTop: spacing.xs, marginBottom: spacing.sm }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
+                          {effectivePayeeName}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>
+                          UPI ID: {effectiveVpa}
+                        </Text>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing.xs }}>
+                        <Pressable
+                          style={[styles.flexButton, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                          onPress={() => {
+                            Share.share({
+                              message: `Pay invoice ${doc.document_number} (${upiConversion?.isConverted ? `₹${moneyToDecimalString(createMoney(upiConversion.inrAmountMinor!, 'INR'))} INR` : formatMoney(balanceMoney)}) via UPI: ${upiUri}`,
+                              title: `UPI Payment: ${doc.document_number}`,
+                            });
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel="Share UPI payment link"
+                        >
+                          <Share2 size={14} color={theme.textPrimary} />
+                          <Text style={[styles.secondaryActionText, { color: theme.textPrimary, fontSize: 12 }]}>Share Link</Text>
+                        </Pressable>
+
+                        <Pressable
+                          style={[styles.flexButton, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                          onPress={() => {
+                            Alert.alert('UPI ID', effectiveVpa, [{ text: 'OK' }]);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel="View UPI ID"
+                        >
+                          <Copy size={14} color={theme.textPrimary} />
+                          <Text style={[styles.secondaryActionText, { color: theme.textPrimary, fontSize: 12 }]}>Copy UPI ID</Text>
+                        </Pressable>
+                      </View>
+
+                      {/* Primary CTA: I Received the Money */}
+                      <Pressable
+                        style={[
+                          styles.primaryActionBtn,
+                          { backgroundColor: theme.statusSuccess, marginTop: spacing.md },
+                        ]}
+                        onPress={() => {
+                          setPaymentInitialMethod('upi');
+                          setPaymentInitialProvider('direct_upi');
+                          setShowPaymentModal(true);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="I received the money via UPI"
+                        accessibilityHint="Opens payment record sheet to confirm direct UPI receipt"
+                      >
+                        <CheckCircle2 color="#FFFFFF" size={18} />
+                        <Text style={[styles.primaryActionText, { color: '#FFFFFF', fontWeight: '700' }]}>
+                          I Received the Money
+                        </Text>
+                      </Pressable>
+                    </>
+                  ) : null}
+                </View>
+              </>
+            )}
 
             {/* 4. Payment History & Receipts (For Invoices) */}
             {isInvoice && isIssued && (
@@ -756,8 +1216,8 @@ export default function DocumentDetailScreen() {
                   accessibilityLabel={isInvoice ? 'Issue official invoice' : 'Issue official estimate'}
                   accessibilityHint="Freezes document numbers and locks financial calculations"
                 >
-                  <FileCheck color={theme.surface} size={18} />
-                  <Text style={[styles.primaryActionText, { color: theme.surface }]}>
+                  <FileCheck color={theme.brandAnchorText} size={18} />
+                  <Text style={[styles.primaryActionText, { color: theme.brandAnchorText }]}>
                     {isInvoice ? 'Issue Official Invoice' : 'Issue Official Estimate'}
                   </Text>
                 </Pressable>
@@ -825,8 +1285,8 @@ export default function DocumentDetailScreen() {
                   accessibilityLabel="Sign and accept estimate"
                   accessibilityHint="Opens on-device signature capture pad"
                 >
-                  <PenTool color={theme.surface} size={18} />
-                  <Text style={[styles.primaryActionText, { color: theme.surface }]}>Sign & Accept Estimate</Text>
+                  <PenTool color="#FFFFFF" size={18} />
+                  <Text style={[styles.primaryActionText, { color: '#FFFFFF' }]}>Sign & Accept Estimate</Text>
                 </Pressable>
 
                 <View style={styles.buttonRow}>
@@ -869,8 +1329,8 @@ export default function DocumentDetailScreen() {
                   accessibilityLabel="Convert estimate to invoice"
                   accessibilityHint="Creates an invoice draft pre-filled with this estimate's customer and items"
                 >
-                  <ArrowRightLeft color={theme.surface} size={18} />
-                  <Text style={[styles.primaryActionText, { color: theme.surface }]}>Convert to Invoice</Text>
+                  <ArrowRightLeft color={theme.brandAnchorText} size={18} />
+                  <Text style={[styles.primaryActionText, { color: theme.brandAnchorText }]}>Convert to Invoice</Text>
                 </Pressable>
 
                 <Pressable
@@ -915,8 +1375,8 @@ export default function DocumentDetailScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Convert accepted estimate to invoice"
                 >
-                  <ArrowRightLeft color={theme.surface} size={18} />
-                  <Text style={[styles.primaryActionText, { color: theme.surface }]}>Convert to Invoice</Text>
+                  <ArrowRightLeft color={theme.brandAnchorText} size={18} />
+                  <Text style={[styles.primaryActionText, { color: theme.brandAnchorText }]}>Convert to Invoice</Text>
                 </Pressable>
 
                 <Pressable
@@ -964,8 +1424,8 @@ export default function DocumentDetailScreen() {
                     accessibilityLabel="Record payment"
                     accessibilityHint="Opens sheet to record partial or full payment and issue a receipt"
                   >
-                    <CreditCard color={theme.surface} size={18} />
-                    <Text style={[styles.primaryActionText, { color: theme.surface }]}>Record Payment</Text>
+                    <CreditCard color={theme.brandAnchorText} size={18} />
+                    <Text style={[styles.primaryActionText, { color: theme.brandAnchorText }]}>Record Payment</Text>
                   </Pressable>
                 )}
 
@@ -1043,10 +1503,16 @@ export default function DocumentDetailScreen() {
           currency={doc.currency}
           totalMinor={doc.total_minor}
           balanceMinor={doc.balance_minor}
+          initialMethod={paymentInitialMethod}
+          initialProvider={paymentInitialProvider}
           onPaymentRecorded={async () => {
             await loadData();
           }}
-          onClose={() => setShowPaymentModal(false)}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setPaymentInitialMethod(undefined);
+            setPaymentInitialProvider(undefined);
+          }}
         />
       )}
 
@@ -1068,6 +1534,16 @@ export default function DocumentDetailScreen() {
           customerId={doc.customer_id}
           customerName={doc.customer_name || ''}
           onClose={() => setShowStatementModal(false)}
+        />
+      )}
+
+      {/* Tax Authority Explanation Modal */}
+      {doc && (
+        <TaxExplanationModal
+          visible={showTaxModal}
+          onClose={() => setShowTaxModal(false)}
+          explanation={taxExplanation}
+          currency={doc.currency}
         />
       )}
     </SafeAreaView>

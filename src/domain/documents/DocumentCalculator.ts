@@ -5,7 +5,12 @@
  */
 
 import { Money, roundHalfUp } from '../money/Money';
-import { calculateTax } from '../tax/TaxEngine';
+import {
+  aggregateDocumentTax,
+  calculateTax,
+  resolveTaxForLineItem,
+  TaxDecision,
+} from '../tax/TaxEngine';
 import { calculateDocumentBalance } from '../accounting/BalanceEngine';
 import {
   DocumentCalculationInput,
@@ -66,6 +71,7 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
   let subtotalMinor = 0n;
   let totalInternalCostMinor = 0n;
   const calculatedItems: LineItemCalculation[] = [];
+  const lineTaxDecisions: TaxDecision[] = [];
 
   for (let i = 0; i < input.items.length; i++) {
     const item = input.items[i];
@@ -80,6 +86,28 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
     subtotalMinor += lineTotalMinor;
     totalInternalCostMinor += itemCostMinor;
 
+    let lineTaxDecision: TaxDecision | undefined;
+    let lineTaxMinor = 0n;
+
+    if (input.taxContext) {
+      lineTaxDecision = resolveTaxForLineItem({
+        businessProfile: input.taxContext.businessProfile,
+        customer: input.taxContext.customer,
+        item: {
+          id: item.id,
+          catalogItemId: item.catalogItemId,
+          hsnSacCode: item.hsnSacCode,
+          unitPriceMinor: item.unitPriceMinor,
+          quantityScaled: item.quantityScaled,
+          taxRateBasisPoints: item.taxRateBasisPoints !== undefined ? item.taxRateBasisPoints : (item.hsnSacCode ? undefined : input.taxRateBasisPoints),
+        },
+        taxType: item.taxType ?? input.taxType,
+        documentDate: input.currentTimestamp,
+      });
+      lineTaxMinor = lineTaxDecision.totalTaxAmountMinor;
+      lineTaxDecisions.push(lineTaxDecision);
+    }
+
     calculatedItems.push({
       id: item.id || `item_${i + 1}`,
       description: item.description,
@@ -91,6 +119,10 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
       internalCostMinor: itemCostMinor,
       profitMinor: itemProfitMinor,
       category: item.category || null,
+      hsnSacCode: item.hsnSacCode || null,
+      taxRateBasisPoints: item.taxRateBasisPoints ?? input.taxRateBasisPoints,
+      taxMinor: lineTaxMinor,
+      taxDecision: lineTaxDecision,
     });
   }
 
@@ -112,15 +144,35 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
   const taxableBase: Money = { amountMinor: taxableBaseMinor, currency };
 
   // 4. Calculate tax
-  const taxResult = calculateTax(
-    taxableBase,
-    input.taxType,
-    input.taxRateBasisPoints,
-    input.taxLabel
-  );
+  let tax: Money;
+  let grandTotal: Money;
+  let calculatedTaxableBase: Money;
+  let taxSummary = input.taxContext ? aggregateDocumentTax(lineTaxDecisions, currency) : undefined;
 
-  const tax = taxResult.taxAmount;
-  const grandTotal = taxResult.grandTotal;
+  if (input.taxContext && lineTaxDecisions.length > 0) {
+    // Multi-component tax aggregation from line decisions
+    const totalTaxMinor = lineTaxDecisions.reduce((acc, d) => acc + d.totalTaxAmountMinor, 0n);
+    tax = { amountMinor: totalTaxMinor, currency };
+
+    if (input.taxType === 'inclusive') {
+      calculatedTaxableBase = { amountMinor: taxSummary ? taxSummary.totalTaxableBaseMinor : taxableBaseMinor, currency };
+      grandTotal = { amountMinor: taxableBaseMinor, currency };
+    } else {
+      calculatedTaxableBase = taxableBase;
+      grandTotal = { amountMinor: taxableBaseMinor + totalTaxMinor, currency };
+    }
+  } else {
+    // Canonical single-rate calculation fallback
+    const taxResult = calculateTax(
+      taxableBase,
+      input.taxType,
+      input.taxRateBasisPoints,
+      input.taxLabel
+    );
+    calculatedTaxableBase = taxResult.taxableBase;
+    tax = taxResult.taxAmount;
+    grandTotal = taxResult.grandTotal;
+  }
 
   // 5. Apply deposits and payments via canonical BalanceEngine
   const balanceResult = calculateDocumentBalance({
@@ -156,7 +208,7 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
     items: calculatedItems,
     subtotal,
     discount,
-    taxableBase: taxResult.taxableBase,
+    taxableBase: calculatedTaxableBase,
     tax,
     grandTotal,
     deposit,
@@ -167,5 +219,7 @@ export function calculateDocument(input: DocumentCalculationInput): DocumentCalc
     marginBasisPoints,
     paymentStatus,
     isOverdue,
+    taxSummary,
+    taxComponents: taxSummary?.components,
   };
 }

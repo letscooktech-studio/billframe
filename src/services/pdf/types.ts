@@ -8,7 +8,7 @@ import { FullDocument } from '../../data/repositories/DocumentRepository';
 import { BusinessProfile } from '../../domain/profile/types';
 import { ReceiptRecord } from '../../data/repositories/PaymentRepository';
 
-export type PdfTemplateType = 'standard' | 'compact' | 'modern';
+export type PdfTemplateType = 'standard' | 'compact' | 'modern' | 'executive' | 'minimal';
 export type PdfPaperSize = 'a4' | 'letter';
 
 export interface PdfDocumentRenderData {

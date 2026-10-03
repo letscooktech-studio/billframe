@@ -202,7 +202,7 @@ export function CustomerStatementModal({
                 <Text
                   style={[
                     styles.periodTabText,
-                    isActive ? { color: theme.surface, fontWeight: '600' } : { color: theme.textSecondary },
+                    isActive ? { color: theme.brandAnchorText, fontWeight: '600' } : { color: theme.textSecondary },
                   ]}
                 >
                   {tab.label}
@@ -339,11 +339,11 @@ export function CustomerStatementModal({
             accessibilityLabel="Share statement via WhatsApp or email"
           >
             {shareSuccess ? (
-              <CheckCircle2 color={theme.surface} size={18} />
+              <CheckCircle2 color={theme.brandAnchorText} size={18} />
             ) : (
-              <Share2 color={theme.surface} size={18} />
+              <Share2 color={theme.brandAnchorText} size={18} />
             )}
-            <Text style={[styles.shareBtnText, { color: theme.surface }]}>
+            <Text style={[styles.shareBtnText, { color: theme.brandAnchorText }]}>
               {shareSuccess ? 'Statement Shared' : 'Share Statement (WhatsApp / Email)'}
             </Text>
           </Pressable>

@@ -22,14 +22,20 @@ export const spacing = {
 } as const;
 
 export const radii = {
+  /** 4dp - Small tags, badges */
+  xs: 4,
   /** 8dp - Inputs, standard buttons, item rows */
   sm: 8,
   /** 12dp - Containers, dialogs */
   md: 12,
   /** 16dp - Bottom sheet top corners */
   lg: 16,
+  /** 20dp - Large bottom sheets, modals */
+  xl: 20,
   /** 9999dp - Exclusively for status badges / pills */
   pill: 9999,
+  /** 9999dp - Circular avatars / pills */
+  full: 9999,
 } as const;
 
 export const typography = {
@@ -85,6 +91,8 @@ export interface ThemeColors {
   textSecondary: string;
   textMuted: string;
   brandAnchor: string;
+  /** Text color ON a brandAnchor background. White in light mode, near-black in dark mode. */
+  brandAnchorText: string;
   statusDraft: string;
   statusIssued: string;
   statusSuccess: string;
@@ -103,6 +111,7 @@ export const colors: { light: ThemeColors; dark: ThemeColors } = {
     textSecondary: '#6B6B6B',
     textMuted: '#9E9E9C',
     brandAnchor: '#171717',
+    brandAnchorText: '#FFFFFF',
     statusDraft: '#6B6B6B',
     statusIssued: '#2563EB',
     statusSuccess: '#15803D',
@@ -119,6 +128,7 @@ export const colors: { light: ThemeColors; dark: ThemeColors } = {
     textSecondary: '#A1A1A1',
     textMuted: '#666666',
     brandAnchor: '#F5F5F5',
+    brandAnchorText: '#111111',
     statusDraft: '#A1A1A1',
     statusIssued: '#3B82F6',
     statusSuccess: '#22C55E',

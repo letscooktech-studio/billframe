@@ -18,6 +18,8 @@ import { DatabaseManager } from '../data/database/DatabaseManager';
 import { WorkspaceRepository } from '../data/repositories/WorkspaceRepository';
 import { SecurityProvider, useSecurity } from '../services/security/SecurityContext';
 import { LockChallengeScreen } from '../components/security/LockChallengeScreen';
+import { ExchangeRateEngine } from '../domain/money/ExchangeRateEngine';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import OnboardingScreen from './onboarding';
 import { colors } from '../design/tokens';
 
@@ -37,6 +39,8 @@ function RootLayoutInner() {
         setDbReady(true);
         const completed = await WorkspaceRepository.isOnboardingCompletedAsync();
         setOnboardingCompleted(completed);
+        // Silently pre-fetch real-time market exchange rates from internet in background
+        ExchangeRateEngine.fetchLiveRatesAsync().catch(() => {});
       } catch (err: any) {
         setDbError(err?.message || 'Database initialization failed');
       }
@@ -99,6 +103,8 @@ function RootLayoutInner() {
       <Stack.Screen name="onboarding" options={{ presentation: 'card' }} />
       <Stack.Screen name="onboarding/setup" options={{ presentation: 'card' }} />
       <Stack.Screen name="settings/workspace" options={{ presentation: 'card' }} />
+      <Stack.Screen name="settings/payments" options={{ presentation: 'card' }} />
+      <Stack.Screen name="collections/index" options={{ presentation: 'card' }} />
       <Stack.Screen name="backup" options={{ presentation: 'card' }} />
       <Stack.Screen name="expenses/index" options={{ presentation: 'card' }} />
       <Stack.Screen name="expenses/add" options={{ presentation: 'card' }} />
@@ -118,9 +124,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={[styles.flex, { backgroundColor: theme.background }]}>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        <SecurityProvider>
-          <RootLayoutInner />
-        </SecurityProvider>
+        <ErrorBoundary>
+          <SecurityProvider>
+            <RootLayoutInner />
+          </SecurityProvider>
+        </ErrorBoundary>
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );

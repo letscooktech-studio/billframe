@@ -17,10 +17,41 @@ import {
   parseDecimalStringToMoney,
   roundHalfUp,
   subtractMoney,
+  toBigIntSafe,
 } from '../../src/domain/money/Money';
 import { calculateTax } from '../../src/domain/tax/TaxEngine';
 
 describe('1. Pure Money & Minor Unit Arithmetic', () => {
+  test('toBigIntSafe safely converts numbers, floats, strings and handles invalid values without throwing RangeError', () => {
+    // BigInt pass-through
+    expect(toBigIntSafe(100n)).toBe(100n);
+    expect(toBigIntSafe(-50n)).toBe(-50n);
+
+    // Number integers
+    expect(toBigIntSafe(2500)).toBe(2500n);
+    expect(toBigIntSafe(0)).toBe(0n);
+
+    // Number floats (which would throw RangeError with standard BigInt)
+    expect(toBigIntSafe(100.4)).toBe(100n);
+    expect(toBigIntSafe(100.6)).toBe(101n);
+    expect(toBigIntSafe(-100.6)).toBe(-101n);
+
+    // Strings
+    expect(toBigIntSafe('500')).toBe(500n);
+    expect(toBigIntSafe('-500')).toBe(-500n);
+    expect(toBigIntSafe('123.45')).toBe(123n);
+    expect(toBigIntSafe('123.85')).toBe(124n);
+    expect(toBigIntSafe('   999   ')).toBe(999n);
+
+    // Invalid & edge cases
+    expect(toBigIntSafe(null)).toBe(0n);
+    expect(toBigIntSafe(undefined)).toBe(0n);
+    expect(toBigIntSafe(NaN)).toBe(0n);
+    expect(toBigIntSafe(Infinity)).toBe(0n);
+    expect(toBigIntSafe('invalid', 99n)).toBe(99n);
+    expect(toBigIntSafe('', 10n)).toBe(10n);
+  });
+
   test('Financial Round Half-Up behaves identically to standard accounting rules', () => {
     // 5 / 2 = 2.5 -> rounds to 3
     expect(roundHalfUp(5n, 2n)).toBe(3n);

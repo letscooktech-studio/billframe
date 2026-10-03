@@ -17,6 +17,12 @@ export interface BackupTableCounts {
   expenses: number;
   time_entries: number;
   estimate_revisions: number;
+  credit_notes?: number;
+  customer_advances?: number;
+  credit_allocations?: number;
+  payment_refunds?: number;
+  reminder_events?: number;
+  invoice_collection_metadata?: number;
 }
 
 export interface BackupManifest {
@@ -43,6 +49,12 @@ export interface BackupPayload {
     expenses: any[];
     time_entries: any[];
     estimate_revisions: any[];
+    credit_notes?: any[];
+    customer_advances?: any[];
+    credit_allocations?: any[];
+    payment_refunds?: any[];
+    reminder_events?: any[];
+    invoice_collection_metadata?: any[];
   };
 }
 

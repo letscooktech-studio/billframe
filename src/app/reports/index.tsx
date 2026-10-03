@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, TrendingUp, DollarSign, Clock, Users, ArrowUpRight } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
-import { formatMoney } from '../../domain/money/Money';
+import { formatMoney, toBigIntSafe } from '../../domain/money/Money';
 
 type PeriodPreset = 'this_month' | 'last_month' | 'this_year' | 'all';
 
@@ -103,7 +103,7 @@ export default function ReportsScreen() {
         invParams.push(end);
       }
       const invRow = await db.getFirstAsync<{ sum_total: number }>(invSql, invParams);
-      const totalInvoiced = BigInt(invRow?.sum_total || 0);
+      const totalInvoiced = toBigIntSafe(invRow?.sum_total);
       setInvoicedMinor(totalInvoiced);
 
       // Collected payments in period
@@ -121,7 +121,7 @@ export default function ReportsScreen() {
         }
       }
       const payRow = await db.getFirstAsync<{ sum_paid: number }>(paySql, payParams);
-      const totalCollected = BigInt(payRow?.sum_paid || 0);
+      const totalCollected = toBigIntSafe(payRow?.sum_paid);
       setCollectedMinor(totalCollected);
 
       // Expenses in period
@@ -139,7 +139,7 @@ export default function ReportsScreen() {
         }
       }
       const expRow = await db.getFirstAsync<{ sum_exp: number }>(expSql, expParams);
-      const totalExpenses = BigInt(expRow?.sum_exp || 0);
+      const totalExpenses = toBigIntSafe(expRow?.sum_exp);
       setExpensesMinor(totalExpenses);
 
       // Net profit = Cash Collected - Cash Expenses
@@ -155,7 +155,7 @@ export default function ReportsScreen() {
          FROM documents d
          WHERE d.doc_type = 'invoice' AND d.lifecycle_status = 'issued' AND d.is_archived = 0;`
       );
-      setOutstandingMinor(BigInt(Math.max(0, outRow?.outstanding || 0)));
+      setOutstandingMinor(toBigIntSafe(Math.max(0, outRow?.outstanding || 0)));
 
       // Overdue invoices (due_date < now, balance > 0)
       const nowTs = Date.now();
@@ -180,7 +180,7 @@ export default function ReportsScreen() {
         const paid = pRow?.sum_paid || 0;
         const bal = d.total_minor - paid;
         if (bal > 0) {
-          sumOverdue += BigInt(bal);
+          sumOverdue += toBigIntSafe(bal);
           cntOverdue++;
         }
       }
@@ -272,7 +272,7 @@ export default function ReportsScreen() {
                   <Text
                     style={[
                       styles.periodText,
-                      { color: active ? theme.surface : theme.textPrimary },
+                      { color: active ? theme.brandAnchorText : theme.textPrimary },
                     ]}
                   >
                     {p.label}
@@ -358,7 +358,7 @@ export default function ReportsScreen() {
                       {c.category.toUpperCase()}
                     </Text>
                     <Text style={[styles.categoryAmount, { color: theme.textPrimary }]}>
-                      {formatMoney({ amountMinor: BigInt(c.total_minor), currency }, locale)}
+                      {formatMoney({ amountMinor: toBigIntSafe(c.total_minor), currency }, locale)}
                     </Text>
                   </View>
                 ))}
@@ -391,7 +391,7 @@ export default function ReportsScreen() {
                       </View>
                     </View>
                     <Text style={[styles.customerTotal, { color: theme.textPrimary }]}>
-                      {formatMoney({ amountMinor: BigInt(cust.total_invoiced_minor), currency }, locale)}
+                      {formatMoney({ amountMinor: toBigIntSafe(cust.total_invoiced_minor), currency }, locale)}
                     </Text>
                   </View>
                 ))}

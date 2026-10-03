@@ -260,4 +260,17 @@ export class PaymentRepository {
     const db = await this.getDb();
     return db.getFirstAsync<ReceiptRecord>('SELECT * FROM receipts WHERE id = ?;', [receiptId]);
   }
+
+  static async getPaymentById(paymentId: string): Promise<PaymentRecord | null> {
+    const db = await this.getDb();
+    return db.getFirstAsync<PaymentRecord>('SELECT * FROM payments WHERE id = ?;', [paymentId]);
+  }
+
+  static async getPaymentByProviderPaymentId(providerPaymentId: string): Promise<PaymentRecord | null> {
+    const db = await this.getDb();
+    return db.getFirstAsync<PaymentRecord>(
+      'SELECT * FROM payments WHERE provider_payment_id = ?;',
+      [providerPaymentId]
+    );
+  }
 }

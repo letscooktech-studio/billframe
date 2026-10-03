@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Save, Building2, Check, AlertCircle } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
+import { DirectUpiEngine } from '../../domain/payments/upi/DirectUpiEngine';
 
 const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'CAD', 'AUD', 'JPY', 'SGD', 'AED'];
 
@@ -40,6 +41,8 @@ export default function BusinessSetupScreen() {
   const [postalCode, setPostalCode] = useState('');
   const [country, setCountry] = useState('US');
   const [currency, setCurrency] = useState('USD');
+  const [upiVpa, setUpiVpa] = useState('');
+  const [upiError, setUpiError] = useState<string | null>(null);
   const [defaultNotes, setDefaultNotes] = useState('');
   const [defaultTerms, setDefaultTerms] = useState('');
 
@@ -71,6 +74,7 @@ export default function BusinessSetupScreen() {
           setPostalCode(profile.postal_code || '');
           setCountry(profile.country || 'US');
           setCurrency(profile.default_currency || 'USD');
+          setUpiVpa(profile.upi_vpa || '');
           setDefaultNotes(profile.default_notes || '');
           setDefaultTerms(profile.default_payment_terms || '');
         }
@@ -97,6 +101,14 @@ export default function BusinessSetupScreen() {
       return;
     }
 
+    if (upiVpa.trim()) {
+      const vpaCheck = DirectUpiEngine.validateVpa(upiVpa.trim());
+      if (!vpaCheck.isValid) {
+        setError(`Invalid UPI ID: ${vpaCheck.error}`);
+        return;
+      }
+    }
+
     setIsSaving(true);
     setError(null);
 
@@ -108,6 +120,7 @@ export default function BusinessSetupScreen() {
         `UPDATE business_profiles SET
           name = ?, legal_name = ?, tax_id = ?, email = ?, phone = ?,
           address_line1 = ?, city = ?, state = ?, postal_code = ?, country = ?,
+          phone_country_iso2 = ?, phone_e164 = ?, upi_vpa = ?,
           default_currency = ?, default_notes = ?, default_payment_terms = ?, updated_at = ?
          WHERE id = ?;`,
         [
@@ -121,6 +134,9 @@ export default function BusinessSetupScreen() {
           stateVal.trim() || null,
           postalCode.trim() || null,
           country.trim() || 'US',
+          country.trim() || 'US',
+          phone.trim() || null,
+          upiVpa.trim() || null,
           currency,
           defaultNotes.trim() || null,
           defaultTerms.trim() || null,
@@ -176,7 +192,7 @@ export default function BusinessSetupScreen() {
             accessibilityRole="button"
             accessibilityLabel="Save business profile"
           >
-            <Text style={[styles.saveBtnText, { color: theme.surface }]}>
+            <Text style={[styles.saveBtnText, { color: theme.brandAnchorText }]}>
               {isSaving ? 'Saving...' : 'Save'}
             </Text>
           </Pressable>
@@ -314,6 +330,37 @@ export default function BusinessSetupScreen() {
                   );
                 })}
               </View>
+            </View>
+
+            {/* Direct UPI Payment Settings */}
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DIRECT UPI PAYMENTS (ZERO FEE)</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginTop: spacing.xs }]}>
+                Merchant UPI ID / VPA
+              </Text>
+              <TextInput
+                style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                placeholder="e.g. business@okhdfcbank or yourname@upi"
+                placeholderTextColor={theme.textMuted}
+                value={upiVpa}
+                onChangeText={(text) => {
+                  setUpiVpa(text);
+                  if (text.trim() && !DirectUpiEngine.validateVpa(text.trim()).isValid) {
+                    setUpiError(DirectUpiEngine.validateVpa(text.trim()).error || null);
+                  } else {
+                    setUpiError(null);
+                  }
+                }}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              {upiError ? (
+                <Text style={{ color: theme.statusDanger, fontSize: 11, marginTop: 4 }}>{upiError}</Text>
+              ) : (
+                <Text style={{ color: theme.textMuted, fontSize: 11, marginTop: 4 }}>
+                  Generates instant offline QR codes on invoices for direct bank-to-bank settlement with 0% gateway fees.
+                </Text>
+              )}
             </View>
 
             {/* Document Number Prefixes */}

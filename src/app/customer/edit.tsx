@@ -131,7 +131,7 @@ export default function CustomerEditScreen() {
             accessibilityRole="button"
             accessibilityLabel="Save customer"
           >
-            <Text style={[styles.saveBtnText, { color: theme.surface }]}>{isSaving ? 'Saving...' : 'Save'}</Text>
+            <Text style={[styles.saveBtnText, { color: theme.brandAnchorText }]}>{isSaving ? 'Saving...' : 'Save'}</Text>
           </Pressable>
         </View>
 

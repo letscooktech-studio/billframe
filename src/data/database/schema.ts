@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS business_profiles (
   subdivision_name TEXT,
   phone_country_iso2 TEXT,
   phone_e164 TEXT,
+  upi_vpa TEXT,
   logo_uri TEXT,
   default_currency TEXT NOT NULL DEFAULT 'USD',
   default_document_locale TEXT NOT NULL DEFAULT 'en-US',
@@ -47,6 +48,9 @@ CREATE TABLE IF NOT EXISTS customers (
   billing_address TEXT,
   shipping_address TEXT,
   country TEXT,
+  subdivision_code TEXT,
+  subdivision_name TEXT,
+  is_business INTEGER NOT NULL DEFAULT 0,
   tax_id TEXT,
   notes TEXT,
   is_archived INTEGER NOT NULL DEFAULT 0,
@@ -66,6 +70,9 @@ CREATE TABLE IF NOT EXISTS catalog_items (
   currency TEXT NOT NULL DEFAULT 'USD',
   unit_name TEXT NOT NULL DEFAULT 'item',
   default_tax_rate_bp INTEGER NOT NULL DEFAULT 0,
+  hsn_sac_code TEXT,
+  item_type TEXT NOT NULL DEFAULT 'service',
+  tax_category TEXT,
   is_archived INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
@@ -77,7 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_catalog_name ON catalog_items(name);
 CREATE TABLE IF NOT EXISTS number_sequences (
   id TEXT PRIMARY KEY NOT NULL,
   business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
-  doc_type TEXT NOT NULL CHECK(doc_type IN ('invoice', 'estimate', 'receipt', 'credit_note', 'proforma', 'delivery_note', 'work_order')),
+  doc_type TEXT NOT NULL CHECK(doc_type IN ('invoice', 'estimate', 'receipt', 'credit_note', 'proforma', 'delivery_note', 'work_order', 'proposal', 'sow')),
   prefix TEXT NOT NULL,
   next_sequence_number INTEGER NOT NULL DEFAULT 1,
   suffix TEXT NOT NULL DEFAULT '',
@@ -103,12 +110,12 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 CREATE INDEX IF NOT EXISTS idx_jobs_customer ON jobs(customer_id);
 
--- 5. Documents (Invoices, Estimates, Receipts, Credit Notes, Proformas, Delivery Notes, Work Orders)
+-- 5. Documents (Invoices, Estimates, Receipts, Credit Notes, Proformas, Delivery Notes, Work Orders, Proposals, SOWs)
 CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY NOT NULL,
   business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE RESTRICT,
   job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
-  doc_type TEXT NOT NULL CHECK(doc_type IN ('invoice', 'estimate', 'receipt', 'credit_note', 'proforma', 'delivery_note', 'work_order')),
+  doc_type TEXT NOT NULL CHECK(doc_type IN ('invoice', 'estimate', 'receipt', 'credit_note', 'proforma', 'delivery_note', 'work_order', 'proposal', 'sow')),
   sequence_number INTEGER,
   document_number TEXT NOT NULL,
   customer_id TEXT REFERENCES customers(id) ON DELETE RESTRICT,
@@ -135,6 +142,11 @@ CREATE TABLE IF NOT EXISTS documents (
   internal_notes TEXT,
   signature_uri TEXT,
   signature_date INTEGER,
+  place_of_supply TEXT,
+  supply_type TEXT,
+  reverse_charge INTEGER NOT NULL DEFAULT 0,
+  payment_link_url TEXT,
+  payment_link_id TEXT,
   parent_document_id TEXT REFERENCES documents(id),
   is_archived INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
@@ -155,11 +167,16 @@ CREATE TABLE IF NOT EXISTS document_items (
   description TEXT NOT NULL,
   item_notes TEXT,
   category TEXT,
+  hsn_sac_code TEXT,
   quantity_scaled INTEGER NOT NULL DEFAULT 10000,
   unit_name TEXT NOT NULL DEFAULT 'item',
   unit_price_minor INTEGER NOT NULL DEFAULT 0,
   internal_cost_minor INTEGER NOT NULL DEFAULT 0,
   line_total_minor INTEGER NOT NULL DEFAULT 0,
+  tax_rate_bp INTEGER NOT NULL DEFAULT 0,
+  tax_minor INTEGER NOT NULL DEFAULT 0,
+  tax_type TEXT NOT NULL DEFAULT 'exclusive',
+  tax_components_json TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0
 );
 
@@ -368,5 +385,140 @@ CREATE TABLE IF NOT EXISTS subdivisions (
 
 CREATE INDEX IF NOT EXISTS idx_subdivisions_country ON subdivisions(country_iso2);
 CREATE INDEX IF NOT EXISTS idx_subdivisions_country_name ON subdivisions(country_iso2, name);
+
+-- 20. Document Tax Snapshots (Frozen tax audit ledger)
+CREATE TABLE IF NOT EXISTS document_tax_snapshots (
+  id TEXT PRIMARY KEY NOT NULL,
+  document_id TEXT NOT NULL UNIQUE REFERENCES documents(id) ON DELETE CASCADE,
+  tax_pack_id TEXT NOT NULL,
+  tax_pack_version TEXT NOT NULL,
+  place_of_supply TEXT,
+  supply_type TEXT NOT NULL,
+  reverse_charge INTEGER NOT NULL DEFAULT 0,
+  tax_summary_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_doc_tax_snapshots_doc ON document_tax_snapshots(document_id);
+
+-- 21. Payment Provider Connections (Non-secret provider connection metadata)
+CREATE TABLE IF NOT EXISTS payment_provider_connections (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL CHECK(provider IN ('razorpay', 'cashfree', 'stripe', 'other')),
+  status TEXT NOT NULL DEFAULT 'not_configured' CHECK(status IN ('not_configured', 'sandbox', 'partner_approval_required', 'production_available', 'connected', 'suspended')),
+  merchant_account_reference TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  is_testnet INTEGER NOT NULL DEFAULT 1,
+  key_id TEXT,
+  capabilities_json TEXT,
+  last_synced_at INTEGER,
+  metadata_json TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  CONSTRAINT uq_provider_business UNIQUE(business_profile_id, provider)
+);
+
+CREATE INDEX IF NOT EXISTS idx_provider_connections_bus ON payment_provider_connections(business_profile_id);
+
+-- 22. Credit Notes (Immutable sales adjustment & tax correction document)
+CREATE TABLE IF NOT EXISTS credit_notes (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  original_invoice_id TEXT NOT NULL REFERENCES documents(id),
+  credit_note_number TEXT NOT NULL UNIQUE,
+  reason TEXT NOT NULL,
+  credit_amount_minor INTEGER NOT NULL,
+  tax_amount_minor INTEGER NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL,
+  issue_date INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('issued', 'applied', 'refunded', 'void')),
+  snapshot_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_credit_notes_customer ON credit_notes(customer_id);
+CREATE INDEX IF NOT EXISTS idx_credit_notes_invoice ON credit_notes(original_invoice_id);
+
+-- 23. Customer Advances (Customer credit balance ledger)
+CREATE TABLE IF NOT EXISTS customer_advances (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  original_amount_minor INTEGER NOT NULL,
+  remaining_amount_minor INTEGER NOT NULL,
+  currency TEXT NOT NULL,
+  payment_source TEXT NOT NULL,
+  reference TEXT,
+  notes TEXT,
+  advance_date INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('available', 'partially_allocated', 'fully_allocated', 'refunded')),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_advances_cust ON customer_advances(customer_id);
+
+-- 24. Credit Allocations (Advance & Credit Note allocations against Invoices)
+CREATE TABLE IF NOT EXISTS credit_allocations (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  customer_advance_id TEXT REFERENCES customer_advances(id) ON DELETE CASCADE,
+  credit_note_id TEXT REFERENCES credit_notes(id) ON DELETE CASCADE,
+  invoice_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  allocated_amount_minor INTEGER NOT NULL,
+  currency TEXT NOT NULL,
+  allocated_at INTEGER NOT NULL,
+  notes TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_credit_allocations_inv ON credit_allocations(invoice_id);
+
+-- 25. Payment Refunds (Immutable refunds linked to original payment)
+CREATE TABLE IF NOT EXISTS payment_refunds (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  payment_id TEXT NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  invoice_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  refund_amount_minor INTEGER NOT NULL,
+  currency TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('completed', 'pending', 'failed')),
+  provider_refund_id TEXT,
+  refund_date INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_refunds_pay ON payment_refunds(payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_refunds_inv ON payment_refunds(invoice_id);
+
+-- 26. Reminder Events (Accounts Receivable Collection Reminder History)
+CREATE TABLE IF NOT EXISTS reminder_events (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  invoice_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  channel TEXT NOT NULL CHECK(channel IN ('whatsapp', 'sms', 'email', 'manual')),
+  template TEXT NOT NULL CHECK(template IN ('friendly', 'firm', 'urgent', 'custom')),
+  status TEXT NOT NULL CHECK(status IN ('opened_for_sending', 'sent', 'failed')),
+  is_automated INTEGER NOT NULL DEFAULT 0,
+  reminder_date INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminder_events_inv ON reminder_events(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_reminder_events_cust ON reminder_events(customer_id);
+
+-- 27. Invoice Collection Metadata (Promise to Pay & Expected Dates)
+CREATE TABLE IF NOT EXISTS invoice_collection_metadata (
+  document_id TEXT PRIMARY KEY NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  expected_payment_date INTEGER,
+  promise_to_pay_date INTEGER,
+  collection_notes TEXT,
+  updated_at INTEGER NOT NULL
+);
 `;
 

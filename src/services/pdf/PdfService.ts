@@ -14,6 +14,8 @@ import { PdfPaperSize, PdfTemplateType } from './types';
 import { renderStandardTemplate } from './templates/standardTemplate';
 import { renderCompactTemplate } from './templates/compactTemplate';
 import { renderModernTemplate } from './templates/modernTemplate';
+import { renderExecutiveTemplate } from './templates/executiveTemplate';
+import { renderMinimalTemplate } from './templates/minimalTemplate';
 import { renderReceiptTemplate } from './templates/receiptTemplate';
 
 export class PdfService {
@@ -31,6 +33,10 @@ export class PdfService {
         return renderCompactTemplate(doc, business, paperSize);
       case 'modern':
         return renderModernTemplate(doc, business, paperSize);
+      case 'executive':
+        return renderExecutiveTemplate(doc, business, paperSize);
+      case 'minimal':
+        return renderMinimalTemplate(doc, business, paperSize);
       case 'standard':
       default:
         return renderStandardTemplate(doc, business, paperSize);

@@ -12,9 +12,32 @@ export class BusinessProfileRepository {
    */
   static async getActiveProfile(): Promise<BusinessProfile | null> {
     const db = await DatabaseManager.getDatabaseAsync();
-    return await db.getFirstAsync<BusinessProfile>(
+    let profile = await db.getFirstAsync<BusinessProfile>(
       'SELECT * FROM business_profiles WHERE is_active = 1 LIMIT 1;'
     );
+    if (!profile) {
+      profile = await db.getFirstAsync<BusinessProfile>(
+        'SELECT * FROM business_profiles ORDER BY created_at ASC LIMIT 1;'
+      );
+      if (profile) {
+        await db.runAsync('UPDATE business_profiles SET is_active = 1 WHERE id = ?;', [profile.id]);
+      }
+    }
+    if (!profile) {
+      const now = Date.now();
+      const defaultId = 'default_business_profile';
+      await db.runAsync(
+        `INSERT INTO business_profiles (
+          id, name, country, default_currency, default_document_locale, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?);`,
+        [defaultId, 'My Business', 'IN', 'INR', 'en-IN', now, now]
+      );
+      profile = await db.getFirstAsync<BusinessProfile>(
+        'SELECT * FROM business_profiles WHERE id = ?;',
+        [defaultId]
+      );
+    }
+    return profile;
   }
 
   /**
@@ -33,38 +56,45 @@ export class BusinessProfileRepository {
    */
   static async updateProfile(profile: Partial<BusinessProfile> & { id: string }): Promise<void> {
     const db = await DatabaseManager.getDatabaseAsync();
+    const existing = (await this.getById(profile.id)) || (await this.getActiveProfile());
+    const merged = { ...existing, ...profile };
     const now = Date.now();
-    const country = profile.country_iso2 || profile.country || 'US';
+    const country = merged.country_iso2 || merged.country || 'IN';
+    const profileId = existing?.id || profile.id || 'default_business_profile';
+
     await db.runAsync(
       `UPDATE business_profiles SET
         name = ?, legal_name = ?, tax_id = ?, email = ?, phone = ?,
         address_line1 = ?, city = ?, state = ?, postal_code = ?,
         country = ?, country_iso2 = ?, subdivision_code = ?, subdivision_name = ?,
-        phone_country_iso2 = ?, phone_e164 = ?,
-        default_currency = ?, default_notes = ?,
-        default_payment_terms = ?, updated_at = ?
+        phone_country_iso2 = ?, phone_e164 = ?, upi_vpa = ?,
+        default_currency = ?, default_document_locale = ?, default_notes = ?,
+        default_payment_terms = ?, logo_uri = ?, is_active = 1, updated_at = ?
       WHERE id = ?;`,
       [
-        profile.name || '',
-        profile.legal_name || null,
-        profile.tax_id || null,
-        profile.email || null,
-        profile.phone || null,
-        profile.address_line1 || null,
-        profile.city || null,
-        profile.state || null,
-        profile.postal_code || null,
+        merged.name || 'My Business',
+        merged.legal_name || null,
+        merged.tax_id || null,
+        merged.email || null,
+        merged.phone || null,
+        merged.address_line1 || null,
+        merged.city || null,
+        merged.state || null,
+        merged.postal_code || null,
         country,
         country,
-        profile.subdivision_code || null,
-        profile.subdivision_name || profile.state || null,
-        profile.phone_country_iso2 || null,
-        profile.phone_e164 || null,
-        profile.default_currency || 'USD',
-        profile.default_notes || null,
-        profile.default_payment_terms || null,
+        merged.subdivision_code || null,
+        merged.subdivision_name || merged.state || null,
+        merged.phone_country_iso2 || null,
+        merged.phone_e164 || null,
+        merged.upi_vpa || null,
+        merged.default_currency || 'INR',
+        merged.default_document_locale || (country === 'IN' ? 'en-IN' : 'en-US'),
+        merged.default_notes || null,
+        merged.default_payment_terms || null,
+        merged.logo_uri || null,
         now,
-        profile.id,
+        profileId,
       ]
     );
   }

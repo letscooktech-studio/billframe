@@ -119,7 +119,7 @@ export default function CatalogScreen() {
           accessibilityRole="button"
           accessibilityLabel="Add catalog item"
         >
-          <Plus color={theme.surface} size={18} strokeWidth={2.5} />
+          <Plus color={theme.brandAnchorText} size={18} strokeWidth={2.5} />
         </Pressable>
       </View>
 
@@ -175,7 +175,7 @@ export default function CatalogScreen() {
                 style={[styles.emptyButton, { backgroundColor: theme.brandAnchor }]}
                 onPress={() => setShowAddModal(true)}
               >
-                <Text style={[styles.emptyButtonText, { color: theme.surface }]}>Add Item</Text>
+                <Text style={[styles.emptyButtonText, { color: theme.brandAnchorText }]}>Add Item</Text>
               </Pressable>
             </View>
           }
@@ -246,7 +246,7 @@ export default function CatalogScreen() {
                 style={[styles.saveBtn, { backgroundColor: theme.brandAnchor }]}
                 onPress={handleCreateItem}
               >
-                <Text style={[styles.saveBtnText, { color: theme.surface }]}>Save Item</Text>
+                <Text style={[styles.saveBtnText, { color: theme.brandAnchorText }]}>Save Item</Text>
               </Pressable>
             </View>
           </View>

@@ -1,7 +1,7 @@
 /**
- * HOME SCREEN
- * Compact dashboard with unmistakable primary actions, outstanding/paid summaries,
- * and recent documents list. No fake charts.
+ * HOME SCREEN — BILLFRAME COMMAND CENTER
+ * Adaptive personalized business workspace with deterministic persona indicators,
+ * connected workflow launchers, authoritative outstanding/paid summaries, and recent activity.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -17,7 +17,18 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, FileText, ArrowUpRight, Zap, ChevronRight, Search, Sparkles } from 'lucide-react-native';
+import {
+  Plus,
+  FileText,
+  ArrowUpRight,
+  Zap,
+  ChevronRight,
+  Search,
+  Sparkles,
+  SlidersHorizontal,
+  Clock,
+  Package,
+} from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { FeatureIcon } from '../../design/icons';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
@@ -25,7 +36,7 @@ import { DocumentRepository } from '../../data/repositories/DocumentRepository';
 import { WorkspaceRepository } from '../../data/repositories/WorkspaceRepository';
 import { FeatureUsageRepository } from '../../data/repositories/FeatureUsageRepository';
 import { AdaptiveWorkspaceEngine } from '../../domain/workspace/AdaptiveWorkspaceEngine';
-import { FeatureCapability } from '../../domain/features/FeatureRegistry';
+import { FeatureCapability, BusinessType } from '../../domain/features/FeatureRegistry';
 import { formatMoney } from '../../domain/money/Money';
 
 interface RecentDocument {
@@ -39,6 +50,49 @@ interface RecentDocument {
   issue_date: number;
 }
 
+const WORKSPACE_META: Record<string, { label: string; mode: string; subtitle: string }> = {
+  freelancer: {
+    label: 'FREELANCER & CONSULTING',
+    mode: 'Freelancer Workspace',
+    subtitle: 'Direct billing, client proposals & WhatsApp reminders',
+  },
+  contractor: {
+    label: 'CONTRACTOR & TRADES',
+    mode: 'Contractor & Trades Workspace',
+    subtitle: 'Quotes, progressive billing & project expenses',
+  },
+  retail: {
+    label: 'RETAIL & STOREFRONT',
+    mode: 'Retail & POS Workspace',
+    subtitle: '30s quick counter billing, catalog & store ledger',
+  },
+  service: {
+    label: 'SERVICE BUSINESS',
+    mode: 'Service Business Workspace',
+    subtitle: 'Service quotes, client invoicing & payment recovery',
+  },
+  agency: {
+    label: 'AGENCY & STUDIO',
+    mode: 'Agency & Studio Workspace',
+    subtitle: 'Retainers, proposals & client account statements',
+  },
+  wholesale: {
+    label: 'WHOLESALE & B2B',
+    mode: 'Wholesale & B2B Workspace',
+    subtitle: 'Bulk invoicing, catalog rates & debtor aging',
+  },
+  professional: {
+    label: 'PROFESSIONAL PRACTICE',
+    mode: 'Professional Practice Workspace',
+    subtitle: 'Client retainers, instant billing & payment receipts',
+  },
+  other: {
+    label: 'BUSINESS OPERATING MODE',
+    mode: 'Business Workspace',
+    subtitle: 'Invoicing, expenses, collections & reports',
+  },
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -50,6 +104,7 @@ export default function HomeScreen() {
   const [documentLocale, setDocumentLocale] = useState<string>('en-US');
   const [recents, setRecents] = useState<RecentDocument[]>([]);
   const [adaptiveActions, setAdaptiveActions] = useState<FeatureCapability[]>([]);
+  const [businessType, setBusinessType] = useState<BusinessType>('other');
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean>(true);
 
   const loadData = useCallback(async () => {
@@ -67,7 +122,7 @@ export default function HomeScreen() {
         setDocumentLocale(profile.default_document_locale || 'en-US');
       }
 
-      // 2. Fetch authoritative business metrics from canonical domain/repository layer
+      // 2. Fetch authoritative business metrics
       const metrics = await DocumentRepository.getHomeDashboardMetricsAsync();
       setOutstandingMinor(metrics.outstandingMinor);
       setPaidThisMonthMinor(metrics.paidThisMonthMinor);
@@ -78,12 +133,14 @@ export default function HomeScreen() {
         FeatureUsageRepository.getAllUsageAsync(),
       ]);
       setOnboardingCompleted(workspacePrefs.onboardingCompleted);
+      setBusinessType(workspacePrefs.businessType);
 
+      // Resolve prioritized ready actions for the active business persona (strictly ready with real routes)
       const prioritized = AdaptiveWorkspaceEngine.getPrioritizedQuickActions(
         workspacePrefs,
         usageHistory,
-        4
-      );
+        6
+      ).filter((a) => a.availability === 'ready' && Boolean(a.route));
       setAdaptiveActions(prioritized);
 
       // 4. Fetch recent documents
@@ -106,12 +163,6 @@ export default function HomeScreen() {
     await FeatureUsageRepository.recordUsageAsync(action.id);
     if (action.availability === 'ready' && action.route) {
       router.push(action.route as any);
-    } else {
-      Alert.alert(
-        `${action.name} (${action.roadmapPhase || 'Roadmap'})`,
-        `${action.description}\n\nThis capability is planned for ${action.roadmapPhase || 'an upcoming release'}.`,
-        [{ text: 'Got it' }]
-      );
     }
   };
 
@@ -120,6 +171,8 @@ export default function HomeScreen() {
       loadData();
     }, [loadData])
   );
+
+  const currentMeta = WORKSPACE_META[businessType] || WORKSPACE_META.other;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -186,10 +239,10 @@ export default function HomeScreen() {
             </Pressable>
           )}
 
-          {/* Quick Bill Action Banner (Instant Walk-in Cash Bill) */}
+          {/* Active Personalized Workspace Persona Card */}
           <Pressable
             style={({ pressed }) => [
-              styles.quickBillCard,
+              styles.personaCard,
               {
                 backgroundColor: theme.surface,
                 borderColor: theme.borderSubtle,
@@ -197,27 +250,40 @@ export default function HomeScreen() {
               },
             ]}
             accessibilityRole="button"
-            accessibilityLabel="30-second Quick Bill"
-            onPress={() => {
-              FeatureUsageRepository.recordUsageAsync('quick_bill');
-              router.push('/quick-bill' as any);
-            }}
+            accessibilityLabel={`Active ${currentMeta.mode}. Tap to customize.`}
+            onPress={() => router.push('/settings/workspace' as any)}
           >
-            <View style={styles.quickBillLeft}>
-              <View style={[styles.quickBillIcon, { backgroundColor: theme.brandAnchor }]}>
-                <Zap color={theme.surface} size={16} fill={theme.surface} />
+            <View style={styles.personaCardLeft}>
+              <View style={styles.personaTagRow}>
+                <View style={[styles.personaTag, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
+                  <Text style={[styles.personaTagText, { color: theme.brandAnchor }]}>
+                    {currentMeta.label}
+                  </Text>
+                </View>
+                <View style={styles.adaptiveIndicator}>
+                  <Sparkles size={11} color={theme.textSecondary} />
+                  <Text style={[styles.adaptiveText, { color: theme.textSecondary }]}>Personalized</Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.quickBillTitle, { color: theme.textPrimary }]}>Quick Bill (30s)</Text>
-                <Text style={[styles.quickBillSubtitle, { color: theme.textSecondary }]}>
-                  Single item + customer → instant bill & receipt
-                </Text>
-              </View>
+              <Text style={[styles.personaModeTitle, { color: theme.textPrimary }]}>
+                {currentMeta.mode}
+              </Text>
+              <Text style={[styles.personaSubtitle, { color: theme.textSecondary }]}>
+                {currentMeta.subtitle}
+              </Text>
             </View>
-            <ChevronRight color={theme.textMuted} size={18} />
+
+            <View style={[styles.customizePill, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}>
+              <SlidersHorizontal size={13} color={theme.textPrimary} />
+              <Text style={[styles.customizeText, { color: theme.textPrimary }]}>Change</Text>
+            </View>
           </Pressable>
 
-          {/* Adaptive Workspace Quick Actions */}
+          {/* Section: Tailored Quick Actions */}
+          <Text style={[styles.sectionSubtitleLabel, { color: theme.textSecondary }]}>
+            RECOMMENDED FOR YOUR WORKSPACE
+          </Text>
+
           <View style={styles.adaptiveActionGrid}>
             {adaptiveActions.map((action) => (
               <Pressable
@@ -234,7 +300,7 @@ export default function HomeScreen() {
                 accessibilityLabel={action.name}
                 onPress={() => handleActionPress(action)}
               >
-                <FeatureIcon name={action.icon} size="sm" color={theme.textPrimary} />
+                <FeatureIcon name={action.icon} size="sm" color={theme.brandAnchor} />
                 <Text
                   style={[styles.adaptiveActionText, { color: theme.textPrimary }]}
                   numberOfLines={1}
@@ -245,12 +311,86 @@ export default function HomeScreen() {
             ))}
           </View>
 
+          {/* Connected Workflows Quick Strip */}
+          <View style={styles.connectedWorkflowSection}>
+            <Text style={[styles.sectionSubtitleLabel, { color: theme.textSecondary }]}>
+              CONNECTED WORKFLOWS
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.flowScroll}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.flowChip,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => router.push({ pathname: '/document/edit', params: { type: 'invoice' } })}
+              >
+                <Plus size={13} color={theme.brandAnchor} />
+                <Text style={[styles.flowChipText, { color: theme.textPrimary }]}>New Invoice</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.flowChip,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => router.push({ pathname: '/document/edit', params: { type: 'estimate' } })}
+              >
+                <Plus size={13} color={theme.brandAnchor} />
+                <Text style={[styles.flowChipText, { color: theme.textPrimary }]}>New Estimate</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.flowChip,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => router.push('/quick-bill' as any)}
+              >
+                <Zap size={13} color={theme.brandAnchor} fill={theme.brandAnchor} />
+                <Text style={[styles.flowChipText, { color: theme.textPrimary }]}>30s Quick Bill</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.flowChip,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => router.push('/collections' as any)}
+              >
+                <Clock size={13} color={theme.brandAnchor} />
+                <Text style={[styles.flowChipText, { color: theme.textPrimary }]}>Collections & Reminders</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.flowChip,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => router.push('/catalog' as any)}
+              >
+                <Package size={13} color={theme.brandAnchor} />
+                <Text style={[styles.flowChipText, { color: theme.textPrimary }]}>Price Catalog</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.flowChip,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => router.push('/expenses/add' as any)}
+              >
+                <Plus size={13} color={theme.brandAnchor} />
+                <Text style={[styles.flowChipText, { color: theme.textPrimary }]}>Add Expense</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+
           {/* Financial Summary */}
           <Pressable
             style={[styles.summaryContainer, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}
             accessibilityRole="button"
             accessibilityLabel="View full financial reports"
-            onPress={() => router.push('/reports/index' as any)}
+            onPress={() => router.push('/reports' as any)}
           >
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Outstanding</Text>
@@ -296,7 +436,7 @@ export default function HomeScreen() {
                 accessibilityRole="button"
                 onPress={() => router.push({ pathname: '/document/edit', params: { type: 'invoice' } })}
               >
-                <Text style={[styles.emptyButtonText, { color: theme.surface }]}>Create Invoice</Text>
+                <Text style={[styles.emptyButtonText, { color: theme.brandAnchorText }]}>Create Invoice</Text>
               </Pressable>
             </View>
           ) : (
@@ -420,26 +560,115 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 1,
   },
+  personaCard: {
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  personaCardLeft: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  personaTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: 4,
+  },
+  personaTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  personaTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  adaptiveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  adaptiveText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  personaModeTitle: {
+    fontSize: typography.bodyMedium.fontSize,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  personaSubtitle: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  customizePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  customizeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sectionSubtitleLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: spacing.xs,
+    marginLeft: 2,
+  },
   adaptiveActionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   adaptiveActionBtn: {
     flexBasis: '48%',
     flexGrow: 1,
-    height: 44,
+    height: 46,
     borderRadius: radii.sm,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: spacing.sm,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   adaptiveActionText: {
     fontSize: 13,
+    fontWeight: '600',
+  },
+  connectedWorkflowSection: {
+    marginBottom: spacing.md,
+  },
+  flowScroll: {
+    gap: spacing.sm,
+    paddingVertical: 4,
+  },
+  flowChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  flowChipText: {
+    fontSize: 12,
     fontWeight: '600',
   },
   appTitle: {
@@ -453,75 +682,12 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 1,
   },
-  quickBillCard: {
-    borderWidth: 1,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  quickBillLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    flex: 1,
-  },
-  quickBillIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickBillTitle: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '700',
-  },
-  quickBillSubtitle: {
-    fontSize: typography.caption.fontSize,
-    marginTop: 1,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  primaryButton: {
-    flex: 1,
-    height: MIN_TOUCH_TARGET,
-    borderRadius: radii.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  primaryButtonText: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: typography.bodyMedium.fontWeight,
-  },
-  secondaryButton: {
-    flex: 1,
-    height: MIN_TOUCH_TARGET,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  secondaryButtonText: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: typography.bodyMedium.fontWeight,
-  },
   summaryContainer: {
     flexDirection: 'row',
     borderWidth: 1,
     borderRadius: radii.md,
     paddingVertical: spacing.lg,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   summaryItem: {
     flex: 1,

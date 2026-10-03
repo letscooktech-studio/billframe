@@ -19,6 +19,7 @@ import {
   KeyboardAvoidingView,
   BackHandler,
   Modal,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -34,10 +35,17 @@ import {
   Eye,
   X,
   Shield,
+  Info,
+  Package,
+  CheckCircle2,
+  Trash2,
+  Users,
+  Save,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { CustomerRepository, CustomerRecord } from '../../data/repositories/CustomerRepository';
 import { DocumentRepository } from '../../data/repositories/DocumentRepository';
+import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
 import { calculateDocument } from '../../domain/documents/DocumentCalculator';
 import {
   DiscountType,
@@ -53,7 +61,24 @@ import {
   parseDecimalStringToMoney,
 } from '../../domain/money/Money';
 import { CustomerPickerModal } from '../../features/customers/CustomerPickerModal';
-import { ItemEditorModal, quantityScaledToString } from '../../features/items/ItemEditorModal';
+import {
+  ItemEditorModal,
+  quantityScaledToString,
+  parseQuantityStringToScaled,
+} from '../../features/items/ItemEditorModal';
+import { TaxExplainabilityEngine } from '../../domain/tax/TaxExplainability';
+import { TaxExplanationModal } from '../../features/tax/TaxExplanationModal';
+
+const COMMON_CURRENCIES = [
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'AED', symbol: 'AED', name: 'UAE Dirham' },
+  { code: 'CAD', symbol: 'CA$', name: 'Canadian Dollar' },
+  { code: 'AUD', symbol: 'AU$', name: 'Australian Dollar' },
+  { code: 'SGD', symbol: 'SG$', name: 'Singapore Dollar' },
+];
 
 const PAYMENT_TERMS_PRESETS: { id: PaymentTermsPreset; label: string }[] = [
   { id: 'due_on_receipt', label: 'Due on Receipt' },
@@ -99,6 +124,21 @@ export default function DocumentEditScreen() {
   const [internalNotes, setInternalNotes] = useState<string>('');
   const [depositStr, setDepositStr] = useState<string>('');
 
+  // Inline Client inputs (allows typing client name directly without opening modals)
+  const [inlineCustomerName, setInlineCustomerName] = useState<string>('');
+  const [inlineCustomerEmail, setInlineCustomerEmail] = useState<string>('');
+  const [inlineCustomerPhone, setInlineCustomerPhone] = useState<string>('');
+  const [inlineCustomerAddress, setInlineCustomerAddress] = useState<string>('');
+  const [inlineCustomerTaxId, setInlineCustomerTaxId] = useState<string>('');
+  const [isCustomerDetailsExpanded, setIsCustomerDetailsExpanded] = useState<boolean>(false);
+
+  // Inline Quick Line Item adder (allows entering items directly on screen)
+  const [quickItemDesc, setQuickItemDesc] = useState<string>('');
+  const [quickItemQty, setQuickItemQty] = useState<string>('1');
+  const [quickItemUnit, setQuickItemUnit] = useState<string>('item');
+  const [quickItemPrice, setQuickItemPrice] = useState<string>('');
+  const [quickItemError, setQuickItemError] = useState<string | null>(null);
+
   // Progressive Disclosure Sections
   const [isTaxDiscountExpanded, setIsTaxDiscountExpanded] = useState(false);
   const [isNotesTermsExpanded, setIsNotesTermsExpanded] = useState(false);
@@ -109,12 +149,15 @@ export default function DocumentEditScreen() {
 
   // Modals & UI status
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [quickAddCustomerMode, setQuickAddCustomerMode] = useState(false);
   const [editingItem, setEditingItem] = useState<{ item: LineItemInput | null; index: number } | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showTaxModal, setShowTaxModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [serverErrorMessage, setServerErrorMessage] = useState<string | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
+  const [isSavingManual, setIsSavingManual] = useState(false);
 
   // Idempotency & Lifecycle Refs
   const isSubmittingRef = useRef(false);
@@ -166,6 +209,13 @@ export default function DocumentEditScreen() {
           if (existing.customer_id) {
             const cust = await CustomerRepository.getById(existing.customer_id);
             setCustomer(cust);
+            if (cust) {
+              setInlineCustomerName(cust.name);
+              setInlineCustomerEmail(cust.email || '');
+              setInlineCustomerPhone(cust.phone || '');
+              setInlineCustomerAddress(cust.billing_address || '');
+              setInlineCustomerTaxId(cust.tax_id || '');
+            }
           }
 
           setItems(
@@ -179,16 +229,56 @@ export default function DocumentEditScreen() {
             }))
           );
         }
-      } else if (searchParams.customerId) {
-        const cust = await CustomerRepository.getById(searchParams.customerId);
-        if (cust) {
-          setCustomer(cust);
+      } else {
+        // NEW DOCUMENT: Fetch active business profile to propagate default currency, locale, terms & tax labels
+        const profile = await BusinessProfileRepository.getActiveProfile();
+        if (profile) {
+          setBusinessProfileId(profile.id);
+          if (profile.default_currency) {
+            setCurrency(profile.default_currency);
+          }
+          if (profile.default_document_locale) {
+            setDocumentLocale(profile.default_document_locale);
+          } else if (profile.country_iso2 === 'IN') {
+            setDocumentLocale('en-IN');
+          }
+          if (profile.default_payment_terms) {
+            const preset = profile.default_payment_terms as PaymentTermsPreset;
+            setPaymentTermsPreset(preset);
+            const baseDate = issueDate || Date.now();
+            if (preset === 'due_on_receipt') setDueDate(baseDate);
+            else if (preset === 'net_7') setDueDate(baseDate + 7 * 86400000);
+            else if (preset === 'net_15') setDueDate(baseDate + 15 * 86400000);
+            else if (preset === 'net_30') setDueDate(baseDate + 30 * 86400000);
+            else if (preset === 'net_45') setDueDate(baseDate + 45 * 86400000);
+            else if (preset === 'net_60') setDueDate(baseDate + 60 * 86400000);
+          }
+          if (profile.default_notes) {
+            setNotes(profile.default_notes);
+            setIsNotesTermsExpanded(true);
+          }
+          if (profile.country_iso2 === 'IN') {
+            setTaxLabel('GST');
+          } else if (profile.country_iso2 === 'GB') {
+            setTaxLabel('VAT');
+          }
+        }
+        if (searchParams.customerId) {
+          const cust = await CustomerRepository.getById(searchParams.customerId);
+          if (cust) {
+            setCustomer(cust);
+            setInlineCustomerName(cust.name);
+            setInlineCustomerEmail(cust.email || '');
+            setInlineCustomerPhone(cust.phone || '');
+            setInlineCustomerAddress(cust.billing_address || '');
+            setInlineCustomerTaxId(cust.tax_id || '');
+          }
         }
       }
       initialLoadDone.current = true;
     }
     loadInitial();
-  }, [existingId, searchParams.customerId]);
+  }, [existingId, searchParams.customerId, issueDate]);
 
   // Payment terms preset handler
   function handleSelectPaymentTerms(preset: PaymentTermsPreset) {
@@ -248,9 +338,20 @@ export default function DocumentEditScreen() {
     lifecycleStatus: 'draft',
   });
 
+  const taxExplanation = React.useMemo(() => {
+    return TaxExplainabilityEngine.explainFromDocument({
+      currency,
+      place_of_supply: customer?.country || 'Standard Location',
+      supply_type: 'intra_state',
+      tax_label: taxLabel,
+      tax_rate_bp: Number(taxRateBp),
+      tax_minor: Number(calculation.tax.amountMinor),
+    });
+  }, [currency, customer, taxLabel, taxRateBp, calculation.tax.amountMinor]);
+
   // Autosave flush
   const flushAutosave = useCallback(async () => {
-    if (!initialLoadDone.current) return;
+    if (!initialLoadDone.current || isSubmittingRef.current) return;
     try {
       await DocumentRepository.saveDraft({
         id: docId,
@@ -372,17 +473,146 @@ export default function DocumentEditScreen() {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }
 
-  // Issuance Handler with double-tap protection
+  // Quick add line item directly from on-screen inputs
+  function handleAddQuickLineItem() {
+    setQuickItemError(null);
+    if (!quickItemDesc.trim()) {
+      setQuickItemError('Please enter an item or service description.');
+      return;
+    }
+    let qtyScaled = 10000n;
+    try {
+      qtyScaled = parseQuantityStringToScaled(quickItemQty.trim() || '1');
+      if (qtyScaled <= 0n) {
+        setQuickItemError('Quantity must be greater than zero.');
+        return;
+      }
+    } catch {
+      setQuickItemError('Please enter a valid numeric quantity.');
+      return;
+    }
+
+    let priceMinor = 0n;
+    try {
+      const priceMoney = parseDecimalStringToMoney(quickItemPrice.trim() || '0', currency);
+      if (priceMoney.amountMinor < 0n) {
+        setQuickItemError('Unit price cannot be negative.');
+        return;
+      }
+      priceMinor = priceMoney.amountMinor;
+    } catch {
+      setQuickItemError('Please enter a valid numeric price.');
+      return;
+    }
+
+    const newItem: LineItemInput = {
+      id: `item_${Date.now()}_${items.length}`,
+      description: quickItemDesc.trim(),
+      quantityScaled: qtyScaled,
+      unitName: quickItemUnit.trim() || 'item',
+      unitPriceMinor: priceMinor,
+    };
+
+    setItems((prev) => [...prev, newItem]);
+    setQuickItemDesc('');
+    setQuickItemQty('1');
+    setQuickItemPrice('');
+    setQuickItemError(null);
+    setServerErrorMessage(null);
+  }
+
+  // Issuance Handler with double-tap protection and inline auto-resolution
   async function handleIssue() {
     setHasAttemptedIssue(true);
     setServerErrorMessage(null);
 
-    // Contextual checks
-    if (!customer) {
+    // 1. Resolve client (selected customer or inline typed name)
+    let activeCustomer = customer;
+    const effectiveName = (customer?.name || inlineCustomerName).trim();
+
+    if (!effectiveName) {
+      setServerErrorMessage(`Client or business name is required before issuing this official ${docType}.`);
+      Alert.alert(
+        'Client Name Required',
+        `Please enter or select a client/customer name before issuing this official ${docType}.`
+      );
       return;
     }
-    if (items.length === 0) {
+
+    // Auto-create customer record if typed inline and not yet saved
+    if (!activeCustomer) {
+      try {
+        activeCustomer = await CustomerRepository.create({
+          name: effectiveName,
+          email: inlineCustomerEmail.trim() || null,
+          phone: inlineCustomerPhone.trim() || null,
+          billingAddress: inlineCustomerAddress.trim() || null,
+          taxId: inlineCustomerTaxId.trim() || null,
+        });
+        setCustomer(activeCustomer);
+      } catch (err: any) {
+        const msg = err.message || 'Failed to create customer record';
+        setServerErrorMessage(msg);
+        Alert.alert('Customer Creation Error', msg);
+        return;
+      }
+    }
+
+    // 2. Resolve line items: if list is empty but quick inputs are filled, auto-add
+    let activeItems = [...items];
+    if (activeItems.length === 0 && quickItemDesc.trim() && quickItemPrice.trim()) {
+      try {
+        const qtyScaled = parseQuantityStringToScaled(quickItemQty.trim() || '1');
+        const priceMoney = parseDecimalStringToMoney(quickItemPrice.trim() || '0', currency);
+        if (qtyScaled > 0n && priceMoney.amountMinor >= 0n) {
+          const autoItem: LineItemInput = {
+            id: `item_${Date.now()}_0`,
+            description: quickItemDesc.trim(),
+            quantityScaled: qtyScaled,
+            unitName: quickItemUnit.trim() || 'item',
+            unitPriceMinor: priceMoney.amountMinor,
+          };
+          activeItems = [autoItem];
+          setItems(activeItems);
+          setQuickItemDesc('');
+          setQuickItemQty('1');
+          setQuickItemPrice('');
+        }
+      } catch {
+        // Fall through to validation check
+      }
+    }
+
+    if (activeItems.length === 0) {
+      setServerErrorMessage(`At least one product or service line item with a price is required.`);
+      Alert.alert(
+        'Line Item Required',
+        `Please add at least one line item (service or product) with a price before issuing this ${docType}.`
+      );
       return;
+    }
+
+    // Validate line item specifications
+    for (let i = 0; i < activeItems.length; i++) {
+      const itm = activeItems[i];
+      if (!itm.description?.trim()) {
+        const msg = `Line item #${i + 1} is missing a description.`;
+        setServerErrorMessage(msg);
+        Alert.alert('Incomplete Item', msg);
+        return;
+      }
+      if (itm.quantityScaled <= 0n) {
+        const msg = `Line item #${i + 1} ("${itm.description}") must have a quantity greater than zero.`;
+        setServerErrorMessage(msg);
+        Alert.alert('Invalid Quantity', msg);
+        return;
+      }
+      if (itm.unitPriceMinor < 0n) {
+        const msg = `Line item #${i + 1} ("${itm.description}") cannot have a negative unit price.`;
+        setServerErrorMessage(msg);
+        Alert.alert('Invalid Price', msg);
+        return;
+      }
     }
 
     if (isSubmittingRef.current) return;
@@ -394,7 +624,7 @@ export default function DocumentEditScreen() {
         id: docId,
         businessProfileId,
         docType,
-        customerId: customer.id,
+        customerId: activeCustomer.id,
         issueDate,
         dueDate: docType === 'invoice' ? dueDate : null,
         currency,
@@ -405,7 +635,7 @@ export default function DocumentEditScreen() {
         taxLabel,
         notes,
         terms,
-        items,
+        items: activeItems,
         poNumber: poNumber.trim() || undefined,
         paymentTermsPreset: docType === 'invoice' ? paymentTermsPreset : undefined,
         shippingAddress: shippingAddress.trim() || undefined,
@@ -415,16 +645,114 @@ export default function DocumentEditScreen() {
       });
 
       const issued = await DocumentRepository.issueDocument(docId);
-      router.replace(`/document/${issued.id}`);
+      router.replace(`/document/${issued.id}` as any);
     } catch (err: any) {
-      setServerErrorMessage(err.message || 'Failed to issue document');
+      const msg = err.message || 'Failed to issue document';
+      setServerErrorMessage(msg);
+      Alert.alert('Unable to Issue Document', msg);
       setIsIssuing(false);
       isSubmittingRef.current = false;
     }
   }
 
-  const isCustomerMissing = hasAttemptedIssue && !customer;
-  const isItemsMissing = hasAttemptedIssue && items.length === 0;
+  // Explicit Save Draft handler with tactile feedback
+  async function handleSaveDraftExplicit() {
+    if (isSubmittingRef.current) return;
+    setServerErrorMessage(null);
+    setIsSavingManual(true);
+    setSaveStatus('saving');
+
+    let activeCustomer = customer;
+    const effectiveName = (customer?.name || inlineCustomerName).trim();
+    if (!activeCustomer && effectiveName) {
+      try {
+        activeCustomer = await CustomerRepository.create({
+          name: effectiveName,
+          email: inlineCustomerEmail.trim() || null,
+          phone: inlineCustomerPhone.trim() || null,
+          billingAddress: inlineCustomerAddress.trim() || null,
+          taxId: inlineCustomerTaxId.trim() || null,
+        });
+        setCustomer(activeCustomer);
+      } catch {
+        // Non-blocking for draft save
+      }
+    }
+
+    let activeItems = [...items];
+    if (activeItems.length === 0 && quickItemDesc.trim() && quickItemPrice.trim()) {
+      try {
+        const qtyScaled = parseQuantityStringToScaled(quickItemQty.trim() || '1');
+        const priceMoney = parseDecimalStringToMoney(quickItemPrice.trim() || '0', currency);
+        if (qtyScaled > 0n && priceMoney.amountMinor >= 0n) {
+          const autoItem: LineItemInput = {
+            id: `item_${Date.now()}_0`,
+            description: quickItemDesc.trim(),
+            quantityScaled: qtyScaled,
+            unitName: quickItemUnit.trim() || 'item',
+            unitPriceMinor: priceMoney.amountMinor,
+          };
+          activeItems = [autoItem];
+          setItems(activeItems);
+          setQuickItemDesc('');
+          setQuickItemQty('1');
+          setQuickItemPrice('');
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    try {
+      await DocumentRepository.saveDraft({
+        id: docId,
+        businessProfileId,
+        docType,
+        customerId: activeCustomer?.id || null,
+        issueDate,
+        dueDate: docType === 'invoice' ? dueDate : null,
+        currency,
+        discountType,
+        discountValue: calculatedDiscountValue,
+        taxType,
+        taxRateBp,
+        taxLabel,
+        notes,
+        terms,
+        items: activeItems,
+        poNumber: poNumber.trim() || undefined,
+        paymentTermsPreset: docType === 'invoice' ? paymentTermsPreset : undefined,
+        shippingAddress: shippingAddress.trim() || undefined,
+        paymentInstructions: paymentInstructions.trim() || undefined,
+        internalNotes: internalNotes.trim() || undefined,
+        depositMinor: calculatedDepositMinor,
+      });
+      setSaveStatus('saved');
+      Alert.alert(
+        'Draft Saved',
+        `Your ${docType === 'invoice' ? 'invoice' : 'estimate'} draft was saved successfully.`,
+        [
+          { text: 'Keep Editing', style: 'cancel' },
+          {
+            text: 'Go to Documents',
+            onPress: () => router.push('/(tabs)/documents' as any),
+          },
+        ]
+      );
+    } catch (err: any) {
+      setSaveStatus('unsaved');
+      const msg = err.message || 'Failed to save draft';
+      setServerErrorMessage(msg);
+      Alert.alert('Save Failed', msg);
+    } finally {
+      setIsSavingManual(false);
+    }
+  }
+
+  const effectiveCustomerName = (customer?.name || inlineCustomerName).trim();
+  const isCustomerMissing = hasAttemptedIssue && !effectiveCustomerName;
+  const hasPendingQuickItem = Boolean(quickItemDesc.trim() && quickItemPrice.trim());
+  const isItemsMissing = hasAttemptedIssue && items.length === 0 && !hasPendingQuickItem;
 
   // Tax & discount summary preview label
   let taxDiscountSummary = 'None';
@@ -496,26 +824,36 @@ export default function DocumentEditScreen() {
               </View>
             )}
 
-            {/* 1. Customer Section (Flattened Form Field) */}
+            {/* 1. Customer Section (Universally Required) */}
             <View style={styles.sectionBlock}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={[styles.sectionHeading, { color: isCustomerMissing ? theme.statusDanger : theme.textPrimary }]}>
-                  Customer *
-                </Text>
+                <View style={styles.headingBadgeRow}>
+                  <Text style={[styles.sectionHeading, { color: isCustomerMissing ? theme.statusDanger : theme.textPrimary }]}>
+                    Customer *
+                  </Text>
+                  <View style={[styles.badgeRequired, { backgroundColor: isCustomerMissing ? theme.statusDanger + '1A' : theme.surfaceSecondary, borderColor: isCustomerMissing ? theme.statusDanger : theme.borderSubtle }]}>
+                    <Text style={[styles.badgeRequiredText, { color: isCustomerMissing ? theme.statusDanger : theme.textSecondary }]}>
+                      REQUIRED
+                    </Text>
+                  </View>
+                </View>
                 {customer && (
-                  <Pressable onPress={() => setShowCustomerPicker(true)} hitSlop={8}>
+                  <Pressable
+                    onPress={() => {
+                      setQuickAddCustomerMode(false);
+                      setShowCustomerPicker(true);
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Change customer"
+                  >
                     <Text style={[styles.linkActionText, { color: theme.brandAnchor }]}>Change</Text>
                   </Pressable>
                 )}
               </View>
 
               {customer ? (
-                <Pressable
-                  style={[styles.fieldRowSelected, { borderBottomColor: theme.borderSubtle }]}
-                  onPress={() => setShowCustomerPicker(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Selected customer: ${customer.name}`}
-                >
+                <View style={[styles.customerCardSelected, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
                   <View style={styles.customerSelectedInfo}>
                     <Text style={[styles.customerSelectedName, { color: theme.textPrimary }]}>{customer.name}</Text>
                     {customer.business_name ? (
@@ -526,42 +864,187 @@ export default function DocumentEditScreen() {
                     {customer.email ? (
                       <Text style={[styles.customerSelectedContact, { color: theme.textMuted }]}>{customer.email}</Text>
                     ) : null}
+                    {customer.phone ? (
+                      <Text style={[styles.customerSelectedContact, { color: theme.textMuted }]}>{customer.phone}</Text>
+                    ) : null}
+                    {customer.billing_address ? (
+                      <Text style={[styles.customerSelectedContact, { color: theme.textMuted }]} numberOfLines={2}>
+                        {customer.billing_address}
+                      </Text>
+                    ) : null}
                   </View>
-                  <ChevronRight color={theme.textMuted} size={18} />
-                </Pressable>
+                  <Pressable
+                    style={styles.customerRemoveBtn}
+                    onPress={() => {
+                      setCustomer(null);
+                      setInlineCustomerName('');
+                      setInlineCustomerEmail('');
+                      setInlineCustomerPhone('');
+                      setInlineCustomerAddress('');
+                      setInlineCustomerTaxId('');
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove selected customer"
+                  >
+                    <X size={16} color={theme.textMuted} />
+                  </Pressable>
+                </View>
               ) : (
-                <Pressable
-                  style={[
-                    styles.fieldRowEmpty,
-                    {
-                      borderColor: isCustomerMissing ? theme.statusDanger : theme.borderSubtle,
-                      backgroundColor: theme.surface,
-                    },
-                  ]}
-                  onPress={() => setShowCustomerPicker(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Select customer"
-                  accessibilityHint="Opens searchable customer list"
-                >
-                  <Text style={[styles.fieldPlaceholderText, { color: theme.textSecondary }]}>Select customer</Text>
-                  <ChevronRight color={theme.textMuted} size={18} />
-                </Pressable>
+                <View style={[styles.customerInlineBox, { borderColor: isCustomerMissing ? theme.statusDanger : theme.borderSubtle, backgroundColor: theme.surface }]}>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Client / Business Name *</Text>
+                  <TextInput
+                    style={[styles.input, { color: theme.textPrimary, borderColor: isCustomerMissing ? theme.statusDanger : theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                    placeholder="e.g. Acme Corp or John Smith"
+                    placeholderTextColor={theme.textMuted}
+                    value={inlineCustomerName}
+                    onChangeText={(val) => {
+                      setInlineCustomerName(val);
+                      if (serverErrorMessage) setServerErrorMessage(null);
+                    }}
+                  />
+                  <View style={styles.customerInlineActionsRow}>
+                    <Pressable
+                      style={styles.expandDetailsToggle}
+                      onPress={() => setIsCustomerDetailsExpanded((prev) => !prev)}
+                      hitSlop={6}
+                    >
+                      {isCustomerDetailsExpanded ? <ChevronUp size={14} color={theme.brandAnchor} /> : <ChevronDown size={14} color={theme.brandAnchor} />}
+                      <Text style={[styles.expandDetailsText, { color: theme.brandAnchor }]}>
+                        {isCustomerDetailsExpanded ? 'Hide Contact / Tax Details' : '+ Add Email, Phone, Address, Tax ID (Optional)'}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.chooseClientMiniBtn, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                      onPress={() => {
+                        setQuickAddCustomerMode(false);
+                        setShowCustomerPicker(true);
+                      }}
+                      hitSlop={6}
+                    >
+                      <Users size={13} color={theme.textSecondary} />
+                      <Text style={[styles.chooseClientMiniText, { color: theme.textSecondary }]}>Saved Clients</Text>
+                    </Pressable>
+                  </View>
+
+                  {isCustomerDetailsExpanded && (
+                    <View style={styles.customerDetailsBlock}>
+                      <View style={styles.row}>
+                        <View style={styles.col}>
+                          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email (Optional)</Text>
+                          <TextInput
+                            style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                            placeholder="client@example.com"
+                            placeholderTextColor={theme.textMuted}
+                            value={inlineCustomerEmail}
+                            onChangeText={setInlineCustomerEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                          />
+                        </View>
+                        <View style={styles.col}>
+                          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
+                          <TextInput
+                            style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                            placeholder="+1 555-0199"
+                            placeholderTextColor={theme.textMuted}
+                            value={inlineCustomerPhone}
+                            onChangeText={setInlineCustomerPhone}
+                            keyboardType="phone-pad"
+                          />
+                        </View>
+                      </View>
+                      <View style={{ marginTop: spacing.xs }}>
+                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Billing Address (Optional)</Text>
+                        <TextInput
+                          style={[styles.input, styles.multiInput, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                          placeholder="Street, City, Postal Code, Country"
+                          placeholderTextColor={theme.textMuted}
+                          value={inlineCustomerAddress}
+                          onChangeText={setInlineCustomerAddress}
+                          multiline
+                        />
+                      </View>
+                      <View style={{ marginTop: spacing.xs }}>
+                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Tax ID / GSTIN / VAT (Optional)</Text>
+                        <TextInput
+                          style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                          placeholder="e.g. 29ABCDE1234F1Z5"
+                          placeholderTextColor={theme.textMuted}
+                          value={inlineCustomerTaxId}
+                          onChangeText={setInlineCustomerTaxId}
+                          autoCapitalize="characters"
+                        />
+                      </View>
+                    </View>
+                  )}
+                </View>
               )}
 
               {isCustomerMissing && (
                 <Text style={[styles.fieldInlineError, { color: theme.statusDanger }]}>
-                  Please select a customer before issuing.
+                  Please enter a customer or client name before issuing this {docType}.
                 </Text>
               )}
             </View>
 
             <View style={[styles.sectionDivider, { backgroundColor: theme.borderSubtle }]} />
 
-            {/* 2. Dates Section (Compact Form Rows) */}
+            {/* 2. Currency & Dates Section (Universally Required) */}
             <View style={styles.sectionBlock}>
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.headingBadgeRow}>
+                  <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>
+                    Currency & Dates *
+                  </Text>
+                  <View style={[styles.badgeRequired, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
+                    <Text style={[styles.badgeRequiredText, { color: theme.textSecondary }]}>
+                      REQUIRED
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Currency Selector Strip */}
+              <View style={{ marginBottom: spacing.sm }}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Currency</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.termsPresetsScroll}>
+                  {COMMON_CURRENCIES.map((c) => {
+                    const isSelected = currency === c.code;
+                    return (
+                      <Pressable
+                        key={c.code}
+                        style={[
+                          styles.termsChip,
+                          {
+                            backgroundColor: isSelected ? theme.brandAnchor : theme.surfaceSecondary,
+                            borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
+                          },
+                        ]}
+                        onPress={() => setCurrency(c.code)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Select currency ${c.code}`}
+                      >
+                        <Text
+                          style={[
+                            styles.termsChipText,
+                            {
+                              color: isSelected ? theme.brandAnchorText : theme.textSecondary,
+                              fontWeight: isSelected ? '700' : '500',
+                            },
+                          ]}
+                        >
+                          {c.code} ({c.symbol})
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
               <View style={styles.datesGrid}>
                 <View style={styles.dateCol}>
-                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Issue date</Text>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Issue Date *</Text>
                   <View style={[styles.dateDisplayRow, { borderBottomColor: theme.borderSubtle }]}>
                     <Calendar color={theme.textMuted} size={16} />
                     <Text style={[styles.dateText, { color: theme.textPrimary }]}>
@@ -572,7 +1055,7 @@ export default function DocumentEditScreen() {
 
                 {docType === 'invoice' && (
                   <View style={styles.dateCol}>
-                    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Due date</Text>
+                    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Due Date *</Text>
                     <View style={[styles.dateDisplayRow, { borderBottomColor: theme.borderSubtle }]}>
                       <Calendar color={theme.textMuted} size={16} />
                       <Text style={[styles.dateText, { color: theme.textPrimary }]}>
@@ -607,7 +1090,7 @@ export default function DocumentEditScreen() {
                             style={[
                               styles.termsChipText,
                               {
-                                color: isSelected ? theme.surface : theme.textSecondary,
+                                color: isSelected ? theme.brandAnchorText : theme.textSecondary,
                                 fontWeight: isSelected ? '600' : '400',
                               },
                             ]}
@@ -624,12 +1107,19 @@ export default function DocumentEditScreen() {
 
             <View style={[styles.sectionDivider, { backgroundColor: theme.borderSubtle }]} />
 
-            {/* 3. Line Items Section (Disciplined List, No Card Box) */}
+            {/* 3. Line Items Section (Universally Required - Min 1) */}
             <View style={styles.sectionBlock}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={[styles.sectionHeading, { color: isItemsMissing ? theme.statusDanger : theme.textPrimary }]}>
-                  Line items ({items.length})
-                </Text>
+                <View style={styles.headingBadgeRow}>
+                  <Text style={[styles.sectionHeading, { color: isItemsMissing ? theme.statusDanger : theme.textPrimary }]}>
+                    Line items ({items.length}) *
+                  </Text>
+                  <View style={[styles.badgeRequired, { backgroundColor: isItemsMissing ? theme.statusDanger + '1A' : theme.surfaceSecondary, borderColor: isItemsMissing ? theme.statusDanger : theme.borderSubtle }]}>
+                    <Text style={[styles.badgeRequiredText, { color: isItemsMissing ? theme.statusDanger : theme.textSecondary }]}>
+                      REQUIRED (MIN 1)
+                    </Text>
+                  </View>
+                </View>
                 <Pressable
                   onPress={() => {
                     setEditingItem(null);
@@ -643,19 +1133,8 @@ export default function DocumentEditScreen() {
                 </Pressable>
               </View>
 
-              {items.length === 0 ? (
-                <View style={[styles.emptyItemsWrapper, isItemsMissing && { borderColor: theme.statusDanger, borderWidth: 1, borderRadius: radii.sm, padding: spacing.md }]}>
-                  <Text style={[styles.emptyItemsHeading, { color: theme.textPrimary }]}>No line items yet</Text>
-                  <Text style={[styles.emptyItemsSub, { color: theme.textSecondary }]}>
-                    Add a product or service to this {docType}.
-                  </Text>
-                  {isItemsMissing && (
-                    <Text style={[styles.fieldInlineError, { color: theme.statusDanger, marginTop: 4 }]}>
-                      Add at least one line item before issuing this {docType}.
-                    </Text>
-                  )}
-                </View>
-              ) : (
+              {/* Existing Items List (if any) */}
+              {items.length > 0 && (
                 <View style={styles.itemsList}>
                   {items.map((item, idx) => {
                     const itemTotal = calculateDocument({
@@ -670,45 +1149,168 @@ export default function DocumentEditScreen() {
                     }).grandTotal;
 
                     return (
-                      <Pressable
+                      <View
                         key={item.id || idx}
-                        style={({ pressed }) => [
-                          styles.itemRow,
+                        style={[
+                          styles.itemRowWrapper,
                           idx < items.length - 1 && { borderBottomColor: theme.borderSubtle, borderBottomWidth: 1 },
-                          pressed && { opacity: 0.8 },
                         ]}
-                        onPress={() => {
-                          setEditingItem({ item, index: idx });
-                          setShowItemModal(true);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${item.description}, ${formatMoney(itemTotal, documentLocale)}`}
                       >
-                        <View style={styles.itemLeft}>
-                          <Text style={[styles.itemDesc, { color: theme.textPrimary }]}>{item.description}</Text>
-                          {item.itemNotes ? (
-                            <Text style={[styles.itemNotesPreview, { color: theme.textSecondary }]} numberOfLines={1}>
-                              {item.itemNotes}
+                        <Pressable
+                          style={styles.itemRowPressable}
+                          onPress={() => {
+                            setEditingItem({ item, index: idx });
+                            setShowItemModal(true);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${item.description}, ${formatMoney(itemTotal, documentLocale)}`}
+                        >
+                          <View style={styles.itemLeft}>
+                            <Text style={[styles.itemDesc, { color: theme.textPrimary }]}>{item.description}</Text>
+                            {item.itemNotes ? (
+                              <Text style={[styles.itemNotesPreview, { color: theme.textSecondary }]} numberOfLines={1}>
+                                {item.itemNotes}
+                              </Text>
+                            ) : null}
+                            <Text style={[styles.itemSub, { color: theme.textMuted }]}>
+                              {quantityScaledToString(item.quantityScaled)} {item.unitName || 'item'} ×{' '}
+                              {formatMoney(createMoney(item.unitPriceMinor, currency), documentLocale)}
                             </Text>
-                          ) : null}
-                          <Text style={[styles.itemSub, { color: theme.textMuted }]}>
-                            {quantityScaledToString(item.quantityScaled)} {item.unitName || 'item'} ×{' '}
-                            {formatMoney(createMoney(item.unitPriceMinor, currency), documentLocale)}
+                          </View>
+                          <Text style={[styles.itemTotal, { color: theme.textPrimary }]}>
+                            {formatMoney(itemTotal, documentLocale)}
                           </Text>
-                        </View>
-                        <Text style={[styles.itemTotal, { color: theme.textPrimary }]}>
-                          {formatMoney(itemTotal, documentLocale)}
-                        </Text>
-                      </Pressable>
+                        </Pressable>
+                        <Pressable
+                          style={styles.itemDeleteBtn}
+                          onPress={() => handleDeleteItem(item.id || '')}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Delete ${item.description}`}
+                        >
+                          <Trash2 size={16} color={theme.statusDanger} />
+                        </Pressable>
+                      </View>
                     );
                   })}
                 </View>
+              )}
+
+              {/* Direct On-Screen Line Item Adder (Frictionless entry) */}
+              <View style={[styles.quickItemCard, { borderColor: isItemsMissing ? theme.statusDanger : theme.borderSubtle, backgroundColor: theme.surface }]}>
+                <Text style={[styles.quickItemCardTitle, { color: theme.textSecondary }]}>
+                  {items.length === 0 ? 'Add Line Item *' : '+ Add Another Item'}
+                </Text>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Item or Service Description *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: theme.textPrimary,
+                      borderColor: isItemsMissing && !quickItemDesc.trim() ? theme.statusDanger : theme.borderSubtle,
+                      backgroundColor: theme.surfaceSecondary,
+                    },
+                  ]}
+                  placeholder="e.g. Website Design, Consulting, or Product SKU"
+                  placeholderTextColor={theme.textMuted}
+                  value={quickItemDesc}
+                  onChangeText={(val) => {
+                    setQuickItemDesc(val);
+                    if (quickItemError) setQuickItemError(null);
+                    if (serverErrorMessage) setServerErrorMessage(null);
+                  }}
+                />
+
+                <View style={styles.quickItemGridRow}>
+                  <View style={styles.quickItemColQty}>
+                    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Qty *</Text>
+                    <TextInput
+                      style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                      placeholder="1"
+                      placeholderTextColor={theme.textMuted}
+                      value={quickItemQty}
+                      onChangeText={setQuickItemQty}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.quickItemColUnit}>
+                    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Unit</Text>
+                    <TextInput
+                      style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                      placeholder="item"
+                      placeholderTextColor={theme.textMuted}
+                      value={quickItemUnit}
+                      onChangeText={setQuickItemUnit}
+                    />
+                  </View>
+                  <View style={styles.quickItemColPrice}>
+                    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Unit Price ({currency}) *</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          color: theme.textPrimary,
+                          borderColor: isItemsMissing && !quickItemPrice.trim() ? theme.statusDanger : theme.borderSubtle,
+                          backgroundColor: theme.surfaceSecondary,
+                        },
+                      ]}
+                      placeholder="0.00"
+                      placeholderTextColor={theme.textMuted}
+                      value={quickItemPrice}
+                      onChangeText={(val) => {
+                        setQuickItemPrice(val);
+                        if (quickItemError) setQuickItemError(null);
+                      }}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {quickItemError && (
+                  <Text style={[styles.fieldInlineError, { color: theme.statusDanger }]}>
+                    {quickItemError}
+                  </Text>
+                )}
+
+                <View style={styles.quickItemActionsRow}>
+                  <Pressable
+                    style={[styles.addQuickItemBtn, { backgroundColor: theme.brandAnchor }]}
+                    onPress={handleAddQuickLineItem}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add line item to document"
+                  >
+                    <Plus size={16} color={theme.brandAnchorText} strokeWidth={2.5} />
+                    <Text style={[styles.addQuickItemBtnText, { color: theme.brandAnchorText }]}>
+                      Add Item
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.catalogModalBtn, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                    onPress={() => {
+                      setEditingItem(null);
+                      setShowItemModal(true);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose from saved catalog or advanced editor"
+                  >
+                    <Package size={15} color={theme.textSecondary} />
+                    <Text style={[styles.catalogModalBtnText, { color: theme.textSecondary }]}>
+                      Catalog Item
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {isItemsMissing && (
+                <Text style={[styles.fieldInlineError, { color: theme.statusDanger, marginTop: 8 }]}>
+                  At least one line item is required before issuing this {docType}.
+                </Text>
               )}
             </View>
 
             <View style={[styles.sectionDivider, { backgroundColor: theme.borderSubtle }]} />
 
-            {/* 4. Taxes & Discounts (Progressive Disclosure) */}
+            {/* 4. Taxes & Discounts (Optional) */}
             <View style={styles.sectionBlock}>
               <Pressable
                 style={styles.disclosureHeader}
@@ -717,7 +1319,12 @@ export default function DocumentEditScreen() {
                 accessibilityLabel="Toggle taxes and discounts section"
               >
                 <View style={styles.disclosureTitleCol}>
-                  <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>Tax & discount</Text>
+                  <View style={styles.headingBadgeRow}>
+                    <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>Tax & discount</Text>
+                    <View style={[styles.badgeOptional, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
+                      <Text style={[styles.badgeOptionalText, { color: theme.textMuted }]}>OPTIONAL</Text>
+                    </View>
+                  </View>
                   <Text style={[styles.disclosureSummary, { color: theme.textMuted }]}>{taxDiscountSummary}</Text>
                 </View>
                 {isTaxDiscountExpanded ? (
@@ -757,29 +1364,44 @@ export default function DocumentEditScreen() {
                   </View>
 
                   {taxType !== 'none' && (
-                    <View style={[styles.row, { marginTop: spacing.sm }]}>
-                      <View style={styles.col}>
-                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Tax Label</Text>
-                        <TextInput
-                          style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
-                          placeholder="e.g. GST, VAT"
-                          placeholderTextColor={theme.textMuted}
-                          value={taxLabel}
-                          onChangeText={setTaxLabel}
-                        />
+                    <>
+                      <View style={[styles.row, { marginTop: spacing.sm }]}>
+                        <View style={styles.col}>
+                          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Tax Label</Text>
+                          <TextInput
+                            style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                            placeholder="e.g. GST, VAT"
+                            placeholderTextColor={theme.textMuted}
+                            value={taxLabel}
+                            onChangeText={setTaxLabel}
+                          />
+                        </View>
+                        <View style={styles.col}>
+                          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Tax Rate (%)</Text>
+                          <TextInput
+                            style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                            placeholder="e.g. 18 or 8.25"
+                            placeholderTextColor={theme.textMuted}
+                            value={taxRateStr}
+                            onChangeText={setTaxRateStr}
+                            keyboardType="numeric"
+                          />
+                        </View>
                       </View>
-                      <View style={styles.col}>
-                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Tax Rate (%)</Text>
-                        <TextInput
-                          style={[styles.input, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
-                          placeholder="e.g. 18 or 8.25"
-                          placeholderTextColor={theme.textMuted}
-                          value={taxRateStr}
-                          onChangeText={setTaxRateStr}
-                          keyboardType="numeric"
-                        />
-                      </View>
-                    </View>
+
+                      <Pressable
+                        style={[styles.taxExplainRow, { borderColor: theme.brandAnchor + '30', backgroundColor: theme.brandAnchor + '0D' }]}
+                        onPress={() => setShowTaxModal(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel="View tax explanation and statutory rules"
+                      >
+                        <Info size={14} color={theme.brandAnchor} />
+                        <Text style={[styles.taxExplainText, { color: theme.brandAnchor }]}>
+                          Why this rate? View statutory rules & component split
+                        </Text>
+                        <ChevronRight size={14} color={theme.brandAnchor} />
+                      </Pressable>
+                    </>
                   )}
 
                   {/* Discount selector */}
@@ -830,7 +1452,7 @@ export default function DocumentEditScreen() {
 
             <View style={[styles.sectionDivider, { backgroundColor: theme.borderSubtle }]} />
 
-            {/* 5. Notes & Terms (Progressive Disclosure) */}
+            {/* 5. Notes & Terms (Optional) */}
             <View style={styles.sectionBlock}>
               <Pressable
                 style={styles.disclosureHeader}
@@ -839,9 +1461,14 @@ export default function DocumentEditScreen() {
                 accessibilityLabel="Toggle notes and terms section"
               >
                 <View style={styles.disclosureTitleCol}>
-                  <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>Notes & terms</Text>
+                  <View style={styles.headingBadgeRow}>
+                    <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>Notes & terms</Text>
+                    <View style={[styles.badgeOptional, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
+                      <Text style={[styles.badgeOptionalText, { color: theme.textMuted }]}>OPTIONAL</Text>
+                    </View>
+                  </View>
                   <Text style={[styles.disclosureSummary, { color: theme.textMuted }]}>
-                    {notes || terms ? 'Configured' : 'Optional'}
+                    {notes || terms ? 'Configured' : 'Optional customer memo and sale conditions'}
                   </Text>
                 </View>
                 {isNotesTermsExpanded ? (
@@ -886,7 +1513,7 @@ export default function DocumentEditScreen() {
 
             <View style={[styles.sectionDivider, { backgroundColor: theme.borderSubtle }]} />
 
-            {/* 6. More Options (Progressive Disclosure) */}
+            {/* 6. More Options (Optional) */}
             <View style={styles.sectionBlock}>
               <Pressable
                 style={styles.disclosureHeader}
@@ -895,7 +1522,12 @@ export default function DocumentEditScreen() {
                 accessibilityLabel="Toggle more options section"
               >
                 <View style={styles.disclosureTitleCol}>
-                  <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>More options</Text>
+                  <View style={styles.headingBadgeRow}>
+                    <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>More options</Text>
+                    <View style={[styles.badgeOptional, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
+                      <Text style={[styles.badgeOptionalText, { color: theme.textMuted }]}>OPTIONAL</Text>
+                    </View>
+                  </View>
                   <Text style={[styles.disclosureSummary, { color: theme.textMuted }]}>
                     {poNumber || shippingAddress || paymentInstructions || internalNotes ? 'Configured' : 'PO #, site address, bank details, internal note'}
                   </Text>
@@ -995,14 +1627,26 @@ export default function DocumentEditScreen() {
                       {formatMoney(calculation.taxableBase, documentLocale)}
                     </Text>
                   </View>
-                  <View style={styles.totalRow}>
-                    <Text style={[styles.totalLabel, { color: theme.textSecondary }]}>
-                      {taxLabel} ({taxRateStr}%)
-                    </Text>
+                  <Pressable
+                    style={({ pressed }) => [styles.totalRow, pressed && { opacity: 0.7 }]}
+                    onPress={() => setShowTaxModal(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View tax explanation for ${taxLabel}`}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.totalLabel, { color: theme.textSecondary }]}>
+                        {taxLabel} ({taxRateStr}%)
+                      </Text>
+                      <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: radii.xs, backgroundColor: theme.brandAnchor + '18' }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: theme.brandAnchor }}>
+                          Why this rate?
+                        </Text>
+                      </View>
+                    </View>
                     <Text style={[styles.totalValue, { color: theme.textPrimary }]}>
                       {formatMoney(calculation.tax, documentLocale)}
                     </Text>
-                  </View>
+                  </Pressable>
                 </>
               )}
 
@@ -1051,26 +1695,65 @@ export default function DocumentEditScreen() {
               )}
             </View>
 
-            {/* 8. Primary Issuance Action */}
-            <Pressable
-              style={[
-                styles.issueButton,
-                { backgroundColor: theme.brandAnchor, opacity: isIssuing ? 0.7 : 1 },
-              ]}
-              onPress={handleIssue}
-              disabled={isIssuing}
-              accessibilityRole="button"
-              accessibilityLabel={docType === 'invoice' ? 'Issue official invoice' : 'Issue official estimate'}
-            >
-              <FileCheck color={theme.surface} size={20} />
-              <Text style={[styles.issueButtonText, { color: theme.surface }]}>
-                {isIssuing
-                  ? 'Issuing Document...'
-                  : docType === 'invoice'
-                  ? 'Issue Official Invoice'
-                  : 'Issue Official Estimate'}
-              </Text>
-            </Pressable>
+            {/* Issuance Readiness Checklist */}
+            <View style={[styles.checklistCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              <Text style={[styles.checklistTitle, { color: theme.textSecondary }]}>REQUIRED TO ISSUE</Text>
+              <View style={styles.checkItemRow}>
+                <CheckCircle2 size={16} color={effectiveCustomerName ? theme.statusSuccess : theme.statusDanger} />
+                <Text style={[styles.checkItemText, { color: effectiveCustomerName ? theme.textPrimary : theme.statusDanger }]}>
+                  {effectiveCustomerName ? `Client: ${effectiveCustomerName}` : 'Client required (Type name or choose client)'}
+                </Text>
+              </View>
+              <View style={styles.checkItemRow}>
+                <CheckCircle2 size={16} color={(items.length > 0 || hasPendingQuickItem) ? theme.statusSuccess : theme.statusDanger} />
+                <Text style={[styles.checkItemText, { color: (items.length > 0 || hasPendingQuickItem) ? theme.textPrimary : theme.statusDanger }]}>
+                  {items.length > 0 ? `Line items: ${items.length} added` : hasPendingQuickItem ? 'Line item ready to add' : 'At least 1 product or service line item required'}
+                </Text>
+              </View>
+            </View>
+
+            {/* 8. Action Buttons (Save Draft + Issue Official Document) */}
+            <View style={styles.bottomButtonsRow}>
+              <Pressable
+                style={[
+                  styles.saveDraftBtn,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.borderSubtle,
+                    opacity: isSavingManual ? 0.7 : 1,
+                  },
+                ]}
+                onPress={handleSaveDraftExplicit}
+                disabled={isSavingManual || isIssuing}
+                accessibilityRole="button"
+                accessibilityLabel="Save draft"
+              >
+                <Save color={theme.textPrimary} size={18} />
+                <Text style={[styles.saveDraftBtnText, { color: theme.textPrimary }]}>
+                  {isSavingManual ? 'Saving...' : 'Save Draft'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.issueButton,
+                  { backgroundColor: theme.brandAnchor, opacity: isIssuing ? 0.7 : 1 },
+                ]}
+                onPress={handleIssue}
+                disabled={isIssuing || isSavingManual}
+                accessibilityRole="button"
+                accessibilityLabel={docType === 'invoice' ? 'Issue official invoice' : 'Issue official estimate'}
+              >
+                <FileCheck color={theme.brandAnchorText} size={20} />
+                <Text style={[styles.issueButtonText, { color: theme.brandAnchorText }]}>
+                  {isIssuing
+                    ? 'Issuing...'
+                    : docType === 'invoice'
+                    ? 'Issue Official Invoice'
+                    : 'Issue Official Estimate'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </ScrollView>
 
@@ -1297,7 +1980,7 @@ export default function DocumentEditScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Close preview"
               >
-                <Text style={[styles.closePreviewBtnText, { color: theme.surface }]}>Close Preview</Text>
+                <Text style={[styles.closePreviewBtnText, { color: theme.brandAnchorText }]}>Close Preview</Text>
               </Pressable>
             </ScrollView>
           </SafeAreaView>
@@ -1307,8 +1990,11 @@ export default function DocumentEditScreen() {
         <CustomerPickerModal
           visible={showCustomerPicker}
           selectedCustomerId={customer?.id}
+          initialQuickAdd={quickAddCustomerMode}
           onSelectCustomer={(c) => {
             setCustomer(c);
+            setHasAttemptedIssue(false);
+            setServerErrorMessage(null);
             setShowCustomerPicker(false);
           }}
           onClose={() => setShowCustomerPicker(false)}
@@ -1326,6 +2012,14 @@ export default function DocumentEditScreen() {
             setShowItemModal(false);
             setEditingItem(null);
           }}
+        />
+
+        {/* Tax Explanation Modal */}
+        <TaxExplanationModal
+          visible={showTaxModal}
+          onClose={() => setShowTaxModal(false)}
+          explanation={taxExplanation}
+          currency={currency}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -1477,7 +2171,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   emptyItemsWrapper: {
-    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: radii.md,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.xs,
   },
   emptyItemsHeading: {
     fontSize: 14,
@@ -1595,15 +2296,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
+  bottomButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.xl,
+    marginBottom: spacing.xxl,
+  },
+  saveDraftBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    height: 52,
+    borderRadius: radii.sm,
+    borderWidth: 1.5,
+  },
+  saveDraftBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   issueButton: {
+    flex: 1.4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
     height: 52,
     borderRadius: radii.sm,
-    marginTop: spacing.xl,
-    marginBottom: spacing.xxl,
   },
   issueButtonText: {
     fontSize: 15,
@@ -1800,5 +2521,274 @@ const styles = StyleSheet.create({
   closePreviewBtnText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  taxExplainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    marginTop: spacing.sm,
+  },
+  taxExplainText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    marginHorizontal: spacing.xs,
+  },
+  headingBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  badgeRequired: {
+    borderWidth: 1,
+    borderRadius: radii.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  badgeRequiredText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  badgeOptional: {
+    borderWidth: 1,
+    borderRadius: radii.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  badgeOptionalText: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  customerCardSelected: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+  },
+  customerRemoveBtn: {
+    padding: 4,
+    marginLeft: spacing.sm,
+  },
+  customerEmptyBox: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+    gap: spacing.sm,
+  },
+  customerInlineBox: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+    gap: spacing.sm,
+  },
+  customerInlineActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    gap: spacing.sm,
+  },
+  expandDetailsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+  },
+  expandDetailsText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chooseClientMiniBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: radii.xs,
+    borderWidth: 1,
+  },
+  chooseClientMiniText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  customerDetailsBlock: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: spacing.xs,
+  },
+  customerEmptyHeading: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  customerEmptyButtonsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  customerBtnPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  customerBtnPrimaryText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  customerBtnSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    borderRadius: radii.sm,
+  },
+  customerBtnSecondaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  quickItemCard: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+  },
+  quickItemCardTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  quickItemGridRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  quickItemColQty: {
+    flex: 1,
+  },
+  quickItemColUnit: {
+    flex: 1,
+  },
+  quickItemColPrice: {
+    flex: 1.5,
+  },
+  quickItemActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: 4,
+  },
+  addQuickItemBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 42,
+    borderRadius: radii.sm,
+  },
+  addQuickItemBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  catalogModalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 42,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  catalogModalBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  addFirstItemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.lg,
+    height: 40,
+    borderRadius: radii.sm,
+    marginTop: spacing.md,
+  },
+  addFirstItemBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  itemRowWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  itemRowPressable: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingRight: spacing.sm,
+  },
+  itemDeleteBtn: {
+    padding: spacing.xs,
+  },
+  addAnotherItemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginTop: spacing.sm,
+  },
+  addAnotherItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  checklistCard: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  checklistTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  checkItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  checkItemText: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
   },
 });

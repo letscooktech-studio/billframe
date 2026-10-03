@@ -104,8 +104,9 @@ export class WorkspaceResolver {
     const bottomNavigation: NavigationItem[] = [
       { id: 'tab_home', name: 'index', label: 'Home', icon: 'home', route: '/(tabs)' },
       { id: 'tab_documents', name: 'documents', label: 'Documents', icon: 'invoices', route: '/(tabs)/documents' },
-      { id: 'tab_customers', name: 'customers', label: 'Customers', icon: 'customers', route: '/(tabs)/customers' },
-      { id: 'tab_more', name: 'more', label: 'More', icon: 'settings', route: '/(tabs)/more' },
+      { id: 'tab_contacts', name: 'contacts', label: 'Contacts', icon: 'customers', route: '/(tabs)/contacts' },
+      { id: 'tab_money', name: 'money', label: 'Money', icon: 'payments', route: '/(tabs)/money' },
+      { id: 'tab_settings', name: 'settings', label: 'Settings', icon: 'settings', route: '/(tabs)/settings' },
     ];
 
     // Derive quick actions based on business type preset

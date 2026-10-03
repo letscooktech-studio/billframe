@@ -90,7 +90,7 @@ export default function ExpensesScreen() {
           accessibilityRole="button"
           accessibilityLabel="Add expense"
         >
-          <Plus color="#fff" size={18} />
+          <Plus color={theme.brandAnchorText} size={18} />
         </Pressable>
       </View>
 
@@ -119,7 +119,7 @@ export default function ExpensesScreen() {
               <Text
                 style={[
                   styles.filterChipText,
-                  { color: isActive ? '#fff' : theme.textSecondary },
+                  { color: isActive ? theme.brandAnchorText : theme.textSecondary },
                 ]}
               >
                 {cat === 'all' ? 'All' : CATEGORY_LABELS[cat as ExpenseCategory]}

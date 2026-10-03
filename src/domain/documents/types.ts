@@ -3,7 +3,14 @@
  */
 
 import { Money } from '../money/Money';
-import { TaxType } from '../tax/TaxEngine';
+import {
+  CustomerTaxContext,
+  DocumentTaxSummary,
+  TaxComponentSummary,
+  TaxDecision,
+  TaxProfileContext,
+  TaxType,
+} from '../tax/TaxTypes';
 
 /**
  * Domain constant: 1 unit = 10_000n scaled integer (supports 4 decimal places, e.g. 0.0001 precision)
@@ -17,7 +24,9 @@ export type DocumentType =
   | 'credit_note'
   | 'proforma'
   | 'delivery_note'
-  | 'work_order';
+  | 'work_order'
+  | 'proposal'
+  | 'sow';
 
 /**
  * Orthogonal document lifecycle statuses
@@ -59,10 +68,15 @@ export interface LineItemCalculation {
   readonly internalCostMinor: bigint;
   readonly profitMinor: bigint;
   readonly category?: string | null;
+  readonly hsnSacCode?: string | null;
+  readonly taxRateBasisPoints?: bigint;
+  readonly taxMinor?: bigint;
+  readonly taxDecision?: TaxDecision;
 }
 
 export interface LineItemInput {
   readonly id?: string;
+  readonly catalogItemId?: string | null;
   readonly description: string;
   readonly itemNotes?: string | null;
   readonly quantityScaled: bigint;
@@ -70,6 +84,9 @@ export interface LineItemInput {
   readonly unitPriceMinor: bigint;
   readonly internalCostMinor?: bigint;
   readonly category?: string | null;
+  readonly hsnSacCode?: string | null;
+  readonly taxRateBasisPoints?: bigint;
+  readonly taxType?: TaxType;
 }
 
 export interface DocumentCalculationInput {
@@ -85,6 +102,10 @@ export interface DocumentCalculationInput {
   readonly dueDateTimestamp?: number | null;
   readonly currentTimestamp?: number;
   readonly lifecycleStatus?: DocumentLifecycleStatus;
+  readonly taxContext?: {
+    readonly businessProfile: TaxProfileContext;
+    readonly customer?: CustomerTaxContext | null;
+  };
 }
 
 export interface DocumentCalculationOutput {
@@ -103,4 +124,6 @@ export interface DocumentCalculationOutput {
   readonly marginBasisPoints: number; // e.g. 2500 bp = 25.00%
   readonly paymentStatus: PaymentStatus;
   readonly isOverdue: boolean;
+  readonly taxSummary?: DocumentTaxSummary;
+  readonly taxComponents?: readonly TaxComponentSummary[];
 }

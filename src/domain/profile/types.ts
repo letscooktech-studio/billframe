@@ -21,6 +21,7 @@ export interface BusinessProfile {
   subdivision_name?: string | null;
   phone_country_iso2?: string | null;
   phone_e164?: string | null;
+  upi_vpa?: string | null;
   contact_person?: string | null;
   website?: string | null;
   logo_uri?: string | null;

@@ -4,7 +4,7 @@
  * Customer + description + amount -> instant issued invoice + optional immediate receipt.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -14,17 +14,22 @@ import {
   Pressable,
   useColorScheme,
   Alert,
+  Share,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Zap, Check, UserPlus, CreditCard } from 'lucide-react-native';
+import { ArrowLeft, Zap, Check, UserPlus, CreditCard, QrCode, Copy, Share2, AlertCircle, Edit3, RotateCcw, CheckCircle2 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../design/tokens';
 import { CustomerRepository, CustomerRecord } from '../data/repositories/CustomerRepository';
 import { DocumentRepository } from '../data/repositories/DocumentRepository';
 import { PaymentRepository } from '../data/repositories/PaymentRepository';
-import { DatabaseManager } from '../data/database/DatabaseManager';
-import { parseDecimalStringToMoney } from '../domain/money/Money';
+import { BusinessProfileRepository } from '../data/repositories/BusinessProfileRepository';
+import { BusinessProfile } from '../domain/profile/types';
+import { DirectUpiEngine } from '../domain/payments/upi/DirectUpiEngine';
+import { ExchangeRateEngine } from '../domain/money/ExchangeRateEngine';
+import { UpiQrCode } from '../components/common/UpiQrCode';
+import { parseDecimalStringToMoney, moneyToDecimalString, createMoney } from '../domain/money/Money';
 import { CustomerPickerModal } from '../features/customers/CustomerPickerModal';
 
 export default function QuickBillScreen() {
@@ -36,63 +41,168 @@ export default function QuickBillScreen() {
   const [quickCustomerName, setQuickCustomerName] = useState('');
   const [description, setDescription] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [currency, setCurrency] = useState('USD');
-  const [isPaidNow, setIsPaidNow] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer' | 'upi' | 'card'>('cash');
+  const [currency, setCurrency] = useState('INR');
+  const [isPaidNow, setIsPaidNow] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer' | 'upi' | 'card'>('upi');
   const [loading, setLoading] = useState(false);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [profile, setProfile] = useState<BusinessProfile | null>(null);
+
+  // Payee / Vendor UPI customization & inline setup state
+  const [customPayeeVpa, setCustomPayeeVpa] = useState('');
+  const [customPayeeName, setCustomPayeeName] = useState('');
+  const [isEditingPayee, setIsEditingPayee] = useState(false);
+  const [inlineVpaInput, setInlineVpaInput] = useState('');
+  const [inlineNameInput, setInlineNameInput] = useState('');
+  const [inlineVpaError, setInlineVpaError] = useState<string | null>(null);
+  const [isSavingProfileVpa, setIsSavingProfileVpa] = useState(false);
+  const [isRefreshingFx, setIsRefreshingFx] = useState(false);
+  const [fxRateTick, setFxRateTick] = useState(0);
 
   useEffect(() => {
     async function loadDefaults() {
       try {
-        const db = await DatabaseManager.getDatabaseAsync();
-        const profile = await db.getFirstAsync<{ default_currency: string }>(
-          'SELECT default_currency FROM business_profiles WHERE is_active = 1 LIMIT 1;'
-        );
-        if (profile?.default_currency) {
-          setCurrency(profile.default_currency);
+        const activeProfile = await BusinessProfileRepository.getActiveProfile();
+        if (activeProfile) {
+          setProfile(activeProfile);
+          const initialCurr = activeProfile.default_currency || (activeProfile.country_iso2 === 'IN' ? 'INR' : 'USD');
+          setCurrency(initialCurr);
+          if (initialCurr === 'INR' || activeProfile.country_iso2 === 'IN' || activeProfile.upi_vpa) {
+            setPaymentMethod('upi');
+            setIsPaidNow(true);
+          }
+          if (activeProfile.upi_vpa) {
+            setInlineVpaInput(activeProfile.upi_vpa);
+          }
+          if (activeProfile.legal_name || activeProfile.name) {
+            setInlineNameInput(activeProfile.legal_name || activeProfile.name);
+          }
         }
       } catch {
-        // Fallback to USD
+        // Fallback
+      }
+
+      // Proactively fetch live real-time market exchange rates in background
+      try {
+        ExchangeRateEngine.fetchLiveRatesAsync().then((updated) => {
+          if (updated) {
+            setFxRateTick((prev) => prev + 1);
+          }
+        });
+      } catch {
+        // Offline resilient
       }
     }
     loadDefaults();
   }, []);
 
-  const handleIssueQuickBill = async () => {
-    const custName = customer?.name || quickCustomerName.trim();
-    if (!custName) {
-      Alert.alert('Customer Required', 'Please select a customer or type a customer name.');
-      return;
-    }
-
-    if (!description.trim()) {
-      Alert.alert('Description Required', 'Please enter a brief description for this bill.');
-      return;
-    }
-
-    let parsedAmountMinor = 0n;
+  const handleRefreshLiveRate = async () => {
+    setIsRefreshingFx(true);
     try {
-      const money = parseDecimalStringToMoney(amountStr.trim(), currency);
-      parsedAmountMinor = money.amountMinor;
-      if (parsedAmountMinor <= 0n) {
-        throw new Error();
+      const updated = await ExchangeRateEngine.fetchLiveRatesAsync(true);
+      if (updated) {
+        setFxRateTick((prev) => prev + 1);
+      } else {
+        Alert.alert('Offline Mode', 'Could not reach live market rate servers. Using ECB official reference rate.');
       }
     } catch {
-      Alert.alert('Invalid Amount', 'Please enter a valid billing amount greater than zero.');
+      Alert.alert('Network Error', 'Unable to fetch real-time market rates right now.');
+    } finally {
+      setIsRefreshingFx(false);
+    }
+  };
+
+  const effectiveVpa = useMemo(() => {
+    return (customPayeeVpa.trim() || profile?.upi_vpa?.trim() || '');
+  }, [customPayeeVpa, profile?.upi_vpa]);
+
+  const effectivePayeeName = useMemo(() => {
+    return (
+      customPayeeName.trim() ||
+      profile?.legal_name?.trim() ||
+      profile?.name?.trim() ||
+      'Merchant'
+    );
+  }, [customPayeeName, profile?.legal_name, profile?.name]);
+
+  const quickUpiResult = useMemo(() => {
+    if (!isPaidNow || paymentMethod !== 'upi' || !effectiveVpa) {
+      return null;
+    }
+    try {
+      let parsedMinor: bigint | undefined = undefined;
+      if (amountStr.trim()) {
+        const money = parseDecimalStringToMoney(amountStr.trim(), currency);
+        if (money.amountMinor > 0n) {
+          parsedMinor = money.amountMinor;
+        }
+      }
+      return DirectUpiEngine.buildUpiUriWithCurrencyConversion({
+        vpa: effectiveVpa,
+        payeeName: effectivePayeeName,
+        sourceAmountMinor: parsedMinor,
+        sourceCurrency: currency,
+        transactionNote: description.trim() || 'Quick Bill',
+      });
+    } catch {
+      return null;
+    }
+  }, [isPaidNow, paymentMethod, effectiveVpa, effectivePayeeName, amountStr, currency, description, fxRateTick]);
+
+  const handleSaveVpaToProfile = async () => {
+    const val = DirectUpiEngine.validateVpa(inlineVpaInput);
+    if (!val.isValid || !val.normalizedVpa) {
+      setInlineVpaError(val.error || 'Please enter a valid UPI ID (e.g. name@bank)');
       return;
     }
+    setInlineVpaError(null);
+    setIsSavingProfileVpa(true);
+    try {
+      const activeProfile = profile || (await BusinessProfileRepository.getActiveProfile());
+      if (activeProfile) {
+        const updated = {
+          ...activeProfile,
+          upi_vpa: val.normalizedVpa,
+          legal_name: inlineNameInput.trim() || activeProfile.legal_name || activeProfile.name,
+        };
+        await BusinessProfileRepository.updateProfile(updated);
+        setProfile(updated);
+      }
+      setCustomPayeeVpa('');
+      setCustomPayeeName('');
+      setIsEditingPayee(false);
+      Alert.alert('UPI ID Saved', `Saved ${val.normalizedVpa} to your business profile.`);
+    } catch (err: any) {
+      Alert.alert('Save Failed', err.message || 'Could not save profile.');
+    } finally {
+      setIsSavingProfileVpa(false);
+    }
+  };
 
+  const handleUseOnceCustomPayee = () => {
+    const val = DirectUpiEngine.validateVpa(inlineVpaInput);
+    if (!val.isValid || !val.normalizedVpa) {
+      setInlineVpaError(val.error || 'Please enter a valid UPI ID (e.g. vendor@bank)');
+      return;
+    }
+    setInlineVpaError(null);
+    setCustomPayeeVpa(val.normalizedVpa);
+    setCustomPayeeName(inlineNameInput.trim());
+    setIsEditingPayee(false);
+  };
+
+  const handleResetToProfileDefault = () => {
+    setCustomPayeeVpa('');
+    setCustomPayeeName('');
+    setIsEditingPayee(false);
+    setInlineVpaInput(profile?.upi_vpa || '');
+    setInlineNameInput(profile?.legal_name || profile?.name || '');
+    setInlineVpaError(null);
+  };
+
+  const executeIssueBill = async (targetCustomer: CustomerRecord, parsedAmountMinor: bigint) => {
     setLoading(true);
     try {
-      // 1. Resolve or create customer
-      let targetCustomer = customer;
-      if (!targetCustomer) {
-        targetCustomer = await CustomerRepository.createCustomer({
-          name: custName,
-        });
-      }
-
       // 2. Create and autosave draft invoice
       const draft = await DocumentRepository.saveDraft({
         customerId: targetCustomer.id,
@@ -129,6 +239,70 @@ export default function QuickBillScreen() {
       Alert.alert('Error Creating Bill', err.message || 'An unexpected error occurred.');
       setLoading(false);
     }
+  };
+
+  const handleIssueQuickBill = async () => {
+    const custName = customer?.name || quickCustomerName.trim();
+    if (!custName) {
+      Alert.alert('Customer Required', 'Please select a customer or type a customer name.');
+      return;
+    }
+
+    if (!description.trim()) {
+      Alert.alert('Description Required', 'Please enter a brief description for this bill.');
+      return;
+    }
+
+    let parsedAmountMinor = 0n;
+    try {
+      const money = parseDecimalStringToMoney(amountStr.trim(), currency);
+      parsedAmountMinor = money.amountMinor;
+      if (parsedAmountMinor <= 0n) {
+        throw new Error();
+      }
+    } catch {
+      Alert.alert('Invalid Amount', 'Please enter a valid billing amount greater than zero.');
+      return;
+    }
+
+    // 1. Resolve or create customer
+    let targetCustomer = customer;
+    if (!targetCustomer) {
+      try {
+        targetCustomer = await CustomerRepository.createCustomer({
+          name: custName,
+        });
+      } catch (err: any) {
+        Alert.alert('Customer Error', err.message || 'Could not create customer record.');
+        return;
+      }
+    }
+
+    // Cross-Currency UPI Warning & Confirmation (per NPCI regulations)
+    if (isPaidNow && paymentMethod === 'upi' && currency !== 'INR' && quickUpiResult?.inrAmountMinor) {
+      const inrAmountFormatted = moneyToDecimalString(createMoney(quickUpiResult.inrAmountMinor, 'INR'));
+      Alert.alert(
+        'Confirm Cross-Currency UPI',
+        `You are billing ${amountStr} ${currency}. UPI apps (GPay, PhonePe, Paytm, BHIM) strictly transact in Indian Rupees (INR).\n\nAt the current live market exchange rate, this charges ₹${inrAmountFormatted} INR.\n\nAre you sure you want to proceed with this payment?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: `Switch Bill to ₹${inrAmountFormatted} INR`,
+            onPress: () => {
+              setCurrency('INR');
+              setAmountStr(inrAmountFormatted);
+            },
+          },
+          {
+            text: `Keep ${currency} & Issue`,
+            onPress: () => executeIssueBill(targetCustomer!, parsedAmountMinor),
+          },
+        ]
+      );
+      return;
+    }
+
+    await executeIssueBill(targetCustomer, parsedAmountMinor);
   };
 
   return (
@@ -231,7 +405,40 @@ export default function QuickBillScreen() {
               onChangeText={setDescription}
             />
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: spacing.md }]}>
+            {/* Currency Selector Strip */}
+            <View style={styles.currencySection}>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Currency</Text>
+              <View style={styles.currencyStrip}>
+                {(['INR', 'USD', 'EUR', 'GBP'] as const).map((curr) => {
+                  const isSelected = currency === curr;
+                  const symbol = curr === 'INR' ? '₹' : curr === 'USD' ? '$' : curr === 'EUR' ? '€' : '£';
+                  return (
+                    <Pressable
+                      key={curr}
+                      style={[
+                        styles.currencyChip,
+                        {
+                          backgroundColor: isSelected ? theme.brandAnchor : theme.surfaceSecondary,
+                          borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
+                        },
+                      ]}
+                      onPress={() => setCurrency(curr)}
+                    >
+                      <Text
+                        style={[
+                          styles.currencyChipText,
+                          { color: isSelected ? theme.brandAnchorText : theme.textPrimary },
+                        ]}
+                      >
+                        {symbol} {curr}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: spacing.xs }]}>
               Amount ({currency})
             </Text>
             <TextInput
@@ -280,7 +487,7 @@ export default function QuickBillScreen() {
 
             {isPaidNow && (
               <View style={styles.methodStrip}>
-                {(['cash', 'upi', 'bank_transfer', 'card'] as const).map((method) => {
+                {(['upi', 'cash', 'bank_transfer', 'card'] as const).map((method) => {
                   const active = paymentMethod === method;
                   const label = method === 'bank_transfer' ? 'Bank' : method.toUpperCase();
                   return (
@@ -298,7 +505,7 @@ export default function QuickBillScreen() {
                       <Text
                         style={[
                           styles.methodChipText,
-                          { color: active ? theme.surface : theme.textPrimary },
+                          { color: active ? theme.brandAnchorText : theme.textPrimary },
                         ]}
                       >
                         {label}
@@ -306,6 +513,296 @@ export default function QuickBillScreen() {
                     </Pressable>
                   );
                 })}
+              </View>
+            )}
+
+            {isPaidNow && paymentMethod === 'upi' && (
+              <View
+                style={[
+                  styles.upiCounterCard,
+                  {
+                    backgroundColor: theme.surfaceSecondary,
+                    borderColor: theme.borderSubtle,
+                  },
+                ]}
+              >
+                <View style={styles.upiCounterHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <QrCode size={18} color={theme.brandAnchor} />
+                    <Text style={[styles.upiCounterTitle, { color: theme.textPrimary }]}>
+                      Scan to Pay via UPI
+                    </Text>
+                  </View>
+                  <View style={[styles.zeroFeeBadge, { backgroundColor: theme.surface }]}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: theme.statusSuccess }}>0% FEE</Text>
+                  </View>
+                </View>
+
+                {/* Foreign Currency (USD, EUR, GBP) with UPI Warning & 1-Tap Conversion */}
+                {currency !== 'INR' && quickUpiResult?.isConverted && (
+                  <View
+                    style={[
+                      styles.fxWarningCard,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: '#F59E0B',
+                      },
+                    ]}
+                  >
+                    <View style={styles.fxWarningHeader}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                        <AlertCircle size={15} color="#D97706" />
+                        <Text style={[styles.fxWarningTitle, { color: theme.textPrimary }]}>
+                          Cross-Currency UPI ({currency} → INR)
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={handleRefreshLiveRate}
+                        disabled={isRefreshingFx}
+                        style={[styles.refreshFxBtn, { borderColor: '#F59E0B' }]}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Refresh real-time market exchange rate"
+                      >
+                        {isRefreshingFx ? (
+                          <ActivityIndicator size="small" color="#D97706" />
+                        ) : (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <RotateCcw size={11} color="#D97706" />
+                            <Text style={styles.refreshFxText}>Refresh Rate</Text>
+                          </View>
+                        )}
+                      </Pressable>
+                    </View>
+                    <Text style={[styles.fxWarningDesc, { color: theme.textSecondary }]}>
+                      UPI apps strictly process INR. Converted amount:{' '}
+                      <Text style={{ fontWeight: '700', color: theme.statusSuccess }}>
+                        ₹{moneyToDecimalString(createMoney(quickUpiResult.inrAmountMinor!, 'INR'))} INR
+                      </Text>
+                      {'\n'}Rate: {quickUpiResult.exchangeRateLabel}
+                    </Text>
+                    <Pressable
+                      style={[styles.switchInrBtn, { backgroundColor: theme.brandAnchor }]}
+                      onPress={() => {
+                        setCurrency('INR');
+                        setAmountStr(moneyToDecimalString(createMoney(quickUpiResult.inrAmountMinor!, 'INR')));
+                      }}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.switchInrBtnText, { color: theme.brandAnchorText }]}>
+                        Switch Bill Currency to INR (₹{moneyToDecimalString(createMoney(quickUpiResult.inrAmountMinor!, 'INR'))})
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+
+                {/* Inline UPI ID Setup / Vendor Override Container */}
+                {(!effectiveVpa || isEditingPayee) ? (
+                  <View style={[styles.inlineConfigBox, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+                    <View style={styles.inlineConfigHeader}>
+                      <Text style={[styles.inlineConfigTitle, { color: theme.textPrimary }]}>
+                        {isEditingPayee ? 'Payee / Vendor UPI Override' : 'Configure UPI ID'}
+                      </Text>
+                      {isEditingPayee && (
+                        <Pressable onPress={handleResetToProfileDefault} hitSlop={8}>
+                          <Text style={[styles.cancelEditText, { color: theme.textSecondary }]}>Cancel</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                    <Text style={[styles.inlineConfigDesc, { color: theme.textSecondary }]}>
+                      {isEditingPayee
+                        ? 'Enter a vendor, contractor, or alternate bank UPI ID to direct this payment.'
+                        : 'Enter your merchant UPI ID (Google Pay, PhonePe, Paytm, BHIM) to immediately show payment QR.'}
+                    </Text>
+
+                    <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: spacing.xs }]}>
+                      UPI ID (VPA) *
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.surfaceSecondary,
+                          color: theme.textPrimary,
+                          borderColor: inlineVpaError ? theme.statusDanger : theme.borderSubtle,
+                        },
+                      ]}
+                      placeholder="e.g. name@okhdfcbank or 9876543210@paytm"
+                      placeholderTextColor={theme.textMuted}
+                      value={inlineVpaInput}
+                      onChangeText={(val) => {
+                        setInlineVpaInput(val);
+                        if (inlineVpaError) setInlineVpaError(null);
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+
+                    <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: spacing.xs }]}>
+                      Payee / Business Name
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.surfaceSecondary,
+                          color: theme.textPrimary,
+                          borderColor: theme.borderSubtle,
+                        },
+                      ]}
+                      placeholder="e.g. Store Name or Vendor Name"
+                      placeholderTextColor={theme.textMuted}
+                      value={inlineNameInput}
+                      onChangeText={setInlineNameInput}
+                    />
+
+                    {inlineVpaError && (
+                      <View style={styles.errorBanner}>
+                        <AlertCircle size={14} color={theme.statusDanger} />
+                        <Text style={[styles.errorBannerText, { color: theme.statusDanger }]}>
+                          {inlineVpaError}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.configBtnRow}>
+                      <Pressable
+                        style={[styles.configPrimaryBtn, { backgroundColor: theme.brandAnchor }]}
+                        onPress={handleSaveVpaToProfile}
+                        disabled={isSavingProfileVpa}
+                        accessibilityRole="button"
+                      >
+                        {isSavingProfileVpa ? (
+                          <ActivityIndicator size="small" color={theme.brandAnchorText} />
+                        ) : (
+                          <Text style={[styles.configPrimaryBtnText, { color: theme.brandAnchorText }]}>
+                            Save as Default & Show QR
+                          </Text>
+                        )}
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.configSecondaryBtn, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
+                        onPress={handleUseOnceCustomPayee}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.configSecondaryBtnText, { color: theme.textPrimary }]}>
+                          Use Once for this Bill
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.qrHeaderRow}>
+                      <Text style={[styles.upiCounterSub, { color: theme.textSecondary }]}>
+                        Customer scans with Google Pay, PhonePe, Paytm, or BHIM
+                      </Text>
+                      <Pressable
+                        style={[styles.editUpiBtn, { borderColor: theme.borderSubtle }]}
+                        onPress={() => {
+                          setInlineVpaInput(effectiveVpa);
+                          setInlineNameInput(effectivePayeeName);
+                          setIsEditingPayee(true);
+                        }}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Change or override payee UPI ID"
+                      >
+                        <Edit3 size={12} color={theme.textPrimary} />
+                        <Text style={[styles.editUpiText, { color: theme.textPrimary }]}>
+                          {customPayeeVpa ? 'Edit Vendor' : 'Change UPI'}
+                        </Text>
+                      </Pressable>
+                    </View>
+
+                    {customPayeeVpa ? (
+                      <View style={[styles.customPayeeBadge, { backgroundColor: theme.surface }]}>
+                        <Text style={[styles.customPayeeBadgeText, { color: '#D97706' }]}>
+                          Vendor / Custom Payee Active: {customPayeeVpa}
+                        </Text>
+                        <Pressable onPress={handleResetToProfileDefault} hitSlop={8}>
+                          <Text style={[styles.resetUpiText, { color: theme.brandAnchor }]}>Reset</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+
+                    {/* Live QR Matrix */}
+                    {quickUpiResult?.upiUri ? (
+                      <View style={styles.upiQrWrapper}>
+                        <UpiQrCode
+                          value={quickUpiResult.upiUri}
+                          size={175}
+                          color="#000000"
+                          backgroundColor="#FFFFFF"
+                        />
+                      </View>
+                    ) : (
+                      <View style={styles.emptyQrBox}>
+                        <Text style={{ color: theme.textMuted }}>Enter an amount or UPI ID to generate QR</Text>
+                      </View>
+                    )}
+
+                    {/* Mode explanation */}
+                    <Text style={[styles.qrModeNote, { color: theme.textSecondary }]}>
+                      {amountStr.trim() && parseFloat(amountStr) > 0
+                        ? `Exact Amount: ${quickUpiResult?.isConverted ? `₹${moneyToDecimalString(createMoney(quickUpiResult.inrAmountMinor!, 'INR'))} INR` : `${amountStr} ${currency}`}`
+                        : 'Open Standee QR (Customer enters amount in app)'}
+                    </Text>
+
+                    {/* Payee Info */}
+                    <View style={styles.upiDetailsBlock}>
+                      <Text style={[styles.upiPayeeName, { color: theme.textPrimary }]}>
+                        {effectivePayeeName}
+                      </Text>
+                      <Text style={[styles.upiVpaText, { color: theme.textSecondary }]}>
+                        UPI ID: {effectiveVpa}
+                      </Text>
+                    </View>
+
+                    {/* Actions */}
+                    <View style={styles.upiActionsRow}>
+                      <Pressable
+                        style={[
+                          styles.upiActionBtn,
+                          { backgroundColor: theme.surface, borderColor: theme.borderSubtle },
+                        ]}
+                        onPress={() => {
+                          if (quickUpiResult?.upiUri) {
+                            Share.share({
+                              message: `Pay ${description || 'bill'} (${quickUpiResult.isConverted ? `₹${moneyToDecimalString(createMoney(quickUpiResult.inrAmountMinor!, 'INR'))} INR` : `${amountStr} ${currency}`}) via UPI: ${quickUpiResult.upiUri}`,
+                              title: 'Quick Bill Payment',
+                            });
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Share UPI payment link"
+                      >
+                        <Share2 size={14} color={theme.textPrimary} />
+                        <Text style={[styles.upiActionBtnText, { color: theme.textPrimary }]}>
+                          Share Link
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[
+                          styles.upiActionBtn,
+                          { backgroundColor: theme.surface, borderColor: theme.borderSubtle },
+                        ]}
+                        onPress={() => {
+                          Alert.alert('UPI ID', effectiveVpa, [{ text: 'OK' }]);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="View UPI ID"
+                      >
+                        <Copy size={14} color={theme.textPrimary} />
+                        <Text style={[styles.upiActionBtnText, { color: theme.textPrimary }]}>
+                          Copy ID
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -324,11 +821,11 @@ export default function QuickBillScreen() {
             accessibilityRole="button"
           >
             {loading ? (
-              <ActivityIndicator color={theme.surface} />
+              <ActivityIndicator color={theme.brandAnchorText} />
             ) : (
               <>
-                <Zap color={theme.surface} size={20} fill={theme.surface} />
-                <Text style={[styles.issueButtonText, { color: theme.surface }]}>
+                <Zap color={theme.brandAnchorText} size={20} fill={theme.brandAnchorText} />
+                <Text style={[styles.issueButtonText, { color: theme.brandAnchorText }]}>
                   {isPaidNow ? 'Create, Issue & Settle' : 'Create & Issue Invoice'}
                 </Text>
               </>
@@ -522,5 +1019,269 @@ const styles = StyleSheet.create({
   issueButtonText: {
     fontSize: typography.bodyMedium.fontSize,
     fontWeight: '700',
+  },
+  upiCounterCard: {
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  upiCounterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  upiCounterTitle: {
+    fontSize: typography.bodyMedium.fontSize,
+    fontWeight: '700',
+  },
+  zeroFeeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  upiCounterSub: {
+    fontSize: typography.caption.fontSize,
+    marginBottom: spacing.sm,
+  },
+  upiQrWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    padding: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.md,
+    marginVertical: spacing.xs,
+  },
+  fxBanner: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
+    marginVertical: spacing.xs,
+    alignItems: 'center',
+  },
+  fxTitle: {
+    fontSize: typography.bodyMedium.fontSize,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  fxDesc: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  upiDetailsBlock: {
+    alignItems: 'center',
+    marginVertical: spacing.xs,
+  },
+  upiPayeeName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  upiVpaText: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  upiActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  upiActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.xs,
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    minHeight: 38,
+  },
+  upiActionBtnText: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
+  },
+  currencySection: {
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  currencyStrip: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  currencyChip: {
+    flex: 1,
+    height: 36,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  currencyChipText: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '700',
+  },
+  fxWarningCard: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
+    marginVertical: spacing.xs,
+    gap: 4,
+  },
+  fxWarningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  refreshFxBtn: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  refreshFxText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  fxWarningTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  fxWarningDesc: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  switchInrBtn: {
+    marginTop: 4,
+    height: 36,
+    borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchInrBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  inlineConfigBox: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    marginVertical: spacing.xs,
+    gap: spacing.xs,
+  },
+  inlineConfigHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  inlineConfigTitle: {
+    fontSize: typography.bodyMedium.fontSize,
+    fontWeight: '700',
+  },
+  cancelEditText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  inlineConfigDesc: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginBottom: spacing.xs,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  errorBannerText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  configBtnRow: {
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  configPrimaryBtn: {
+    height: 40,
+    borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  configPrimaryBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  configSecondaryBtn: {
+    height: 36,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  configSecondaryBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  qrHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  editUpiBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  editUpiText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  customPayeeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+    marginBottom: spacing.xs,
+  },
+  customPayeeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  resetUpiText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  emptyQrBox: {
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qrModeNote: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  noUpiWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  noUpiText: {
+    flex: 1,
+    fontSize: typography.caption.fontSize,
+    lineHeight: 16,
   },
 });

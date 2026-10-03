@@ -33,6 +33,21 @@ export class BackupManager {
     const time_entries = await db.getAllAsync('SELECT * FROM time_entries;');
     const estimate_revisions = await db.getAllAsync('SELECT * FROM estimate_revisions;');
 
+    const safeGetAll = async (sql: string): Promise<any[]> => {
+      try {
+        return await db.getAllAsync(sql);
+      } catch {
+        return [];
+      }
+    };
+
+    const credit_notes = await safeGetAll('SELECT * FROM credit_notes;');
+    const customer_advances = await safeGetAll('SELECT * FROM customer_advances;');
+    const credit_allocations = await safeGetAll('SELECT * FROM credit_allocations;');
+    const payment_refunds = await safeGetAll('SELECT * FROM payment_refunds;');
+    const reminder_events = await safeGetAll('SELECT * FROM reminder_events;');
+    const invoice_collection_metadata = await safeGetAll('SELECT * FROM invoice_collection_metadata;');
+
     const counts: BackupTableCounts = {
       business_profiles: business_profiles.length,
       customers: customers.length,
@@ -47,6 +62,12 @@ export class BackupManager {
       expenses: expenses.length,
       time_entries: time_entries.length,
       estimate_revisions: estimate_revisions.length,
+      credit_notes: credit_notes.length,
+      customer_advances: customer_advances.length,
+      credit_allocations: credit_allocations.length,
+      payment_refunds: payment_refunds.length,
+      reminder_events: reminder_events.length,
+      invoice_collection_metadata: invoice_collection_metadata.length,
     };
 
     const dataPayload = {
@@ -63,6 +84,12 @@ export class BackupManager {
       expenses,
       time_entries,
       estimate_revisions,
+      credit_notes,
+      customer_advances,
+      credit_allocations,
+      payment_refunds,
+      reminder_events,
+      invoice_collection_metadata,
     };
 
     // Calculate deterministic SHA-256 checksum over data payload
@@ -145,7 +172,7 @@ export class BackupManager {
         return { valid: false, error: 'Invalid backup file: Not a recognized Billframe backup.' };
       }
 
-      if (payload.manifest.version !== 1 && payload.manifest.version !== 2) {
+      if (payload.manifest.version !== 1 && payload.manifest.version !== 2 && payload.manifest.version !== 3) {
         return { valid: false, error: `Unsupported backup version ${payload.manifest.version}.` };
       }
 
@@ -182,7 +209,21 @@ export class BackupManager {
 
     try {
       await db.withTransactionAsync(async () => {
+        const safeRun = async (sql: string, params: any[] = []): Promise<void> => {
+          try {
+            await db.runAsync(sql, params);
+          } catch {
+            // Ignore if table does not exist in schema
+          }
+        };
+
         // 1. Delete dependent tables first to respect foreign keys
+        await safeRun('DELETE FROM credit_allocations;');
+        await safeRun('DELETE FROM payment_refunds;');
+        await safeRun('DELETE FROM reminder_events;');
+        await safeRun('DELETE FROM invoice_collection_metadata;');
+        await safeRun('DELETE FROM credit_notes;');
+        await safeRun('DELETE FROM customer_advances;');
         await db.runAsync('DELETE FROM document_snapshots;');
         await db.runAsync('DELETE FROM receipts;');
         await db.runAsync('DELETE FROM payments;');
@@ -392,6 +433,96 @@ export class BackupManager {
               id, estimate_id, revision_number, snapshot_json, change_notes, created_at
             ) VALUES (?, ?, ?, ?, ?, ?);`,
             [rev.id, rev.estimate_id, rev.revision_number, rev.snapshot_json, rev.change_notes || null, rev.created_at]
+          );
+        }
+
+        // 15. Restore credit notes
+        for (const cn of data.credit_notes || []) {
+          await safeRun(
+            `INSERT INTO credit_notes (
+              id, business_profile_id, customer_id, original_invoice_id, credit_note_number,
+              reason, credit_amount_minor, tax_amount_minor, currency, issue_date, status,
+              snapshot_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              cn.id, cn.business_profile_id, cn.customer_id, cn.original_invoice_id,
+              cn.credit_note_number, cn.reason, cn.credit_amount_minor, cn.tax_amount_minor || 0,
+              cn.currency, cn.issue_date, cn.status, cn.snapshot_json, cn.created_at, cn.updated_at,
+            ]
+          );
+        }
+
+        // 16. Restore customer advances
+        for (const adv of data.customer_advances || []) {
+          await safeRun(
+            `INSERT INTO customer_advances (
+              id, business_profile_id, customer_id, original_amount_minor, remaining_amount_minor,
+              currency, payment_source, reference, notes, advance_date, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              adv.id, adv.business_profile_id, adv.customer_id, adv.original_amount_minor,
+              adv.remaining_amount_minor, adv.currency, adv.payment_source, adv.reference || null,
+              adv.notes || null, adv.advance_date, adv.status, adv.created_at, adv.updated_at,
+            ]
+          );
+        }
+
+        // 17. Restore credit allocations
+        for (const alloc of data.credit_allocations || []) {
+          await safeRun(
+            `INSERT INTO credit_allocations (
+              id, business_profile_id, customer_advance_id, credit_note_id, invoice_id,
+              allocated_amount_minor, currency, allocated_at, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              alloc.id, alloc.business_profile_id, alloc.customer_advance_id || null,
+              alloc.credit_note_id || null, alloc.invoice_id, alloc.allocated_amount_minor,
+              alloc.currency, alloc.allocated_at, alloc.notes || null,
+            ]
+          );
+        }
+
+        // 18. Restore payment refunds
+        for (const ref of data.payment_refunds || []) {
+          await safeRun(
+            `INSERT INTO payment_refunds (
+              id, business_profile_id, payment_id, invoice_id, refund_amount_minor,
+              currency, reason, status, provider_refund_id, refund_date, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              ref.id, ref.business_profile_id, ref.payment_id, ref.invoice_id,
+              ref.refund_amount_minor, ref.currency, ref.reason, ref.status,
+              ref.provider_refund_id || null, ref.refund_date, ref.created_at, ref.updated_at,
+            ]
+          );
+        }
+
+        // 19. Restore reminder events
+        for (const rem of data.reminder_events || []) {
+          await safeRun(
+            `INSERT INTO reminder_events (
+              id, business_profile_id, invoice_id, customer_id, channel, template,
+              status, is_automated, reminder_date, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              rem.id, rem.business_profile_id, rem.invoice_id, rem.customer_id,
+              rem.channel, rem.template, rem.status, rem.is_automated || 0,
+              rem.reminder_date, rem.created_at,
+            ]
+          );
+        }
+
+        // 20. Restore invoice collection metadata
+        for (const meta of data.invoice_collection_metadata || []) {
+          await safeRun(
+            `INSERT INTO invoice_collection_metadata (
+              document_id, expected_payment_date, promise_to_pay_date, collection_notes, updated_at
+            ) VALUES (?, ?, ?, ?, ?);`,
+            [
+              meta.document_id, meta.expected_payment_date || null,
+              meta.promise_to_pay_date || null, meta.collection_notes || null,
+              meta.updated_at,
+            ]
           );
         }
       });

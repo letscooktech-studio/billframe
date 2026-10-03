@@ -119,7 +119,7 @@ export const FEATURE_REGISTRY: FeatureCapability[] = [
       service: 100,
       agency: 100,
       contractor: 95,
-      retail: 80,
+      retail: 95,
       wholesale: 100,
       professional: 100,
       other: 90,
@@ -233,8 +233,48 @@ export const FEATURE_REGISTRY: FeatureCapability[] = [
     module: 'settings',
     priority: 72,
   },
-
-  // ── ROADMAP CAPABILITIES (Properly tagged with phase) ──
+  {
+    id: 'payment_gateways',
+    name: 'Payments & Gateways',
+    description: 'Configure Direct UPI QR codes, bank handles, and Razorpay payment links',
+    icon: 'payments',
+    route: '/settings/payments',
+    availability: 'ready',
+    businessRelevance: {
+      freelancer: 95,
+      service: 95,
+      agency: 95,
+      contractor: 90,
+      retail: 95,
+      wholesale: 90,
+      professional: 95,
+      other: 90,
+    },
+    searchKeywords: ['upi', 'qr code', 'payment', 'gateway', 'razorpay', 'phonepe', 'gpay', 'paytm', 'bhim', 'online payment', 'payment link'],
+    module: 'payments',
+    priority: 85,
+  },
+  {
+    id: 'catalog_items',
+    name: 'Products & Price List',
+    description: 'Catalog of items, services, hourly rates, and standard units',
+    icon: 'inventory',
+    route: '/catalog',
+    availability: 'ready',
+    businessRelevance: {
+      freelancer: 85,
+      service: 90,
+      agency: 85,
+      contractor: 95,
+      retail: 100,
+      wholesale: 100,
+      professional: 85,
+      other: 85,
+    },
+    searchKeywords: ['catalog', 'items', 'products', 'services', 'rates', 'price list', 'inventory'],
+    module: 'inventory',
+    priority: 86,
+  },
   {
     id: 'gst_filing',
     name: 'GST Reports & HSN/SAC',
@@ -257,6 +297,8 @@ export const FEATURE_REGISTRY: FeatureCapability[] = [
     module: 'gst',
     priority: 65,
   },
+
+  // ── ROADMAP CAPABILITIES (Properly tagged with phase) ──
   {
     id: 'credit_note',
     name: 'Credit & Debit Notes',
@@ -306,9 +348,8 @@ export const FEATURE_REGISTRY: FeatureCapability[] = [
     name: 'Collections & WhatsApp Reminders',
     description: 'Overdue debtor management, payment reminders, and customer balance statements',
     icon: 'collections',
-    route: null,
-    availability: 'roadmap',
-    roadmapPhase: 'Phase 4',
+    route: '/collections',
+    availability: 'ready',
     businessRelevance: {
       freelancer: 85,
       service: 90,
@@ -460,8 +501,6 @@ export const FEATURE_REGISTRY: FeatureCapability[] = [
 export class FeatureRegistry {
   /**
    * Returns true if running in development / test mode.
-   * In React Native / Expo, __DEV__ is defined as true in debug.
-   * In Node.js / Jest, process.env.NODE_ENV !== 'production'.
    */
   public static isDevelopment(): boolean {
     if (typeof __DEV__ !== 'undefined') {

@@ -490,4 +490,196 @@ export const MIGRATIONS: readonly Migration[] = [
       }
     },
   },
+  {
+    version: 6,
+    name: 'v6_tax_engine_and_country_packs',
+    checksum: 'c6e43187a552fb821034f89d34208a689e4726bf69dc7268d0bb9930f305c6a1',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      // 1. Expand customers table with tax & subdivision attributes
+      await addColumnIfNotExistsAsync(db, 'customers', 'subdivision_code', 'subdivision_code TEXT');
+      await addColumnIfNotExistsAsync(db, 'customers', 'subdivision_name', 'subdivision_name TEXT');
+      await addColumnIfNotExistsAsync(db, 'customers', 'is_business', 'is_business INTEGER NOT NULL DEFAULT 0');
+
+      // 2. Expand catalog_items with HSN/SAC and tax attributes
+      await addColumnIfNotExistsAsync(db, 'catalog_items', 'hsn_sac_code', 'hsn_sac_code TEXT');
+      await addColumnIfNotExistsAsync(db, 'catalog_items', 'item_type', "item_type TEXT NOT NULL DEFAULT 'service'");
+      await addColumnIfNotExistsAsync(db, 'catalog_items', 'tax_category', 'tax_category TEXT');
+
+      // 3. Expand documents with tax decision attributes
+      await addColumnIfNotExistsAsync(db, 'documents', 'place_of_supply', 'place_of_supply TEXT');
+      await addColumnIfNotExistsAsync(db, 'documents', 'supply_type', 'supply_type TEXT');
+      await addColumnIfNotExistsAsync(db, 'documents', 'reverse_charge', 'reverse_charge INTEGER NOT NULL DEFAULT 0');
+
+      // 4. Expand document_items with HSN/SAC and line tax attributes
+      await addColumnIfNotExistsAsync(db, 'document_items', 'hsn_sac_code', 'hsn_sac_code TEXT');
+      await addColumnIfNotExistsAsync(db, 'document_items', 'tax_rate_bp', 'tax_rate_bp INTEGER NOT NULL DEFAULT 0');
+      await addColumnIfNotExistsAsync(db, 'document_items', 'tax_minor', 'tax_minor INTEGER NOT NULL DEFAULT 0');
+      await addColumnIfNotExistsAsync(db, 'document_items', 'tax_type', "tax_type TEXT NOT NULL DEFAULT 'exclusive'");
+      await addColumnIfNotExistsAsync(db, 'document_items', 'tax_components_json', 'tax_components_json TEXT');
+
+      // 5. Create document_tax_snapshots table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS document_tax_snapshots (
+          id TEXT PRIMARY KEY NOT NULL,
+          document_id TEXT NOT NULL UNIQUE REFERENCES documents(id) ON DELETE CASCADE,
+          tax_pack_id TEXT NOT NULL,
+          tax_pack_version TEXT NOT NULL,
+          place_of_supply TEXT,
+          supply_type TEXT NOT NULL,
+          reverse_charge INTEGER NOT NULL DEFAULT 0,
+          tax_summary_json TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_doc_tax_snapshots_doc ON document_tax_snapshots(document_id);
+      `);
+    },
+  },
+  {
+    version: 7,
+    name: 'v7_upi_and_payment_connections',
+    checksum: '1ab6a8bb2eb7edc01f304e5c826bbc3687f05d789f189c64f39a77f92acf4fec',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      // 1. Add upi_vpa to business_profiles
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'upi_vpa', 'upi_vpa TEXT');
+
+      // 2. Add payment_link_url and payment_link_id to documents
+      await addColumnIfNotExistsAsync(db, 'documents', 'payment_link_url', 'payment_link_url TEXT');
+      await addColumnIfNotExistsAsync(db, 'documents', 'payment_link_id', 'payment_link_id TEXT');
+
+      // 3. Create payment_provider_connections table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS payment_provider_connections (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          provider TEXT NOT NULL CHECK(provider IN ('razorpay', 'cashfree', 'stripe', 'other')),
+          is_active INTEGER NOT NULL DEFAULT 1,
+          is_testnet INTEGER NOT NULL DEFAULT 1,
+          key_id TEXT NOT NULL,
+          webhook_secret TEXT,
+          metadata_json TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          CONSTRAINT uq_provider_business UNIQUE(business_profile_id, provider)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_provider_connections_bus ON payment_provider_connections(business_profile_id);
+      `);
+    },
+  },
+  {
+    version: 8,
+    name: 'v8_sanitize_provider_connections_and_financial_entities',
+    checksum: 'e8acb1060166fa6cb0db792fd2dce3d66620cbc7c1c0955efff26b520959988d',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      // 1. Expand payment_provider_connections table with non-secret partner/status attributes
+      await addColumnIfNotExistsAsync(db, 'payment_provider_connections', 'status', "status TEXT NOT NULL DEFAULT 'not_configured'");
+      await addColumnIfNotExistsAsync(db, 'payment_provider_connections', 'merchant_account_reference', 'merchant_account_reference TEXT');
+      await addColumnIfNotExistsAsync(db, 'payment_provider_connections', 'capabilities_json', 'capabilities_json TEXT');
+      await addColumnIfNotExistsAsync(db, 'payment_provider_connections', 'last_synced_at', 'last_synced_at INTEGER');
+
+      // 2. Create financial completeness tables (Credit Notes, Customer Advances, Allocations, Refunds, Reminders)
+      await db.execAsync(`
+        -- 22. Credit Notes (Immutable sales adjustment & tax correction document)
+        CREATE TABLE IF NOT EXISTS credit_notes (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          customer_id TEXT NOT NULL REFERENCES customers(id),
+          original_invoice_id TEXT NOT NULL REFERENCES documents(id),
+          credit_note_number TEXT NOT NULL UNIQUE,
+          reason TEXT NOT NULL,
+          credit_amount_minor INTEGER NOT NULL,
+          tax_amount_minor INTEGER NOT NULL DEFAULT 0,
+          currency TEXT NOT NULL,
+          issue_date INTEGER NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('issued', 'applied', 'refunded', 'void')),
+          snapshot_json TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_credit_notes_customer ON credit_notes(customer_id);
+        CREATE INDEX IF NOT EXISTS idx_credit_notes_invoice ON credit_notes(original_invoice_id);
+
+        -- 23. Customer Advances (Customer credit balance ledger)
+        CREATE TABLE IF NOT EXISTS customer_advances (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          customer_id TEXT NOT NULL REFERENCES customers(id),
+          original_amount_minor INTEGER NOT NULL,
+          remaining_amount_minor INTEGER NOT NULL,
+          currency TEXT NOT NULL,
+          payment_source TEXT NOT NULL,
+          reference TEXT,
+          notes TEXT,
+          advance_date INTEGER NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('available', 'partially_allocated', 'fully_allocated', 'refunded')),
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_customer_advances_cust ON customer_advances(customer_id);
+
+        -- 24. Credit Allocations (Advance & Credit Note allocations against Invoices)
+        CREATE TABLE IF NOT EXISTS credit_allocations (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          customer_advance_id TEXT REFERENCES customer_advances(id) ON DELETE CASCADE,
+          credit_note_id TEXT REFERENCES credit_notes(id) ON DELETE CASCADE,
+          invoice_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+          allocated_amount_minor INTEGER NOT NULL,
+          currency TEXT NOT NULL,
+          allocated_at INTEGER NOT NULL,
+          notes TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_credit_allocations_inv ON credit_allocations(invoice_id);
+
+        -- 25. Payment Refunds (Immutable refunds linked to original payment)
+        CREATE TABLE IF NOT EXISTS payment_refunds (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          payment_id TEXT NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+          invoice_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+          refund_amount_minor INTEGER NOT NULL,
+          currency TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('completed', 'pending', 'failed')),
+          provider_refund_id TEXT,
+          refund_date INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_payment_refunds_pay ON payment_refunds(payment_id);
+        CREATE INDEX IF NOT EXISTS idx_payment_refunds_inv ON payment_refunds(invoice_id);
+
+        -- 26. Reminder Events (Accounts Receivable Collection Reminder History)
+        CREATE TABLE IF NOT EXISTS reminder_events (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          invoice_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+          customer_id TEXT NOT NULL REFERENCES customers(id),
+          channel TEXT NOT NULL CHECK(channel IN ('whatsapp', 'sms', 'email', 'manual')),
+          template TEXT NOT NULL CHECK(template IN ('friendly', 'firm', 'urgent', 'custom')),
+          status TEXT NOT NULL CHECK(status IN ('opened_for_sending', 'sent', 'failed')),
+          is_automated INTEGER NOT NULL DEFAULT 0,
+          reminder_date INTEGER NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_reminder_events_inv ON reminder_events(invoice_id);
+        CREATE INDEX IF NOT EXISTS idx_reminder_events_cust ON reminder_events(customer_id);
+
+        -- 27. Invoice Collection Metadata (Promise to Pay & Expected Dates)
+        CREATE TABLE IF NOT EXISTS invoice_collection_metadata (
+          document_id TEXT PRIMARY KEY NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+          expected_payment_date INTEGER,
+          promise_to_pay_date INTEGER,
+          collection_notes TEXT,
+          updated_at INTEGER NOT NULL
+        );
+      `);
+    },
+  },
 ];

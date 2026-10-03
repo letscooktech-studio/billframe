@@ -266,8 +266,8 @@ export function SignatureModal({
                 accessibilityRole="button"
                 accessibilityLabel="Confirm and accept estimate"
               >
-                <Check size={18} color={theme.surface} />
-                <Text style={[styles.confirmBtnText, { color: theme.surface }]}>
+                <Check size={18} color={theme.brandAnchorText} />
+                <Text style={[styles.confirmBtnText, { color: theme.brandAnchorText }]}>
                   {isSubmitting ? 'Accepting...' : 'Sign & Accept'}
                 </Text>
               </Pressable>

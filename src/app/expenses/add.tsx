@@ -116,7 +116,7 @@ export default function AddExpenseScreen() {
             accessibilityRole="button"
             accessibilityLabel="Save expense"
           >
-            <Text style={[styles.saveBtnText, { color: '#fff' }]}>
+            <Text style={[styles.saveBtnText, { color: theme.brandAnchorText }]}>
               {isSaving ? 'Saving...' : 'Save'}
             </Text>
           </Pressable>

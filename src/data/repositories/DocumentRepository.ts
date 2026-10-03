@@ -7,6 +7,7 @@
 
 import * as SQLite from 'expo-sqlite';
 import { DatabaseManager } from '../database/DatabaseManager';
+import { BusinessProfileRepository } from './BusinessProfileRepository';
 import { calculateDocument } from '../../domain/documents/DocumentCalculator';
 import { validateForIssuance } from '../../domain/documents/DocumentStateMachine';
 import { buildDocumentSnapshot } from '../../domain/documents/SnapshotBuilder';
@@ -21,6 +22,22 @@ import {
   LineItemInput,
 } from '../../domain/documents/types';
 import { TaxType } from '../../domain/tax/TaxEngine';
+
+function toBigIntSafe(val: any, fallback = 0n): bigint {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'bigint') return val;
+  if (typeof val === 'number') {
+    if (isNaN(val)) return fallback;
+    return BigInt(Math.round(val));
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return fallback;
+    const num = Number(trimmed);
+    if (!isNaN(num)) return BigInt(Math.round(num));
+  }
+  return fallback;
+}
 
 export interface DocumentRow {
   id: string;
@@ -53,6 +70,9 @@ export interface DocumentRow {
   internal_notes: string | null;
   signature_uri: string | null;
   signature_date: number | null;
+  place_of_supply?: string | null;
+  supply_type?: string | null;
+  reverse_charge?: number;
   parent_document_id: string | null;
   is_archived: number;
   created_at: number;
@@ -66,11 +86,16 @@ export interface DocumentItemRow {
   description: string;
   item_notes: string | null;
   category?: string | null;
+  hsn_sac_code?: string | null;
   quantity_scaled: number;
   unit_name: string;
   unit_price_minor: number;
   internal_cost_minor?: number;
   line_total_minor: number;
+  tax_rate_bp?: number;
+  tax_minor?: number;
+  tax_type?: string;
+  tax_components_json?: string | null;
   sort_order: number;
 }
 
@@ -86,6 +111,7 @@ export interface FullDocument extends DocumentRow {
   payment_status: 'unpaid' | 'partially_paid' | 'paid';
   is_overdue: boolean;
   snapshot_json?: string | null;
+  tax_summary?: any | null;
 }
 
 export class DocumentRepository {
@@ -130,11 +156,9 @@ export class DocumentRepository {
 
     // 1. Resolve business profile
     let businessProfileId = doc.businessProfileId;
-    if (!businessProfileId) {
-      const profile = await db.getFirstAsync<{ id: string }>(
-        'SELECT id FROM business_profiles WHERE is_active = 1 LIMIT 1;'
-      );
-      businessProfileId = profile?.id || 'default_business_profile';
+    if (!businessProfileId || businessProfileId === 'default_business_profile') {
+      const activeProf = await BusinessProfileRepository.getActiveProfile();
+      businessProfileId = activeProf?.id || 'default_business_profile';
     }
 
     // 2. Calculate values via pure domain engine
@@ -285,8 +309,8 @@ export class DocumentRepository {
       customerId: doc.customer_id,
       items: doc.items.map((i) => ({
         description: i.description,
-        quantityScaled: BigInt(i.quantity_scaled),
-        unitPriceMinor: BigInt(i.unit_price_minor),
+        quantityScaled: toBigIntSafe(i.quantity_scaled, 10000n),
+        unitPriceMinor: toBigIntSafe(i.unit_price_minor, 0n),
       })),
       issueDateTimestamp: doc.issue_date,
       currency: doc.currency,
@@ -298,8 +322,18 @@ export class DocumentRepository {
 
     const now = Date.now();
 
+    // Resolve active business profile if doc is on default or missing
+    let activeProfileId = doc.business_profile_id;
+    if (!activeProfileId || activeProfileId === 'default_business_profile') {
+      const activeProf = await BusinessProfileRepository.getActiveProfile();
+      activeProfileId = activeProf?.id || 'default_business_profile';
+    }
+
+    let finalAllocatedDocNumber = '';
+    let allocatedSeqNum = 1;
+
     await db.withTransactionAsync(async () => {
-      // 1. Fetch & increment sequence counter atomically
+      // 1. Fetch sequence settings for this profile and doc_type
       const seq = await db.getFirstAsync<{
         id: string;
         prefix: string;
@@ -308,32 +342,60 @@ export class DocumentRepository {
         padding: number;
       }>(
         'SELECT id, prefix, next_sequence_number, suffix, padding FROM number_sequences WHERE business_profile_id = ? AND doc_type = ?;',
-        [doc.business_profile_id, doc.doc_type]
+        [activeProfileId, doc.doc_type]
       );
 
       const prefix = seq?.prefix || (doc.doc_type === 'invoice' ? 'INV-' : 'EST-');
-      const seqNum = seq?.next_sequence_number || 1;
       const padding = seq?.padding || 4;
       const suffix = seq?.suffix || '';
 
-      const finalDocumentNumber = formatDocumentNumber(prefix, seqNum, padding, suffix);
+      // Determine highest sequence_number across existing documents for this profile and doc_type
+      const maxDocRow = await db.getFirstAsync<{ max_seq: number | null }>(
+        'SELECT MAX(sequence_number) AS max_seq FROM documents WHERE business_profile_id = ? AND doc_type = ?;',
+        [activeProfileId, doc.doc_type]
+      );
 
-      // Increment sequence table
+      let candidateSeq = Math.max(
+        seq?.next_sequence_number || 1,
+        (maxDocRow?.max_seq ?? 0) + 1
+      );
+
+      // Monotonic collision guard: loop check to guarantee document_number uniqueness under SQLite UNIQUE constraint
+      let candidateDocNumber = formatDocumentNumber(prefix, candidateSeq, padding, suffix);
+      while (true) {
+        const existingDoc = await db.getFirstAsync<{ id: string }>(
+          'SELECT id FROM documents WHERE business_profile_id = ? AND doc_type = ? AND document_number = ? AND id != ?;',
+          [activeProfileId, doc.doc_type, candidateDocNumber, doc.id]
+        );
+        if (!existingDoc) {
+          break;
+        }
+        candidateSeq++;
+        candidateDocNumber = formatDocumentNumber(prefix, candidateSeq, padding, suffix);
+      }
+
+      allocatedSeqNum = candidateSeq;
+      finalAllocatedDocNumber = candidateDocNumber;
+
+      // Increment sequence table to candidateSeq + 1
       if (seq) {
         await db.runAsync(
-          'UPDATE number_sequences SET next_sequence_number = next_sequence_number + 1, updated_at = ? WHERE id = ?;',
-          [now, seq.id]
+          'UPDATE number_sequences SET next_sequence_number = ?, updated_at = ? WHERE id = ?;',
+          [allocatedSeqNum + 1, now, seq.id]
         );
       } else {
         await db.runAsync(
           `INSERT INTO number_sequences (id, business_profile_id, doc_type, prefix, next_sequence_number, suffix, padding, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-          [`seq_${doc.business_profile_id}_${doc.doc_type}`, doc.business_profile_id, doc.doc_type, prefix, seqNum + 1, suffix, padding, now]
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(business_profile_id, doc_type) DO UPDATE SET
+             next_sequence_number = excluded.next_sequence_number,
+             updated_at = excluded.updated_at;`,
+          [`seq_${activeProfileId}_${doc.doc_type}`, activeProfileId, doc.doc_type, prefix, allocatedSeqNum + 1, suffix, padding, now]
         );
       }
 
       // 2. Fetch seller and buyer data for snapshot
-      const seller = await db.getFirstAsync<any>('SELECT * FROM business_profiles WHERE id = ?;', [doc.business_profile_id]);
+      const seller = await db.getFirstAsync<any>('SELECT * FROM business_profiles WHERE id = ?;', [activeProfileId]);
       const buyer = await db.getFirstAsync<any>('SELECT * FROM customers WHERE id = ?;', [doc.customer_id]);
 
       // Calculate authoritative values
@@ -343,30 +405,47 @@ export class DocumentRepository {
           id: i.id,
           description: i.description,
           itemNotes: i.item_notes,
-          quantityScaled: BigInt(i.quantity_scaled),
+          quantityScaled: toBigIntSafe(i.quantity_scaled, 10000n),
           unitName: i.unit_name,
-          unitPriceMinor: BigInt(i.unit_price_minor),
+          unitPriceMinor: toBigIntSafe(i.unit_price_minor, 0n),
+          hsnSacCode: i.hsn_sac_code || null,
+          taxRateBasisPoints: i.tax_rate_bp ? toBigIntSafe(i.tax_rate_bp, 0n) : undefined,
+          taxType: (i.tax_type as any) || doc.tax_type,
         })),
         discountType: doc.discount_type,
-        discountValue: BigInt(doc.discount_value),
+        discountValue: toBigIntSafe(doc.discount_value, 0n),
         taxType: doc.tax_type,
-        taxRateBasisPoints: BigInt(doc.tax_rate_bp),
+        taxRateBasisPoints: toBigIntSafe(doc.tax_rate_bp, 0n),
         taxLabel: doc.tax_label,
-        depositMinor: BigInt(doc.deposit_minor || 0),
+        depositMinor: toBigIntSafe(doc.deposit_minor || 0, 0n),
         totalPaymentsMinor: 0n,
         dueDateTimestamp: doc.due_date,
         currentTimestamp: now,
         lifecycleStatus: 'issued',
+        taxContext: {
+          businessProfile: {
+            countryIso2: seller?.country_iso2 || seller?.country || 'US',
+            subdivisionCode: seller?.subdivision_code,
+            taxId: seller?.tax_id,
+            isTaxRegistered: Boolean(seller?.tax_id),
+          },
+          customer: buyer ? {
+            countryIso2: buyer.country || seller?.country_iso2 || 'US',
+            subdivisionCode: buyer.subdivision_code,
+            taxId: buyer.tax_id,
+            isBusiness: Boolean(buyer.is_business || buyer.tax_id),
+          } : null,
+        },
       });
 
       const snapshot = buildDocumentSnapshot(
         doc.id,
-        finalDocumentNumber,
+        finalAllocatedDocNumber,
         doc.doc_type,
         doc.issue_date,
         doc.due_date,
         {
-          businessProfileId: seller?.id || doc.business_profile_id,
+          businessProfileId: seller?.id || activeProfileId,
           name: seller?.name || 'Business',
           legalName: seller?.legal_name,
           taxId: seller?.tax_id,
@@ -394,9 +473,9 @@ export class DocumentRepository {
         },
         calc,
         doc.discount_type,
-        BigInt(doc.discount_value),
+        toBigIntSafe(doc.discount_value, 0n),
         doc.tax_type,
-        BigInt(doc.tax_rate_bp),
+        toBigIntSafe(doc.tax_rate_bp, 0n),
         doc.tax_label,
         doc.notes,
         doc.terms,
@@ -415,18 +494,59 @@ export class DocumentRepository {
         `INSERT INTO document_snapshots (id, document_id, snapshot_json, created_at)
          VALUES (?, ?, ?, ?)
          ON CONFLICT(document_id) DO UPDATE SET snapshot_json = excluded.snapshot_json;`,
-        [`snap_${doc.id}`, doc.id, JSON.stringify(snapshot), now]
+        [`snap_${doc.id}`, doc.id, JSON.stringify(snapshot, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)), now]
       );
+
+      // Save frozen tax snapshot if taxSummary generated
+      if (calc.taxSummary) {
+        await db.runAsync(
+          `INSERT INTO document_tax_snapshots (
+            id, document_id, tax_pack_id, tax_pack_version, place_of_supply,
+            supply_type, reverse_charge, tax_summary_json, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(document_id) DO UPDATE SET
+            tax_pack_id = excluded.tax_pack_id,
+            tax_pack_version = excluded.tax_pack_version,
+            place_of_supply = excluded.place_of_supply,
+            supply_type = excluded.supply_type,
+            reverse_charge = excluded.reverse_charge,
+            tax_summary_json = excluded.tax_summary_json;`,
+          [
+            `taxsnap_${doc.id}`,
+            doc.id,
+            calc.taxSummary.packId || 'tax_standard',
+            calc.taxSummary.packVersion || '1.0.0',
+            calc.taxSummary.placeOfSupply || null,
+            calc.taxSummary.supplyType || 'intra_state',
+            calc.taxSummary.reverseCharge ? 1 : 0,
+            JSON.stringify(calc.taxSummary, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)),
+            now,
+          ]
+        );
+      }
 
       // Update document to issued
       await db.runAsync(
         `UPDATE documents SET
+          business_profile_id = ?,
           sequence_number = ?,
           document_number = ?,
           lifecycle_status = 'issued',
+          place_of_supply = ?,
+          supply_type = ?,
+          reverse_charge = ?,
           updated_at = ?
          WHERE id = ?;`,
-        [seqNum, finalDocumentNumber, now, doc.id]
+        [
+          activeProfileId,
+          allocatedSeqNum,
+          finalAllocatedDocNumber,
+          calc.taxSummary?.placeOfSupply || null,
+          calc.taxSummary?.supplyType || null,
+          calc.taxSummary?.reverseCharge ? 1 : 0,
+          now,
+          doc.id,
+        ]
       );
     });
 
@@ -519,65 +639,90 @@ export class DocumentRepository {
   }
 
   /**
+   * Generalized Document Transition & Lineage Engine.
+   * Converts any compatible source document into a target document type:
+   * - estimate / proposal -> invoice
+   * - proposal -> sow | invoice
+   * - sow -> invoice
+   * - invoice -> delivery_note | receipt | credit_note | proforma
+   *
+   * Atomically preserves:
+   * - parent_document_id lineage link
+   * - customer assignment & shipping address
+   * - all line items (descriptions, quantities, units, rates)
+   * - currency, discounts, taxes, PO number
+   * - audit event tracking
+   */
+  static async convertDocument(sourceId: string, targetType: DocumentType): Promise<FullDocument> {
+    const source = await this.getById(sourceId);
+    if (!source) throw new Error(`Source document not found for id ${sourceId}`);
+
+    // Automatically mark estimate or proposal as accepted if currently issued
+    if ((source.doc_type === 'estimate' || (source.doc_type as string) === 'proposal') && source.lifecycle_status === 'issued') {
+      await this.acceptEstimate(sourceId);
+    }
+
+    // Save as new target document draft
+    const newDoc = await this.saveDraft({
+      businessProfileId: source.business_profile_id,
+      jobId: source.job_id,
+      docType: targetType,
+      customerId: source.customer_id,
+      issueDate: Date.now(),
+      dueDate: targetType === 'invoice' ? source.due_date : null,
+      currency: source.currency,
+      discountType: source.discount_type,
+      discountValue: toBigIntSafe(source.discount_value, 0n),
+      taxType: source.tax_type,
+      taxRateBp: toBigIntSafe(source.tax_rate_bp, 0n),
+      taxLabel: source.tax_label,
+      depositMinor: toBigIntSafe(source.deposit_minor || 0, 0n),
+      poNumber: source.po_number,
+      paymentTermsPreset: targetType === 'invoice' ? source.payment_terms_preset : undefined,
+      shippingAddress: source.shipping_address,
+      paymentInstructions: source.payment_instructions,
+      notes: source.notes,
+      terms: source.terms,
+      internalNotes: source.internal_notes,
+      parentDocumentId: source.id,
+      items: source.items.map((i) => ({
+        description: i.description,
+        itemNotes: i.item_notes,
+        quantityScaled: toBigIntSafe(i.quantity_scaled, 10000n),
+        unitName: i.unit_name,
+        unitPriceMinor: toBigIntSafe(i.unit_price_minor, 0n),
+      })),
+    });
+
+    const action =
+      source.doc_type === 'estimate' && targetType === 'invoice'
+        ? 'convert_estimate_to_invoice'
+        : `convert_${source.doc_type}_to_${targetType}`;
+
+    await AuditEventRepository.logEvent({
+      businessProfileId: newDoc.business_profile_id,
+      entityType: 'document',
+      entityId: newDoc.id,
+      action,
+      payload: {
+        sourceId: source.id,
+        sourceNumber: source.document_number,
+        sourceType: source.doc_type,
+        targetId: newDoc.id,
+        targetType: targetType,
+      },
+    });
+
+    return newDoc;
+  }
+
+  /**
    * Converts an Accepted Estimate into a New Invoice Draft.
    * Clones all items, customer, rates, discounts, taxes, notes, terms, PO number, shipping address.
    * Links parent_document_id. Leaves estimate intact.
    */
   static async convertEstimateToInvoice(estimateId: string): Promise<FullDocument> {
-    const estimate = await this.getById(estimateId);
-    if (!estimate) throw new Error(`Estimate not found for id ${estimateId}`);
-    if (estimate.doc_type !== 'estimate') throw new Error('Source document must be an estimate');
-
-    // Automatically mark estimate as accepted if currently issued
-    if (estimate.lifecycle_status === 'issued') {
-      await this.acceptEstimate(estimateId);
-    }
-
-    // Save as new invoice draft
-    const newInvoice = await this.saveDraft({
-      businessProfileId: estimate.business_profile_id,
-      jobId: estimate.job_id,
-      docType: 'invoice',
-      customerId: estimate.customer_id,
-      issueDate: Date.now(),
-      dueDate: estimate.due_date,
-      currency: estimate.currency,
-      discountType: estimate.discount_type,
-      discountValue: BigInt(estimate.discount_value),
-      taxType: estimate.tax_type,
-      taxRateBp: BigInt(estimate.tax_rate_bp),
-      taxLabel: estimate.tax_label,
-      depositMinor: BigInt(estimate.deposit_minor || 0),
-      poNumber: estimate.po_number,
-      paymentTermsPreset: estimate.payment_terms_preset,
-      shippingAddress: estimate.shipping_address,
-      paymentInstructions: estimate.payment_instructions,
-      notes: estimate.notes,
-      terms: estimate.terms,
-      internalNotes: estimate.internal_notes,
-      parentDocumentId: estimate.id,
-      items: estimate.items.map((i) => ({
-        description: i.description,
-        itemNotes: i.item_notes,
-        quantityScaled: BigInt(i.quantity_scaled),
-        unitName: i.unit_name,
-        unitPriceMinor: BigInt(i.unit_price_minor),
-      })),
-    });
-
-    await AuditEventRepository.logEvent({
-      businessProfileId: newInvoice.business_profile_id,
-      entityType: 'document',
-      entityId: newInvoice.id,
-      action: 'convert_estimate_to_invoice',
-      payload: {
-        estimateId: estimate.id,
-        estimateNumber: estimate.document_number,
-        invoiceId: newInvoice.id,
-      },
-    });
-
-    return newInvoice;
+    return this.convertDocument(estimateId, 'invoice');
   }
 
   /**
@@ -596,9 +741,9 @@ export class DocumentRepository {
       dueDate: src.due_date ? Date.now() + Math.max(0, src.due_date - src.issue_date) : null,
       currency: src.currency,
       discountType: src.discount_type,
-      discountValue: BigInt(src.discount_value),
+      discountValue: toBigIntSafe(src.discount_value, 0n),
       taxType: src.tax_type,
-      taxRateBp: BigInt(src.tax_rate_bp),
+      taxRateBp: toBigIntSafe(src.tax_rate_bp, 0n),
       taxLabel: src.tax_label,
       depositMinor: 0n, // Deposit is reset on duplicate
       poNumber: src.po_number,
@@ -611,9 +756,9 @@ export class DocumentRepository {
       items: src.items.map((i) => ({
         description: i.description,
         itemNotes: i.item_notes,
-        quantityScaled: BigInt(i.quantity_scaled),
+        quantityScaled: toBigIntSafe(i.quantity_scaled, 10000n),
         unitName: i.unit_name,
-        unitPriceMinor: BigInt(i.unit_price_minor),
+        unitPriceMinor: toBigIntSafe(i.unit_price_minor, 0n),
       })),
     });
   }
@@ -654,19 +799,33 @@ export class DocumentRepository {
     );
 
     const balanceResult = calculateDocumentBalance({
-      grandTotalMinor: BigInt(doc.total_minor || 0),
-      depositMinor: BigInt(doc.deposit_minor || 0),
+      grandTotalMinor: toBigIntSafe(doc.total_minor, 0n),
+      depositMinor: toBigIntSafe(doc.deposit_minor, 0n),
       payments: paymentRows.map((p) => ({
-        amountMinor: BigInt(p.amount_minor),
+        amountMinor: toBigIntSafe(p.amount_minor, 0n),
         status: p.status,
         refundState: p.refund_state,
-        refundedAmountMinor: p.refunded_amount_minor ? BigInt(p.refunded_amount_minor) : 0n,
+        refundedAmountMinor: p.refunded_amount_minor ? toBigIntSafe(p.refunded_amount_minor, 0n) : 0n,
       })),
     });
 
     const totalPaid = Number(balanceResult.validPaymentsMinor);
     const balance = Number(balanceResult.balanceMinor);
     const paymentStatus = balanceResult.paymentStatus;
+
+    const taxSnap = await db.getFirstAsync<{ tax_summary_json: string }>(
+      'SELECT tax_summary_json FROM document_tax_snapshots WHERE document_id = ?;',
+      [id]
+    );
+
+    let taxSummary = null;
+    if (taxSnap?.tax_summary_json) {
+      try {
+        taxSummary = JSON.parse(taxSnap.tax_summary_json);
+      } catch {
+        taxSummary = null;
+      }
+    }
 
     const now = Date.now();
     const isOverdue = Boolean(
@@ -680,7 +839,21 @@ export class DocumentRepository {
       balance_minor: balance,
       payment_status: paymentStatus,
       is_overdue: isOverdue,
+      tax_summary: taxSummary,
     };
+  }
+
+  /**
+   * Retrieves a full document by document_number (e.g. INV-0001).
+   */
+  static async getByDocumentNumber(docNumber: string): Promise<FullDocument | null> {
+    const db = await this.getDb();
+    const row = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM documents WHERE document_number = ?;',
+      [docNumber]
+    );
+    if (!row) return null;
+    return this.getById(row.id);
   }
 
   /**
@@ -729,13 +902,13 @@ export class DocumentRepository {
       );
 
       const bal = calculateDocumentBalance({
-        grandTotalMinor: BigInt(inv.total_minor),
-        depositMinor: BigInt(inv.deposit_minor || 0),
+        grandTotalMinor: toBigIntSafe(inv.total_minor, 0n),
+        depositMinor: toBigIntSafe(inv.deposit_minor, 0n),
         payments: paymentRows.map((p) => ({
-          amountMinor: BigInt(p.amount_minor),
+          amountMinor: toBigIntSafe(p.amount_minor, 0n),
           status: p.status,
           refundState: p.refund_state,
-          refundedAmountMinor: p.refunded_amount_minor ? BigInt(p.refunded_amount_minor) : 0n,
+          refundedAmountMinor: p.refunded_amount_minor ? toBigIntSafe(p.refunded_amount_minor, 0n) : 0n,
         })),
       });
 
@@ -762,7 +935,7 @@ export class DocumentRepository {
       [startOfMonth.getTime()]
     );
 
-    const paidThisMonthMinor = BigInt(monthPayments?.sum_paid || 0);
+    const paidThisMonthMinor = toBigIntSafe(monthPayments?.sum_paid, 0n);
 
     return {
       outstandingMinor,
@@ -770,6 +943,67 @@ export class DocumentRepository {
       overdueInvoicesCount: overdueCount,
       overdueMinor,
     };
+  }
+
+  /**
+   * Retrieves all issued, unarchived invoices with balances and customer details for Collections & Aging.
+   */
+  static async getIssuedInvoicesForAgingAsync(): Promise<import('../../domain/collections/AgingEngine').RawInvoiceForAging[]> {
+    const db = await this.getDb();
+    const rows = await db.getAllAsync<any>(
+      `SELECT d.id, d.document_number, d.customer_id, d.issue_date, d.due_date,
+              d.total_minor, d.deposit_minor, d.currency,
+              c.name AS customer_name, c.phone AS customer_phone, c.email AS customer_email
+       FROM documents d
+       LEFT JOIN customers c ON d.customer_id = c.id
+       WHERE d.doc_type = 'invoice'
+         AND d.lifecycle_status = 'issued'
+         AND d.is_archived = 0
+       ORDER BY d.issue_date DESC;`
+    );
+
+    const result: import('../../domain/collections/AgingEngine').RawInvoiceForAging[] = [];
+
+    for (const r of rows) {
+      const paymentRows = await db.getAllAsync<{
+        amount_minor: number;
+        status?: string | null;
+        refund_state?: string | null;
+        refunded_amount_minor?: number | null;
+      }>(
+        'SELECT amount_minor, status, refund_state, refunded_amount_minor FROM payments WHERE invoice_id = ?;',
+        [r.id]
+      );
+
+      const bal = calculateDocumentBalance({
+        grandTotalMinor: toBigIntSafe(r.total_minor, 0n),
+        depositMinor: toBigIntSafe(r.deposit_minor, 0n),
+        payments: paymentRows.map((p) => ({
+          amountMinor: toBigIntSafe(p.amount_minor, 0n),
+          status: p.status,
+          refundState: p.refund_state,
+          refundedAmountMinor: p.refunded_amount_minor ? toBigIntSafe(p.refunded_amount_minor, 0n) : 0n,
+        })),
+      });
+
+      if (bal.balanceMinor > 0n) {
+        result.push({
+          id: r.id,
+          document_number: r.document_number,
+          customer_id: r.customer_id,
+          customer_name: r.customer_name,
+          customer_phone: r.customer_phone,
+          customer_email: r.customer_email,
+          issue_date: r.issue_date,
+          due_date: r.due_date,
+          total_minor: r.total_minor,
+          balance_minor: bal.balanceMinor,
+          currency: r.currency || 'USD',
+        });
+      }
+    }
+
+    return result;
   }
 
   /**

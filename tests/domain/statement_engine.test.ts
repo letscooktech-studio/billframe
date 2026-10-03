@@ -3,6 +3,9 @@ import {
   formatStatementAsText,
   StatementInvoiceItem,
   StatementPaymentItem,
+  StatementCreditNoteItem,
+  StatementAdvanceItem,
+  StatementRefundItem,
 } from '../../src/domain/statements/StatementEngine';
 
 describe('StatementEngine', () => {
@@ -167,5 +170,82 @@ describe('StatementEngine', () => {
     expect(text).toContain('INV-0001');
     expect(text).toContain('Bank Transfer to Chase Acct 123456789');
     expect(text).toContain('BALANCE DUE:');
+  });
+
+  test('calculates statement incorporating credit notes, advances, and refunds correctly', () => {
+    const invoices: StatementInvoiceItem[] = [
+      {
+        id: 'inv_10',
+        document_number: 'INV-10',
+        issue_date: 1000,
+        total_minor: 100000, // $1,000.00
+        deposit_minor: 0,
+        currency: 'USD',
+        lifecycle_status: 'issued',
+      },
+    ];
+
+    const creditNotes: StatementCreditNoteItem[] = [
+      {
+        id: 'cn_1',
+        original_invoice_id: 'inv_10',
+        credit_note_number: 'CN-001',
+        credit_amount_minor: 20000, // $200.00 credit
+        issue_date: 1500,
+        status: 'issued',
+      },
+    ];
+
+    const advances: StatementAdvanceItem[] = [
+      {
+        id: 'adv_1',
+        original_amount_minor: 30000, // $300.00 advance
+        remaining_amount_minor: 30000,
+        advance_date: 500,
+      },
+    ];
+
+    const refunds: StatementRefundItem[] = [
+      {
+        id: 'ref_1',
+        payment_id: 'pay_1',
+        invoice_id: 'inv_10',
+        refund_amount_minor: 10000, // $100.00 refund (debit increase)
+        refund_date: 2000,
+        reason: 'Overpayment refund',
+      },
+    ];
+
+    const summary = calculateCustomerStatement({
+      customerId: 'cust_1',
+      currency: 'USD',
+      preset: 'all',
+      invoices,
+      payments: [],
+      creditNotes,
+      customerAdvances: advances,
+      refunds,
+    });
+
+    // Advance (500): Credit 300 -> Bal 0
+    // Invoice (1000): Debit 1000 -> Bal 700 (1000 - 300)
+    // Credit Note (1500): Credit 200 -> Bal 500
+    // Refund (2000): Debit 100 -> Bal 600
+    // Total Invoiced/Debits = 1000 + 100 = 1100
+    // Total Credits = 300 + 200 = 500
+    // Closing Balance = 600 ($600.00 / 60000 minor)
+    expect(summary.totalInvoicedMinor).toBe(110000n);
+    expect(summary.totalPaidMinor).toBe(50000n);
+    expect(summary.closingBalanceMinor).toBe(60000n);
+    expect(summary.ledger.length).toBe(4);
+
+    const formatted = formatStatementAsText({
+      statement: summary,
+      customerName: 'Test Customer',
+      businessName: 'Test Business',
+    });
+    expect(formatted).toContain('Credited:');
+    expect(formatted).toContain('Advance:');
+    expect(formatted).toContain('Refunded:');
   });
 });

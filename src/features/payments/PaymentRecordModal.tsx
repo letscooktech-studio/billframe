@@ -5,7 +5,7 @@
  * and freezes receipt snapshot atomically.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -17,8 +17,10 @@ import {
   Platform,
   useColorScheme,
   ScrollView,
+  Share,
+  Alert,
 } from 'react-native';
-import { X, CheckCircle, AlertCircle } from 'lucide-react-native';
+import { X, CheckCircle, AlertCircle, QrCode, Copy, Share2 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET } from '../../design/tokens';
 import {
   formatMoney,
@@ -27,6 +29,10 @@ import {
   createMoney,
 } from '../../domain/money/Money';
 import { PaymentRepository, PaymentRecord, ReceiptRecord } from '../../data/repositories/PaymentRepository';
+import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
+import { BusinessProfile } from '../../domain/profile/types';
+import { DirectUpiEngine } from '../../domain/payments/upi/DirectUpiEngine';
+import { UpiQrCode } from '../../components/common/UpiQrCode';
 
 export interface PaymentRecordModalProps {
   visible: boolean;
@@ -36,6 +42,11 @@ export interface PaymentRecordModalProps {
   totalMinor: number;
   balanceMinor: number;
   documentLocale?: string;
+  initialMethod?: string;
+  initialProvider?: 'manual' | 'direct_upi' | 'razorpay' | 'cashfree' | 'stripe' | 'other';
+  initialReference?: string;
+  initialVerificationState?: 'manual_confirmed' | 'unverified' | 'verified_webhook' | 'verified_api' | 'failed_verification';
+  initialSource?: 'manual_entry' | 'quick_bill' | 'invoice_payment' | 'direct_qr' | 'external_import';
   onPaymentRecorded: (result: { payment: PaymentRecord; receipt: ReceiptRecord }) => void;
   onClose: () => void;
 }
@@ -57,6 +68,11 @@ export function PaymentRecordModal({
   totalMinor,
   balanceMinor,
   documentLocale = 'en-US',
+  initialMethod,
+  initialProvider,
+  initialReference,
+  initialVerificationState,
+  initialSource,
   onPaymentRecorded,
   onClose,
 }: PaymentRecordModalProps) {
@@ -70,20 +86,50 @@ export function PaymentRecordModal({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [profile, setProfile] = useState<BusinessProfile | null>(null);
 
   useEffect(() => {
     if (visible) {
       isSubmittingRef.current = false;
+      BusinessProfileRepository.getActiveProfile()
+        .then(setProfile)
+        .catch(() => {});
       // Default amount to full remaining balance for one-tap convenience
       const balMoney = createMoney(BigInt(balanceMinor), currency);
       setAmountStr(moneyToDecimalString(balMoney));
-      setPaymentMethod('bank_transfer');
-      setReference('');
+      setPaymentMethod(initialMethod || (currency === 'INR' ? 'upi' : 'bank_transfer'));
+      setReference(initialReference || '');
       setNotes('');
       setError(null);
       setIsSubmitting(false);
     }
-  }, [visible, balanceMinor, currency]);
+  }, [visible, balanceMinor, currency, initialMethod, initialReference]);
+
+  const upiConversion = useMemo(() => {
+    if (paymentMethod !== 'upi' || !profile?.upi_vpa) {
+      return null;
+    }
+    try {
+      let parsedMinor: bigint | undefined = undefined;
+      if (amountStr.trim()) {
+        const money = parseDecimalStringToMoney(amountStr.trim(), currency);
+        if (money.amountMinor > 0n) {
+          parsedMinor = money.amountMinor;
+        }
+      }
+
+      return DirectUpiEngine.buildUpiUriWithCurrencyConversion({
+        vpa: profile.upi_vpa,
+        payeeName: profile.legal_name || profile.name || 'Merchant',
+        sourceAmountMinor: parsedMinor,
+        sourceCurrency: currency,
+        transactionRef: invoiceNumber,
+        transactionNote: `Payment for ${invoiceNumber}`,
+      });
+    } catch {
+      return null;
+    }
+  }, [paymentMethod, profile, amountStr, currency, invoiceNumber]);
 
   function handleFillFullBalance() {
     const balMoney = createMoney(BigInt(balanceMinor), currency);
@@ -126,6 +172,9 @@ export function PaymentRecordModal({
         reference: reference.trim() || null,
         notes: notes.trim() || null,
         paymentDate: Date.now(),
+        provider: initialProvider || (paymentMethod === 'upi' ? 'direct_upi' : 'manual'),
+        verificationState: initialVerificationState || 'manual_confirmed',
+        source: initialSource || (paymentMethod === 'upi' ? 'direct_qr' : 'manual_entry'),
       });
 
       onPaymentRecorded(result);
@@ -143,10 +192,15 @@ export function PaymentRecordModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
       >
         <View style={[styles.sheetContainer, { backgroundColor: theme.surface }]}>
+          {/* Grab Handle */}
+          <View style={styles.handleContainer}>
+            <View style={[styles.handleBar, { backgroundColor: theme.borderSubtle }]} />
+          </View>
+
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.borderSubtle }]}>
             <View>
@@ -250,14 +304,137 @@ export function PaymentRecordModal({
               })}
             </View>
 
+            {/* Direct UPI Live Dynamic QR Code Section */}
+            {paymentMethod === 'upi' && (
+              <View
+                style={[
+                  styles.upiCard,
+                  {
+                    backgroundColor: theme.surfaceSecondary,
+                    borderColor: theme.borderSubtle,
+                  },
+                ]}
+              >
+                <View style={styles.upiCardHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <QrCode size={18} color={theme.brandAnchor} />
+                    <Text style={[styles.upiCardTitle, { color: theme.textPrimary }]}>
+                      Direct UPI Instant Payment
+                    </Text>
+                  </View>
+                  <View style={[styles.zeroFeeBadge, { backgroundColor: theme.surface }]}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: theme.statusSuccess }}>0% FEE</Text>
+                  </View>
+                </View>
+
+                {profile?.upi_vpa ? (
+                  <>
+                    <Text style={[styles.upiCardSub, { color: theme.textSecondary }]}>
+                      Scan with Google Pay, PhonePe, Paytm, BHIM, or any UPI app
+                    </Text>
+
+                    {upiConversion?.upiUri && (
+                      <View style={styles.upiQrWrapper}>
+                        <UpiQrCode
+                          value={upiConversion.upiUri}
+                          size={160}
+                          color="#000000"
+                          backgroundColor="#FFFFFF"
+                        />
+                      </View>
+                    )}
+
+                    {/* Regional / FX Conversion Banner */}
+                    {upiConversion?.isConverted && (
+                      <View
+                        style={[
+                          styles.fxBanner,
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: theme.brandAnchor,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.fxTitle, { color: theme.textPrimary }]}>
+                          Auto-Converted to INR: ₹{moneyToDecimalString(createMoney(upiConversion.inrAmountMinor!, 'INR'))}
+                        </Text>
+                        <Text style={[styles.fxDesc, { color: theme.textSecondary }]}>
+                          {upiConversion.conversionSummary} ({upiConversion.exchangeRateLabel})
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.upiDetailsBlock}>
+                      <Text style={[styles.upiPayeeName, { color: theme.textPrimary }]}>
+                        {profile.legal_name || profile.name}
+                      </Text>
+                      <Text style={[styles.upiVpaText, { color: theme.textSecondary }]}>
+                        UPI ID: {profile.upi_vpa}
+                      </Text>
+                    </View>
+
+                    <View style={styles.upiActionsRow}>
+                      <Pressable
+                        style={[
+                          styles.upiActionBtn,
+                          { backgroundColor: theme.surface, borderColor: theme.borderSubtle },
+                        ]}
+                        onPress={() => {
+                          if (upiConversion?.upiUri) {
+                            Share.share({
+                              message: `Pay invoice ${invoiceNumber} (${upiConversion.isConverted ? `₹${moneyToDecimalString(createMoney(upiConversion.inrAmountMinor!, 'INR'))} INR` : `${amountStr} ${currency}`}) via UPI: ${upiConversion.upiUri}`,
+                              title: `UPI Payment: ${invoiceNumber}`,
+                            });
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Share UPI payment link"
+                      >
+                        <Share2 size={14} color={theme.textPrimary} />
+                        <Text style={[styles.upiActionBtnText, { color: theme.textPrimary }]}>
+                          Share Link
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[
+                          styles.upiActionBtn,
+                          { backgroundColor: theme.surface, borderColor: theme.borderSubtle },
+                        ]}
+                        onPress={() => {
+                          Alert.alert('UPI ID', profile.upi_vpa || '', [{ text: 'OK' }]);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="View UPI ID"
+                      >
+                        <Copy size={14} color={theme.textPrimary} />
+                        <Text style={[styles.upiActionBtnText, { color: theme.textPrimary }]}>
+                          Copy UPI ID
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.noUpiWarning}>
+                    <AlertCircle size={16} color={theme.statusWarning} />
+                    <Text style={[styles.noUpiText, { color: theme.textSecondary }]}>
+                      No UPI ID configured. Go to Settings &gt; Payments to configure your UPI ID for instant QR codes.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Transaction / Reference ID */}
-            <Text style={[styles.label, { color: theme.textSecondary }]}>Reference / Transaction ID (Optional)</Text>
+            <Text style={[styles.label, { color: theme.textSecondary }]}>
+              {paymentMethod === 'upi' ? 'Bank UTR / UPI Reference (12 digits)' : 'Reference / Transaction ID (Optional)'}
+            </Text>
             <TextInput
               style={[
                 styles.input,
                 { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary },
               ]}
-              placeholder="e.g. UTR #129384, Cheque #4021"
+              placeholder={paymentMethod === 'upi' ? 'e.g. 423456789012 (12-digit UTR)' : 'e.g. UTR #129384, Cheque #4021'}
               placeholderTextColor={theme.textMuted}
               value={reference}
               onChangeText={setReference}
@@ -293,7 +470,7 @@ export function PaymentRecordModal({
               accessibilityLabel="Confirm and record payment"
               accessibilityHint="Saves payment, updates invoice balance, and issues an official receipt"
             >
-              <Text style={[styles.submitBtnText, { color: theme.surface }]}>
+              <Text style={[styles.submitBtnText, { color: theme.brandAnchorText }]}>
                 {isSubmitting ? 'Recording...' : 'Record Payment & Generate Receipt'}
               </Text>
             </Pressable>
@@ -312,9 +489,19 @@ const styles = StyleSheet.create({
   },
   sheetContainer: {
     maxHeight: '92%',
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
     paddingBottom: spacing.xxl,
+  },
+  handleContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  handleBar: {
+    width: 38,
+    height: 4,
+    borderRadius: radii.full,
   },
   header: {
     flexDirection: 'row',
@@ -440,5 +627,99 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontSize: typography.bodyMedium.fontSize,
     fontWeight: typography.bodyMedium.fontWeight,
+  },
+  upiCard: {
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginVertical: spacing.xs,
+  },
+  upiCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  upiCardTitle: {
+    fontSize: typography.bodyMedium.fontSize,
+    fontWeight: '700',
+  },
+  zeroFeeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  upiCardSub: {
+    fontSize: typography.caption.fontSize,
+    marginBottom: spacing.sm,
+  },
+  upiQrWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    padding: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.md,
+    marginVertical: spacing.xs,
+  },
+  fxBanner: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
+    marginVertical: spacing.xs,
+    alignItems: 'center',
+  },
+  fxTitle: {
+    fontSize: typography.bodyMedium.fontSize,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  fxDesc: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  upiDetailsBlock: {
+    alignItems: 'center',
+    marginVertical: spacing.xs,
+  },
+  upiPayeeName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  upiVpaText: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  upiActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  upiActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.xs,
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    minHeight: 38,
+  },
+  upiActionBtnText: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
+  },
+  noUpiWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  noUpiText: {
+    flex: 1,
+    fontSize: typography.caption.fontSize,
+    lineHeight: 16,
   },
 });

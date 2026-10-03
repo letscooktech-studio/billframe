@@ -138,14 +138,15 @@ describe('WorkspaceResolver — Deterministic Business Personalization Engine', 
   });
 
   describe('4. Navigation and Core Widgets', () => {
-    it('always provides standard 4-tab bottom navigation', () => {
+    it('always provides canonical 5-tab bottom navigation', () => {
       const config = WorkspaceResolver.resolve(mockProfile, createTestPrefs());
-      expect(config.bottomNavigation).toHaveLength(4);
+      expect(config.bottomNavigation).toHaveLength(5);
       expect(config.bottomNavigation.map((n) => n.id)).toEqual([
         'tab_home',
         'tab_documents',
-        'tab_customers',
-        'tab_more',
+        'tab_contacts',
+        'tab_money',
+        'tab_settings',
       ]);
     });
 
