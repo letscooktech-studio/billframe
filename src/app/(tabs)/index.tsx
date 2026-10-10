@@ -1,12 +1,13 @@
 /**
- * HOME SCREEN — ARCTIC AURORA COMMAND CENTER
- * Redesigned according to Billframe 2.0 Arctic Aurora specification:
- * - Subtle two-color Arctic Blue & Slate Violet atmospheric aurora wave in header
- * - One primary outstanding summary card (canonical financial state)
- * - Prominent "New Document" action button
- * - Exactly two recent records above the fold
- * - Dedicated "Continue Working" draft card when available
- * - Clean, uncluttered layout with 0 hardcoded demo values
+ * HOME SCREEN — BILLFRAME RECOVERY 3.0
+ * Pixel-perfect alignment with locked monochrome Android UX specification (Image 2):
+ * - Top bar: "Current organization", active profile name, circular search button (IconButton)
+ * - Hero: "Your documents" / "Create, continue and manage your work."
+ * - Primary Action: Off-white filled "+ New Document" button (PrimaryButton, 54dp height, 14dp radius)
+ * - Section 1: "Continue working" draft card with "Draft · Saved locally" & ArrowUpRight icon
+ * - Section 2: "Recent" list with "View all" link and standardized DocumentRow items
+ * - Modal: Document Type Selection sheet (Invoice, Estimate, Quick Bill, Universal Studio)
+ * - 100% monochrome, zero colored Aurora overlays, guaranteed >= 48dp touch targets
  */
 
 import React, { useState, useCallback } from 'react';
@@ -16,24 +17,30 @@ import {
   Text,
   ScrollView,
   Pressable,
-  Image,
+  Modal,
   useColorScheme,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  FileText,
   Plus,
-  ChevronRight,
   Search,
-  Settings,
+  ArrowUpRight,
+  FileText,
+  Zap,
   Briefcase,
+  Layers,
+  X,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DocumentRepository } from '../../data/repositories/DocumentRepository';
 import { formatMoney } from '../../domain/money/Money';
-import { AuroraBackground } from '../../components/common/AuroraBackground';
+import { PrimaryButton } from '../../components/common/PrimaryButton';
+import { IconButton } from '../../components/common/IconButton';
+import { DocumentRow } from '../../components/common/DocumentRow';
+import { SectionHeader } from '../../components/common/SectionHeader';
+import { EmptyState } from '../../components/common/EmptyState';
 
 interface RecentDocument {
   id: string;
@@ -45,6 +52,7 @@ interface RecentDocument {
   lifecycle_status: string;
   issue_date: number;
   updated_at: number;
+  is_universal?: number;
 }
 
 interface DraftDocument {
@@ -52,24 +60,7 @@ interface DraftDocument {
   document_number: string;
   doc_type: string;
   updated_at: number;
-}
-
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good Morning';
-  if (hour < 18) return 'Good Afternoon';
-  return 'Good Evening';
-}
-
-function formatRelativeTime(timestamp: number): string {
-  if (!timestamp) return 'Recently';
-  const diffMinutes = Math.floor((Date.now() - timestamp) / 60000);
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
+  is_universal?: number;
 }
 
 function formatDateDisplay(timestamp: number): string {
@@ -78,18 +69,25 @@ function formatDateDisplay(timestamp: number): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function formatDocTypeName(type: string): string {
+  if (!type) return 'Document';
+  return type
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? colors.dark : colors.light;
 
-  const [businessName, setBusinessName] = useState<string>('My Business');
-  const [outstandingMinor, setOutstandingMinor] = useState<bigint>(0n);
-  const [overdueCount, setOverdueCount] = useState<number>(0);
+  const [businessName, setBusinessName] = useState<string>('My Organization');
   const [currency, setCurrency] = useState<string>('INR');
   const [documentLocale, setDocumentLocale] = useState<string>('en-IN');
   const [recentDocs, setRecentDocs] = useState<RecentDocument[]>([]);
   const [continueDraft, setContinueDraft] = useState<DraftDocument | null>(null);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -108,39 +106,49 @@ export default function HomeScreen() {
         if (profile.default_document_locale) setDocumentLocale(profile.default_document_locale);
       }
 
-      // 2. Fetch authoritative outstanding metrics
-      const metrics = await DocumentRepository.getHomeDashboardMetricsAsync();
-      setOutstandingMinor(metrics.outstandingMinor);
-
-      // 3. Count overdue invoices
-      const overdueRow = await db.getFirstAsync<{ count: number }>(
-        `SELECT COUNT(*) as count FROM documents WHERE is_overdue = 1 AND lifecycle_status = 'issued' AND is_archived = 0;`
-      );
-      setOverdueCount(overdueRow?.count ?? 0);
-
-      // 4. Fetch 2 most recent non-archived documents for clean hierarchy
+      // 2. Fetch up to 5 most recent non-archived documents across standard & universal
       const recents = await db.getAllAsync<RecentDocument>(
         `SELECT d.id, d.document_number, d.doc_type, COALESCE(c.name, 'Walk-in Client') AS customer_name,
-                d.total_minor, d.currency, d.lifecycle_status, d.issue_date, d.updated_at
+                d.total_minor, d.currency, d.lifecycle_status, d.issue_date, d.updated_at, 0 AS is_universal
          FROM documents d
          LEFT JOIN customers c ON d.customer_id = c.id
          WHERE d.is_archived = 0
          ORDER BY d.created_at DESC
-         LIMIT 2;`
+         LIMIT 5;`
       );
       setRecentDocs(recents || []);
 
-      // 5. Fetch most recent unfinished draft for "Continue Working"
-      const draft = await db.getFirstAsync<DraftDocument>(
-        `SELECT id, document_number, doc_type, updated_at
+      // 3. Fetch most recent unfinished draft across both tables for "Continue working"
+      const draftStandard = await db.getFirstAsync<DraftDocument>(
+        `SELECT id, document_number, doc_type, updated_at, 0 AS is_universal
          FROM documents
          WHERE lifecycle_status = 'draft' AND is_archived = 0
          ORDER BY updated_at DESC
          LIMIT 1;`
       );
-      setContinueDraft(draft || null);
+
+      let draftUniversal: DraftDocument | null = null;
+      try {
+        draftUniversal = await db.getFirstAsync<DraftDocument>(
+          `SELECT id, document_number, template_id AS doc_type, updated_at, 1 AS is_universal
+           FROM universal_documents
+           WHERE lifecycle_status = 'draft' AND is_archived = 0
+           ORDER BY updated_at DESC
+           LIMIT 1;`
+        );
+      } catch {
+        // Universal documents table may not exist in earlier mocks
+      }
+
+      if (draftStandard && draftUniversal) {
+        setContinueDraft(
+          draftStandard.updated_at >= draftUniversal.updated_at ? draftStandard : draftUniversal
+        );
+      } else {
+        setContinueDraft(draftStandard || draftUniversal || null);
+      }
     } catch {
-      // Non-blocking: will display safe zero states
+      // Safe fallback
     }
   }, []);
 
@@ -150,244 +158,285 @@ export default function HomeScreen() {
     }, [loadData])
   );
 
+  const handleOpenDraft = (draft: DraftDocument) => {
+    if (draft.is_universal) {
+      router.push({ pathname: '/templates/studio', params: { id: draft.id } });
+    } else {
+      router.push({ pathname: '/document/edit', params: { id: draft.id } });
+    }
+  };
+
+  const handleSelectDocType = (type: 'invoice' | 'estimate' | 'quick-bill' | 'studio') => {
+    setShowTypeSelector(false);
+    if (type === 'quick-bill') {
+      router.push('/quick-bill');
+    } else if (type === 'studio') {
+      router.push('/templates/studio');
+    } else {
+      router.push({ pathname: '/document/edit', params: { type } });
+    }
+  };
+
+  const draftTitle = continueDraft
+    ? continueDraft.document_number
+      ? `${formatDocTypeName(continueDraft.doc_type)} #${continueDraft.document_number}`
+      : `${formatDocTypeName(continueDraft.doc_type)} Draft`
+    : '';
+
   return (
-    <AuroraBackground section="home" intensity="standard">
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.contentContainer}>
-            {/* Top Bar: Brand, Switcher, Search, Settings */}
-            <View style={styles.topBar}>
-              <View style={styles.brandRow}>
-                <Image
-                  source={require('../../../assets/brand/billframe-mark.png')}
-                  style={styles.brandLogo}
-                  resizeMode="contain"
-                />
-                <View>
-                  <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>Billframe</Text>
-                  <Text style={[styles.brandSubtitle, { color: theme.textSecondary }]}>Business Workspace</Text>
-                </View>
-              </View>
-
-              <View style={styles.topBarActions}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.iconButton,
-                    { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1 },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Search"
-                  onPress={() => router.push('/search' as any)}
-                >
-                  <Search size={18} color={theme.textPrimary} />
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.iconButton,
-                    { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1 },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Settings"
-                  onPress={() => router.push('/settings/workspace' as any)}
-                >
-                  <Settings size={18} color={theme.textPrimary} />
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Personalized Context Greeting */}
-            <View style={styles.greetingSection}>
-              <Text style={[styles.greetingTime, { color: theme.textSecondary }]}>{getGreeting()}</Text>
-              <Text style={[styles.greetingHeadline, { color: theme.textPrimary }]}>Let's continue your work</Text>
-              <Text style={[styles.greetingSubtext, { color: theme.textMuted }]}>
-                Create, manage and track all your business documents in one place.
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.container}>
+          {/* Top Bar: Current organization & circular search button */}
+          <View style={styles.headerRow}>
+            <View style={styles.orgInfoColumn}>
+              <Text style={[styles.orgLabel, { color: theme.textSecondary }]}>
+                Current organization
+              </Text>
+              <Text style={[styles.orgName, { color: theme.textPrimary }]} numberOfLines={1}>
+                {businessName}
               </Text>
             </View>
 
-            {/* Active Business Switcher Card */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.businessSwitcherCard,
-                { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`Active business ${businessName}. Tap to switch.`}
-              onPress={() => router.push('/settings/workspace' as any)}
-            >
-              <View style={[styles.businessIconBadge, { backgroundColor: theme.surfaceSecondary }]}>
-                <Briefcase size={16} color={theme.textPrimary} />
-              </View>
-              <View style={styles.businessSwitcherText}>
-                <Text style={[styles.businessSwitcherName, { color: theme.textPrimary }]} numberOfLines={1}>
-                  {businessName}
-                </Text>
-                <Text style={[styles.businessSwitcherSubtitle, { color: theme.textSecondary }]}>
-                  Business Workspace
-                </Text>
-              </View>
-              <ChevronRight size={18} color={theme.textMuted} />
-            </Pressable>
+            <IconButton
+              icon={<Search size={20} color={theme.textPrimary} />}
+              onPress={() => router.push('/search' as any)}
+              accessibilityLabel="Search documents and organization records"
+              size={44}
+            />
+          </View>
 
-            {/* Single Primary Business Summary: Outstanding Amount */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.summaryCard,
-                { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.9 : 1 },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`Outstanding amount ${formatMoney({ amountMinor: outstandingMinor, currency }, documentLocale)}`}
-              onPress={() => router.push('/collections' as any)}
-            >
-              <View style={[styles.summaryIconContainer, { backgroundColor: theme.surfaceSecondary }]}>
-                <FileText size={22} color={theme.textPrimary} />
-              </View>
-              <View style={styles.summaryBody}>
-                <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Outstanding Amount</Text>
-                <Text style={[styles.summaryAmount, { color: theme.textPrimary }]}>
-                  {formatMoney({ amountMinor: outstandingMinor, currency }, documentLocale)}
-                </Text>
-                <Text style={[styles.summarySubtext, { color: overdueCount > 0 ? theme.statusDanger : theme.textMuted }]}>
-                  {overdueCount > 0 ? `${overdueCount} invoice${overdueCount > 1 ? 's' : ''} overdue` : 'All invoices settled'}
-                </Text>
-              </View>
-              <ChevronRight size={20} color={theme.textMuted} />
-            </Pressable>
+          {/* Hero Section: Your documents */}
+          <View style={styles.heroSection}>
+            <Text style={[styles.heroTitle, { color: theme.textPrimary }]}>
+              Your documents
+            </Text>
+            <Text style={[styles.heroSubtitle, { color: theme.textSecondary }]}>
+              Create, continue and manage your work.
+            </Text>
 
-            {/* Primary Action Button: New Document */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.primaryNewDocBtn,
-                { backgroundColor: theme.brandAnchor, opacity: pressed ? 0.9 : 1 },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Create New Document"
-              onPress={() => router.push({ pathname: '/document/edit', params: { type: 'invoice' } })}
-            >
-              <View style={styles.newDocBtnInner}>
-                <Plus size={20} color={theme.brandAnchorText} strokeWidth={2.5} />
-                <Text style={[styles.primaryNewDocText, { color: theme.brandAnchorText }]}>New Document</Text>
-              </View>
-              <ChevronRight size={18} color={theme.brandAnchorText} strokeWidth={2} />
-            </Pressable>
-
-            {/* Section: Recent Documents */}
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>Recent Documents</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="View all documents"
-                onPress={() => router.push('/(tabs)/documents')}
-                hitSlop={8}
-              >
-                <Text style={[styles.viewAllText, { color: theme.textSecondary }]}>View All &gt;</Text>
-              </Pressable>
+            {/* Primary Action Button: + New Document */}
+            <View style={styles.primaryActionWrapper}>
+              <PrimaryButton
+                label="+ New Document"
+                onPress={() => setShowTypeSelector(true)}
+                icon={<Plus size={20} color={theme.primaryActionText} strokeWidth={2.5} />}
+                accessibilityLabel="Create a new document"
+                fullWidth
+              />
             </View>
+          </View>
+
+          {/* Section 1: Continue working */}
+          <View style={styles.sectionBlock}>
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+              Continue working
+            </Text>
+
+            {continueDraft ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.draftCard,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.borderDefault,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+                onPress={() => handleOpenDraft(continueDraft)}
+                accessibilityRole="button"
+                accessibilityLabel={`Continue working on draft ${draftTitle}`}
+              >
+                <View style={styles.draftContent}>
+                  <Text style={[styles.draftTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {draftTitle}
+                  </Text>
+                  <Text style={[styles.draftSubtitle, { color: theme.textSecondary }]}>
+                    Draft · Saved locally
+                  </Text>
+                </View>
+                <View style={[styles.draftIconCircle, { backgroundColor: theme.surfaceSecondary }]}>
+                  <ArrowUpRight size={20} color={theme.textSecondary} />
+                </View>
+              </Pressable>
+            ) : (
+              <View
+                style={[
+                  styles.draftPlaceholderCard,
+                  { backgroundColor: theme.surface, borderColor: theme.borderDefault },
+                ]}
+              >
+                <View style={styles.draftContent}>
+                  <Text style={[styles.draftTitle, { color: theme.textPrimary }]}>
+                    No unfinished drafts
+                  </Text>
+                  <Text style={[styles.draftSubtitle, { color: theme.textSecondary }]}>
+                    Saved drafts will appear here to resume anytime
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Section 2: Recent */}
+          <View style={styles.sectionBlock}>
+            <SectionHeader
+              title="Recent"
+              actionText="View all"
+              onAction={() => router.push('/(tabs)/documents')}
+            />
 
             {recentDocs.length === 0 ? (
-              <View style={[styles.emptyContainer, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-                <FileText size={32} color={theme.textMuted} strokeWidth={1.5} />
-                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No documents yet</Text>
-                <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                  Tap New Document to create your first invoice or quotation.
-                </Text>
-              </View>
+              <EmptyState
+                title="No documents yet"
+                description="Tap New Document to create your first invoice, quote or agreement."
+                actionLabel="+ New Document"
+                onAction={() => setShowTypeSelector(true)}
+              />
             ) : (
               <View style={styles.recentList}>
                 {recentDocs.map((doc) => {
-                  const isPaid = doc.lifecycle_status === 'paid';
-                  const isDraft = doc.lifecycle_status === 'draft';
-                  const statusBadgeColor = isPaid
-                    ? theme.statusSuccess
-                    : isDraft
-                    ? theme.statusDraft
-                    : theme.statusIssued;
+                  const amount = doc.total_minor > 0
+                    ? formatMoney({ amountMinor: BigInt(doc.total_minor), currency: doc.currency }, documentLocale)
+                    : undefined;
+                  const dateStr = formatDateDisplay(doc.issue_date || doc.updated_at);
+                  const subtitle = `${doc.customer_name} · ${dateStr}`;
 
                   return (
-                    <Pressable
+                    <DocumentRow
                       key={doc.id}
-                      style={({ pressed }) => [
-                        styles.docCard,
-                        { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Document ${doc.document_number}, ${doc.customer_name}`}
-                      onPress={() => router.push(`/document/${doc.id}` as any)}
-                    >
-                      <View style={[styles.docIconBadge, { backgroundColor: theme.surfaceSecondary }]}>
-                        <FileText size={18} color={theme.textPrimary} />
-                      </View>
-                      <View style={styles.docInfo}>
-                        <Text style={[styles.docNumber, { color: theme.textPrimary }]}>
-                          {doc.document_number || 'Draft'}
-                        </Text>
-                        <Text style={[styles.docCustomer, { color: theme.textSecondary }]} numberOfLines={1}>
-                          {doc.customer_name}
-                        </Text>
-                        <Text style={[styles.docMeta, { color: theme.textMuted }]}>
-                          {formatDateDisplay(doc.issue_date || doc.updated_at)} •{' '}
-                          {formatMoney({ amountMinor: BigInt(doc.total_minor || 0), currency: doc.currency || currency }, documentLocale)}
-                        </Text>
-                      </View>
-                      <View style={styles.docRight}>
-                        <View style={[styles.statusBadge, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}>
-                          <View style={[styles.statusDot, { backgroundColor: statusBadgeColor }]} />
-                          <Text style={[styles.statusText, { color: theme.textPrimary }]}>
-                            {doc.lifecycle_status.charAt(0).toUpperCase() + doc.lifecycle_status.slice(1)}
-                          </Text>
-                        </View>
-                        <ChevronRight size={16} color={theme.textMuted} />
-                      </View>
-                    </Pressable>
+                      title={doc.document_number || `${formatDocTypeName(doc.doc_type)}`}
+                      subtitle={subtitle}
+                      amountText={amount}
+                      statusText={doc.lifecycle_status}
+                      onPress={() => router.push({ pathname: '/document/[id]', params: { id: doc.id } })}
+                    />
                   );
                 })}
               </View>
             )}
-
-            {/* Section: Continue Working (only if unfinished draft exists) */}
-            {continueDraft && (
-              <View style={styles.continueSection}>
-                <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>Continue Working</Text>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.draftCard,
-                    { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Continue draft ${continueDraft.document_number || 'Draft'}`}
-                  onPress={() => router.push(`/document/${continueDraft.id}` as any)}
-                >
-                  <View style={[styles.docIconBadge, { backgroundColor: theme.surfaceSecondary }]}>
-                    <FileText size={18} color={theme.textPrimary} />
-                  </View>
-                  <View style={styles.draftInfo}>
-                    <Text style={[styles.draftNumber, { color: theme.textPrimary }]}>
-                      {continueDraft.document_number || 'DRAFT'}
-                    </Text>
-                    <Text style={[styles.draftType, { color: theme.textSecondary }]}>
-                      {continueDraft.doc_type ? continueDraft.doc_type.replace('_', ' ') : 'Invoice'} • {businessName}
-                    </Text>
-                    <Text style={[styles.draftTime, { color: theme.textMuted }]}>
-                      Last edited {formatRelativeTime(continueDraft.updated_at)}
-                    </Text>
-                  </View>
-                  <View style={styles.docRight}>
-                    <View style={[styles.statusBadge, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}>
-                      <View style={[styles.statusDot, { backgroundColor: theme.statusDraft }]} />
-                      <Text style={[styles.statusText, { color: theme.textPrimary }]}>Draft</Text>
-                    </View>
-                    <ChevronRight size={16} color={theme.textMuted} />
-                  </View>
-                </Pressable>
-              </View>
-            )}
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </AuroraBackground>
+        </View>
+      </ScrollView>
+
+      {/* Document Type Selection Modal */}
+      <Modal
+        visible={showTypeSelector}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTypeSelector(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowTypeSelector(false)}
+        >
+          <Pressable
+            style={[
+              styles.typeSheetContainer,
+              { backgroundColor: theme.surface, borderColor: theme.borderDefault },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.typeSheetHeader}>
+              <Text style={[styles.typeSheetTitle, { color: theme.textPrimary }]}>
+                Choose Document Type
+              </Text>
+              <IconButton
+                icon={<X size={18} color={theme.textPrimary} />}
+                onPress={() => setShowTypeSelector(false)}
+                accessibilityLabel="Close document type selector"
+                size={36}
+              />
+            </View>
+
+            <View style={styles.typeOptionsList}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.typeOptionRow,
+                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => handleSelectDocType('invoice')}
+              >
+                <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                  <FileText size={20} color={theme.textPrimary} />
+                </View>
+                <View style={styles.typeOptionText}>
+                  <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                    Tax Invoice
+                  </Text>
+                  <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                    Standard commercial invoice with GST, tax calculation and payment terms
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.typeOptionRow,
+                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => handleSelectDocType('estimate')}
+              >
+                <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                  <Briefcase size={20} color={theme.textPrimary} />
+                </View>
+                <View style={styles.typeOptionText}>
+                  <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                    Estimate / Quotation
+                  </Text>
+                  <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                    Project proposal or quote with expiry dates and revision history
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.typeOptionRow,
+                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => handleSelectDocType('quick-bill')}
+              >
+                <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                  <Zap size={20} color={theme.textPrimary} />
+                </View>
+                <View style={styles.typeOptionText}>
+                  <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                    Quick Counter Bill
+                  </Text>
+                  <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                    30-second retail point of sale with instant thermal / digital receipt
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.typeOptionRow,
+                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={() => handleSelectDocType('studio')}
+              >
+                <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                  <Layers size={20} color={theme.textPrimary} />
+                </View>
+                <View style={styles.typeOptionText}>
+                  <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                    Universal Document Studio
+                  </Text>
+                  <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                    Job Offers, Work Orders, Salary Slips, Student Fee Receipts & Contracts
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -396,262 +445,154 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingBottom: 40,
   },
-  contentContainer: {
+  container: {
     maxWidth: MAX_CONTENT_WIDTH,
-    alignSelf: 'center',
     width: '100%',
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.lg,
   },
-  topBar: {
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xl,
-  },
-  brandRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
   },
-  brandLogo: {
-    width: 28,
-    height: 28,
+  orgInfoColumn: {
+    flex: 1,
+    marginRight: spacing.md,
   },
-  brandTitle: {
-    fontSize: 16,
+  orgLabel: {
+    fontSize: 13,
+    fontWeight: '400',
+    marginBottom: 2,
+    letterSpacing: -0.1,
+  },
+  orgName: {
+    fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
-  brandSubtitle: {
-    fontSize: 11,
-    fontWeight: '400',
+  heroSection: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.xl,
   },
-  topBarActions: {
+  heroTitle: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginBottom: 6,
+  },
+  heroSubtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: -0.2,
+    marginBottom: spacing.lg,
+  },
+  primaryActionWrapper: {
+    marginTop: spacing.xs,
+  },
+  sectionBlock: {
+    marginBottom: spacing.xl,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+    marginBottom: spacing.md,
+  },
+  draftCard: {
+    borderRadius: radii.card,
+    borderWidth: 1,
+    padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    minHeight: MIN_TOUCH_TARGET,
   },
-  iconButton: {
-    width: MIN_TOUCH_TARGET,
-    height: MIN_TOUCH_TARGET,
-    borderRadius: radii.md,
+  draftPlaceholderCard: {
+    borderRadius: radii.card,
     borderWidth: 1,
+    padding: spacing.lg,
+  },
+  draftContent: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  draftTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    letterSpacing: -0.2,
+  },
+  draftSubtitle: {
+    fontSize: 14,
+  },
+  draftIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  greetingSection: {
-    marginBottom: spacing.xl,
+  recentList: {
+    marginTop: spacing.xs,
   },
-  greetingTime: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 4,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+    padding: spacing.md,
   },
-  greetingHeadline: {
-    fontSize: 22,
+  typeSheetContainer: {
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    padding: spacing.lg,
+    maxHeight: '80%',
+  },
+  typeSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  typeSheetTitle: {
+    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: -0.4,
-    marginBottom: 6,
+    letterSpacing: -0.3,
   },
-  greetingSubtext: {
-    fontSize: 13,
-    lineHeight: 18,
+  typeOptionsList: {
+    gap: spacing.sm,
   },
-  businessSwitcherCard: {
+  typeOptionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    marginBottom: spacing.lg,
+    borderRadius: radii.md,
+    minHeight: MIN_TOUCH_TARGET,
   },
-  businessIconBadge: {
-    width: 36,
-    height: 36,
+  typeIconBox: {
+    width: 40,
+    height: 40,
     borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
-  businessSwitcherText: {
+  typeOptionText: {
     flex: 1,
   },
-  businessSwitcherName: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  businessSwitcherSubtitle: {
-    fontSize: 12,
-  },
-  summaryCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.lg,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    marginBottom: spacing.lg,
-  },
-  summaryIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  summaryBody: {
-    flex: 1,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  summaryAmount: {
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: 2,
-  },
-  summarySubtext: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  primaryNewDocBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    height: 54,
-    borderRadius: radii.xl,
-    marginBottom: spacing.xxl,
-  },
-  newDocBtnInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  primaryNewDocText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  sectionHeading: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  viewAllText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  recentList: {
-    gap: spacing.sm,
-    marginBottom: spacing.xxl,
-  },
-  docCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-  },
-  docIconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  docInfo: {
-    flex: 1,
-  },
-  docNumber: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  docCustomer: {
-    fontSize: 13,
-    marginBottom: 2,
-  },
-  docMeta: {
-    fontSize: 11,
-  },
-  docRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    gap: 4,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    padding: spacing.xxl,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xxl,
-  },
-  emptyTitle: {
+  typeOptionName: {
     fontSize: 15,
     fontWeight: '600',
-    marginTop: spacing.md,
-    marginBottom: 4,
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  continueSection: {
-    marginTop: spacing.sm,
-  },
-  draftCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    marginTop: spacing.sm,
-  },
-  draftInfo: {
-    flex: 1,
-  },
-  draftNumber: {
-    fontSize: 14,
-    fontWeight: '600',
     marginBottom: 2,
   },
-  draftType: {
+  typeOptionDesc: {
     fontSize: 13,
-    marginBottom: 2,
-  },
-  draftTime: {
-    fontSize: 11,
+    lineHeight: 18,
   },
 });

@@ -93,11 +93,10 @@ export default function SettingsScreen() {
   );
 
   return (
-    <AuroraBackground section="all" intensity="subtle">
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <ScrollView
-          style={styles.scrollArea}
-          contentContainerStyle={styles.scrollContent}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.container}>
@@ -229,7 +228,6 @@ export default function SettingsScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
-    </AuroraBackground>
   );
 }
 

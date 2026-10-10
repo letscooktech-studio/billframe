@@ -31,10 +31,13 @@ export const spacing = {
 export const radii = {
   /** 4dp - Small tags, badges */
   xs: 4,
-  /** 8dp - Inputs, standard buttons, item rows */
+  /** 8dp - Standard small radius */
   sm: 8,
-  /** 12dp - Containers, dialogs */
+  /** 12dp - Containers, inputs */
   md: 12,
+  /** 14dp - Standardized action buttons & card corners */
+  button: 14,
+  card: 14,
   /** 16dp - Bottom sheet top corners, cards */
   lg: 16,
   /** 20dp - Large bottom sheets, modals */
@@ -97,6 +100,12 @@ export interface ThemeColors {
   surfaceElevated: string;
   borderSubtle: string;
   borderFocused: string;
+  borderDefault: string;
+  borderAction: string;
+  primaryActionBg: string;
+  primaryActionText: string;
+  secondaryActionBg: string;
+  secondaryActionText: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
@@ -110,6 +119,47 @@ export interface ThemeColors {
   statusDanger: string;
 }
 
+export const monochrome = {
+  dark: {
+    background: '#0D0E10',
+    surface: '#18191D',
+    surfaceSecondary: '#222326',
+    surfaceElevated: '#282A30',
+    borderSubtle: '#26272B',
+    borderDefault: '#35363B',
+    borderAction: '#404146',
+    borderFocused: '#F5F5F6',
+    textPrimary: '#F5F5F6',
+    textSecondary: '#A5A6AB',
+    textMuted: '#77797F',
+    primaryActionBg: '#F3F3F4',
+    primaryActionText: '#141416',
+    secondaryActionBg: '#222326',
+    secondaryActionText: '#F5F5F6',
+    cardBg: '#18191D',
+    cardBorder: '#35363B',
+  },
+  light: {
+    background: '#F7F7F6',
+    surface: '#FFFFFF',
+    surfaceSecondary: '#EFEFED',
+    surfaceElevated: '#E5E5E3',
+    borderSubtle: '#E5E5E3',
+    borderDefault: '#D4D4D2',
+    borderAction: '#BFBFBC',
+    borderFocused: '#171717',
+    textPrimary: '#171717',
+    textSecondary: '#6B6B6B',
+    textMuted: '#9E9E9C',
+    primaryActionBg: '#171717',
+    primaryActionText: '#FFFFFF',
+    secondaryActionBg: '#EFEFED',
+    secondaryActionText: '#171717',
+    cardBg: '#FFFFFF',
+    cardBorder: '#E5E5E3',
+  },
+} as const;
+
 export const colors: { light: ThemeColors; dark: ThemeColors } = {
   light: {
     background: '#F7F7F6',
@@ -118,6 +168,12 @@ export const colors: { light: ThemeColors; dark: ThemeColors } = {
     surfaceElevated: '#E5E5E3',
     borderSubtle: '#E5E5E3',
     borderFocused: '#171717',
+    borderDefault: '#D4D4D2',
+    borderAction: '#BFBFBC',
+    primaryActionBg: '#171717',
+    primaryActionText: '#FFFFFF',
+    secondaryActionBg: '#EFEFED',
+    secondaryActionText: '#171717',
     textPrimary: '#171717',
     textSecondary: '#6B6B6B',
     textMuted: '#9E9E9C',
@@ -131,17 +187,23 @@ export const colors: { light: ThemeColors; dark: ThemeColors } = {
   },
   dark: {
     background: '#0D0E10',
-    surface: '#17191D',
-    surfaceSecondary: '#202227',
-    surfaceElevated: '#272A30',
-    borderSubtle: '#303238',
+    surface: '#18191D',
+    surfaceSecondary: '#222326',
+    surfaceElevated: '#282A30',
+    borderSubtle: '#26272B',
     borderFocused: '#F5F5F6',
+    borderDefault: '#35363B',
+    borderAction: '#404146',
+    primaryActionBg: '#F3F3F4',
+    primaryActionText: '#141416',
+    secondaryActionBg: '#222326',
+    secondaryActionText: '#F5F5F6',
     textPrimary: '#F5F5F6',
-    textSecondary: '#A8AAB0',
-    textMuted: '#777B83',
-    brandAnchor: '#F5F5F6',
-    brandAnchorText: '#0D0E10',
-    statusDraft: '#A8AAB0',
+    textSecondary: '#A5A6AB',
+    textMuted: '#77797F',
+    brandAnchor: '#F3F3F4',
+    brandAnchorText: '#141416',
+    statusDraft: '#A5A6AB',
     statusIssued: '#3B82F6',
     statusSuccess: '#22C55E',
     statusWarning: '#F59E0B',

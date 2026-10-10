@@ -154,13 +154,12 @@ export default function MoneyScreen() {
   );
 
   return (
-    <AuroraBackground section="work" intensity="subtle">
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <ScrollView
-          style={styles.scrollArea}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
           <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
@@ -412,7 +411,6 @@ export default function MoneyScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
-  </AuroraBackground>
   );
 }
 

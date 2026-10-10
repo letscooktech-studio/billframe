@@ -27,11 +27,11 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.brandAnchor,
+        tabBarActiveTintColor: theme.textPrimary,
         tabBarInactiveTintColor: theme.textMuted,
         tabBarStyle: {
           backgroundColor: theme.surface,
-          borderTopColor: theme.borderSubtle,
+          borderTopColor: theme.borderDefault,
           borderTopWidth: 1,
           height: Platform.OS === 'ios' ? 88 : 66,
           paddingBottom: Platform.OS === 'ios' ? 28 : 10,
@@ -54,14 +54,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="documents"
         options={{
-          title: 'Documents',
+          title: 'Docs',
           tabBarIcon: ({ color }) => <FileText color={color} size={22} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="contacts"
         options={{
-          title: 'Clients',
+          title: 'People',
           tabBarIcon: ({ color }) => <Users color={color} size={22} strokeWidth={2} />,
         }}
       />

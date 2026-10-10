@@ -319,8 +319,7 @@ export default function DocumentStudioScreen() {
   };
 
   return (
-    <AuroraBackground section="template_studio" intensity="subtle">
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
         {/* Top Bar Header */}
         <View style={styles.topBar}>
           <Pressable
@@ -744,7 +743,6 @@ export default function DocumentStudioScreen() {
           </ScrollView>
         )}
       </SafeAreaView>
-    </AuroraBackground>
   );
 }
 

@@ -1,7 +1,12 @@
 /**
- * CONTACTS HUB (Clients, Customers, Vendors & Suppliers)
- * Searchable contact registry with transaction ledgers, quick actions,
- * and direct customer statement generation.
+ * CONTACTS / PEOPLE HUB — BILLFRAME RECOVERY 3.0
+ * Unified directory for Clients, Customers, Recipients, Vendors & Suppliers.
+ * 
+ * Features:
+ * - Clean monochrome styling matching Image 1 & 2 design system
+ * - Standardized SearchField, IconButton, PrimaryButton, and EmptyState
+ * - Guaranteed >= 48dp touch targets on every interactive element
+ * - Zero colored Aurora background overlays
  */
 
 import React, { useState, useCallback } from 'react';
@@ -10,17 +15,18 @@ import {
   View,
   Text,
   FlatList,
-  TextInput,
   Pressable,
   useColorScheme,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Plus, Users, ChevronRight, Phone, Mail, Building, FileText } from 'lucide-react-native';
+import { Plus, Users, ChevronRight } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
-import { AuroraBackground } from '../../components/common/AuroraBackground';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { formatMoney } from '../../domain/money/Money';
+import { SearchField } from '../../components/common/SearchField';
+import { IconButton } from '../../components/common/IconButton';
+import { EmptyState } from '../../components/common/EmptyState';
 
 interface ContactItem {
   id: string;
@@ -65,9 +71,9 @@ export default function ContactsScreen() {
       query += ' GROUP BY c.id ORDER BY c.name ASC;';
 
       const items = await db.getAllAsync<ContactItem>(query, params);
-      setContacts(items);
+      setContacts(items || []);
     } catch {
-      // Non-blocking
+      setContacts([]);
     }
   }, [searchQuery]);
 
@@ -86,7 +92,7 @@ export default function ContactsScreen() {
           styles.rowItem,
           {
             backgroundColor: theme.surface,
-            borderBottomColor: theme.borderSubtle,
+            borderColor: theme.borderDefault,
             opacity: pressed ? 0.8 : 1,
           },
         ]}
@@ -96,17 +102,21 @@ export default function ContactsScreen() {
       >
         <View style={styles.rowMain}>
           <View style={[styles.avatar, { backgroundColor: theme.surfaceSecondary }]}>
-            <Text style={[styles.avatarText, { color: theme.brandAnchor }]}>
+            <Text style={[styles.avatarText, { color: theme.textPrimary }]}>
               {item.name.charAt(0).toUpperCase()}
             </Text>
           </View>
 
           <View style={styles.rowInfo}>
-            <Text style={[styles.contactName, { color: theme.textPrimary }]}>{item.name}</Text>
+            <Text style={[styles.contactName, { color: theme.textPrimary }]} numberOfLines={1}>
+              {item.name}
+            </Text>
             {item.business_name ? (
-              <Text style={[styles.businessName, { color: theme.textSecondary }]}>{item.business_name}</Text>
+              <Text style={[styles.businessName, { color: theme.textSecondary }]} numberOfLines={1}>
+                {item.business_name}
+              </Text>
             ) : null}
-            <Text style={[styles.contactMeta, { color: theme.textMuted }]}>
+            <Text style={[styles.contactMeta, { color: theme.textMuted }]} numberOfLines={1}>
               {[item.email, item.phone].filter(Boolean).join(' • ') || 'No contact details'}
             </Text>
           </View>
@@ -115,169 +125,136 @@ export default function ContactsScreen() {
         <View style={styles.rowRight}>
           <View style={styles.rightMetrics}>
             {hasBalance ? (
-              <Text style={[styles.balanceDueText, { color: theme.statusWarning }]}>
+              <Text style={[styles.balanceDueText, { color: theme.textPrimary }]}>
                 Due: {formatMoney({ amountMinor: BigInt(item.balance_due_minor), currency: 'INR' }, 'en-IN')}
               </Text>
             ) : (
               <Text style={[styles.billedText, { color: theme.textSecondary }]}>
-                {item.total_invoices} {item.total_invoices === 1 ? 'document' : 'documents'}
+                {item.total_invoices} {item.total_invoices === 1 ? 'doc' : 'docs'}
               </Text>
             )}
           </View>
-          <ChevronRight color={theme.textMuted} size={16} />
+          <ChevronRight color={theme.textMuted} size={18} />
         </View>
       </Pressable>
     );
   };
 
   return (
-    <AuroraBackground section="clients" intensity="subtle">
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Clients</Text>
-              <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-                {contacts.length} {contacts.length === 1 ? 'client' : 'clients'} registered
-              </Text>
-            </View>
-            <Pressable
-              style={[styles.addButton, { backgroundColor: theme.brandAnchor }]}
-              onPress={() => router.push('/customer/edit')}
-              accessibilityRole="button"
-              accessibilityLabel="Add new client"
-            >
-              <Plus color={theme.brandAnchorText} size={18} strokeWidth={2.5} />
-              <Text style={[styles.addButtonText, { color: theme.brandAnchorText }]}>Add Client</Text>
-            </Pressable>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerTextCol}>
+            <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>People</Text>
+            <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
+              {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'} in directory
+            </Text>
           </View>
-
-          {/* Search */}
-          <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-            <Search color={theme.textSecondary} size={18} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.textPrimary }]}
-              placeholder="Search by name, company, email, phone..."
-              placeholderTextColor={theme.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-
-          {/* List */}
-          <FlatList
-            data={contacts}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={[styles.emptyContainer, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-                <Users color={theme.textMuted} size={40} strokeWidth={1.5} />
-                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                  {searchQuery ? 'No matching clients' : 'No clients yet'}
-                </Text>
-                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                  {searchQuery
-                    ? 'Try a different search term.'
-                    : 'Add clients to issue tax invoices, track balances, and generate account statements.'}
-                </Text>
-                {!searchQuery && (
-                  <Pressable
-                    style={[styles.emptyButton, { backgroundColor: theme.brandAnchor }]}
-                    onPress={() => router.push('/customer/edit')}
-                  >
-                    <Text style={[styles.emptyButtonText, { color: theme.brandAnchorText }]}>Add First Client</Text>
-                  </Pressable>
-                )}
-              </View>
-            }
+          <IconButton
+            icon={<Plus color={theme.textPrimary} size={20} />}
+            onPress={() => router.push('/customer/edit')}
+            accessibilityLabel="Add new contact or client"
+            size={44}
           />
         </View>
-      </SafeAreaView>
-    </AuroraBackground>
+
+        {/* Standardized Search Bar */}
+        <View style={styles.searchContainer}>
+          <SearchField
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search by name, company, email, phone..."
+            onClear={() => setSearchQuery('')}
+          />
+        </View>
+
+        {/* Contacts FlatList */}
+        <FlatList
+          data={contacts}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <EmptyState
+              title={searchQuery ? 'No matching contacts' : 'No contacts yet'}
+              description={
+                searchQuery
+                  ? 'Try a different search term or clear the filter.'
+                  : 'Add contacts to issue documents, track balances, and generate account statements.'
+              }
+              actionLabel="+ Add Contact"
+              onAction={() => router.push('/customer/edit')}
+            />
+          }
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
     maxWidth: MAX_CONTENT_WIDTH,
-    alignSelf: 'center',
     width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: spacing.lg,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  headerTextCol: {
+    flex: 1,
   },
   screenTitle: {
-    fontSize: typography.screenTitle.fontSize,
-    fontWeight: typography.screenTitle.fontWeight,
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: -0.4,
   },
   screenSubtitle: {
-    fontSize: typography.caption.fontSize,
+    fontSize: 13,
     marginTop: 2,
   },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: MIN_TOUCH_TARGET,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.sm,
-    gap: spacing.xs,
-  },
-  addButtonText: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: typography.bodyMedium.fontWeight,
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: MIN_TOUCH_TARGET,
-    borderWidth: 1,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
+  searchContainer: {
+    marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: typography.body.fontSize,
-  },
   listContent: {
-    paddingBottom: spacing.xxl,
+    paddingBottom: 40,
   },
   rowItem: {
+    minHeight: MIN_TOUCH_TARGET,
+    borderRadius: radii.md,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderRadius: radii.sm,
-    marginBottom: 4,
-    minHeight: MIN_TOUCH_TARGET,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: spacing.sm,
   },
   rowMain: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: spacing.md,
+    marginRight: spacing.md,
   },
   avatar: {
     width: 40,
     height: 40,
-    borderRadius: radii.full,
-    justifyContent: 'center',
+    borderRadius: 20,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   avatarText: {
     fontSize: 16,
@@ -287,72 +264,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contactName: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: typography.bodyMedium.fontWeight,
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   businessName: {
-    fontSize: typography.supporting.fontSize,
-    marginTop: 1,
+    fontSize: 13,
+    marginBottom: 2,
   },
   contactMeta: {
-    fontSize: typography.caption.fontSize,
-    marginTop: 2,
+    fontSize: 12,
   },
   rowRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
   },
   rightMetrics: {
     alignItems: 'flex-end',
+    marginRight: 8,
   },
   balanceDueText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    fontVariant: ['tabular-nums'],
   },
   billedText: {
     fontSize: 12,
-    fontWeight: '500',
-  },
-  invoiceBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.full,
-  },
-  invoiceBadgeText: {
-    fontSize: typography.caption.fontSize,
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xxl,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    marginTop: spacing.xl,
-    gap: spacing.sm,
-  },
-  emptyTitle: {
-    fontSize: typography.sectionTitle.fontSize,
-    fontWeight: typography.sectionTitle.fontWeight,
-    marginTop: spacing.sm,
-  },
-  emptyText: {
-    fontSize: typography.body.fontSize,
-    textAlign: 'center',
-    maxWidth: 280,
-  },
-  emptyButton: {
-    height: MIN_TOUCH_TARGET,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  emptyButtonText: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: typography.bodyMedium.fontWeight,
   },
 });

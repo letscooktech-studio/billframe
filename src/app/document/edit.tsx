@@ -72,6 +72,8 @@ import { TaxExplanationModal } from '../../features/tax/TaxExplanationModal';
 import { showAlert } from '../../utils/alert';
 import { BusinessProfile } from '../../domain/profile/types';
 import { LogoUploader } from '../../components/common/LogoUploader';
+import { PrimaryButton } from '../../components/common/PrimaryButton';
+import { SecondaryButton } from '../../components/common/SecondaryButton';
 
 const COMMON_CURRENCIES = [
   { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
@@ -1738,47 +1740,41 @@ export default function DocumentEditScreen() {
               </View>
             )}
 
-            {/* 8. Action Buttons (Save Draft + Issue Official Document) */}
-            <View style={styles.bottomButtonsRow}>
-              <Pressable
-                style={[
-                  styles.saveDraftBtn,
-                  {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.borderSubtle,
-                    opacity: isSavingManual ? 0.7 : 1,
-                  },
-                ]}
-                onPress={handleSaveDraftExplicit}
-                disabled={isSavingManual || isIssuing}
-                accessibilityRole="button"
-                accessibilityLabel="Save draft"
-              >
-                <Save color={theme.textPrimary} size={18} />
-                <Text style={[styles.saveDraftBtnText, { color: theme.textPrimary }]}>
-                  {isSavingManual ? 'Saving...' : 'Save Draft'}
-                </Text>
-              </Pressable>
+            {/* 8. Action Buttons (Secondary Row [Preview] [Save Draft] + Primary Action [Issue Official Document]) */}
+            <View style={{ marginTop: spacing.xl, marginBottom: spacing.lg }}>
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                <SecondaryButton
+                  label="Preview"
+                  icon={<Eye color={theme.secondaryActionText} size={18} />}
+                  onPress={() => setShowPreviewModal(true)}
+                  accessibilityLabel="Preview document"
+                  style={{ flex: 1 }}
+                />
+                <SecondaryButton
+                  label={isSavingManual ? 'Saving...' : 'Save Draft'}
+                  icon={<Save color={theme.secondaryActionText} size={18} />}
+                  onPress={handleSaveDraftExplicit}
+                  disabled={isSavingManual || isIssuing}
+                  accessibilityLabel="Save draft"
+                  style={{ flex: 1 }}
+                />
+              </View>
 
-              <Pressable
-                style={[
-                  styles.issueButton,
-                  { backgroundColor: theme.brandAnchor, opacity: isIssuing ? 0.7 : 1 },
-                ]}
-                onPress={handleIssue}
-                disabled={isIssuing || isSavingManual}
-                accessibilityRole="button"
-                accessibilityLabel={docType === 'invoice' ? 'Issue official invoice' : 'Issue official estimate'}
-              >
-                <FileCheck color={theme.brandAnchorText} size={20} />
-                <Text style={[styles.issueButtonText, { color: theme.brandAnchorText }]}>
-                  {isIssuing
+              <PrimaryButton
+                label={
+                  isIssuing
                     ? 'Issuing...'
                     : docType === 'invoice'
                     ? 'Issue Official Invoice'
-                    : 'Issue Official Estimate'}
-                </Text>
-              </Pressable>
+                    : 'Issue Official Estimate'
+                }
+                icon={<FileCheck color={theme.primaryActionText} size={20} />}
+                onPress={handleIssue}
+                disabled={isIssuing || isSavingManual}
+                loading={isIssuing}
+                accessibilityLabel={docType === 'invoice' ? 'Issue official invoice' : 'Issue official estimate'}
+                fullWidth
+              />
             </View>
           </View>
         </ScrollView>

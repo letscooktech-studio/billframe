@@ -19,5 +19,8 @@ module.exports = {
     '^expo-crypto$': '<rootDir>/tests/mocks/expo-crypto.ts',
     '^expo-file-system$': '<rootDir>/tests/mocks/expo-file-system.ts',
     '^expo-secure-store$': '<rootDir>/tests/mocks/expo-secure-store.ts',
+    '^lucide-react-native$': '<rootDir>/tests/mocks/lucide-react-native.ts',
+    '^expo-router$': '<rootDir>/tests/mocks/expo-router.ts',
+    '^react-native-safe-area-context$': '<rootDir>/tests/mocks/react-native-safe-area-context.ts',
   },
 };
