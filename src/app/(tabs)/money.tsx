@@ -31,7 +31,6 @@ import {
   Package,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
-import { AuroraBackground } from '../../components/common/AuroraBackground';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DocumentRepository } from '../../data/repositories/DocumentRepository';
 import { formatMoney, createMoney } from '../../domain/money/Money';
@@ -39,10 +38,10 @@ import { formatMoney, createMoney } from '../../domain/money/Money';
 interface RecentPaymentItem {
   id: string;
   invoice_id: string;
-  document_number: string;
-  customer_name: string;
+  document_number: string | null;
+  customer_name: string | null;
   amount_minor: number;
-  payment_method: string;
+  payment_method: string | null;
   reference: string | null;
   payment_date: number;
 }
@@ -390,10 +389,10 @@ export default function MoneyScreen() {
                 >
                   <View style={styles.docLeft}>
                     <Text style={[styles.docNumber, { color: theme.textPrimary }]}>
-                      {p.document_number} • {p.payment_method.toUpperCase()}
+                      {p.document_number || 'Payment'} • {(p.payment_method ? p.payment_method.replace(/_/g, ' ') : 'PAYMENT').toUpperCase()}
                     </Text>
                     <Text style={[styles.docCustomer, { color: theme.textSecondary }]} numberOfLines={1}>
-                      {p.customer_name} {p.reference ? `(${p.reference})` : ''}
+                      {p.customer_name || 'Customer'} {p.reference ? `(${p.reference})` : ''}
                     </Text>
                   </View>
                   <View style={styles.docRight}>
@@ -401,7 +400,7 @@ export default function MoneyScreen() {
                       +{formatMoney({ amountMinor: BigInt(Math.round(p.amount_minor || 0)), currency }, locale)}
                     </Text>
                     <Text style={[styles.docDate, { color: theme.textMuted }]}>
-                      {new Date(p.payment_date).toLocaleDateString()}
+                      {p.payment_date ? new Date(p.payment_date).toLocaleDateString() : ''}
                     </Text>
                   </View>
                 </Pressable>

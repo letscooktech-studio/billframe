@@ -183,7 +183,7 @@ export default function ReceiptDetailScreen() {
                     <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Payment method</Text>
                   </View>
                   <Text style={[styles.detailValue, { color: theme.textPrimary }]}>
-                    {snapshot.paymentMethod.replace('_', ' ').toUpperCase()}
+                    {(snapshot.paymentMethod ? snapshot.paymentMethod.replace('_', ' ') : 'PAYMENT').toUpperCase()}
                   </Text>
                 </View>
 

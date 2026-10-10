@@ -103,7 +103,7 @@ export default function ContactsScreen() {
         <View style={styles.rowMain}>
           <View style={[styles.avatar, { backgroundColor: theme.surfaceSecondary }]}>
             <Text style={[styles.avatarText, { color: theme.textPrimary }]}>
-              {item.name.charAt(0).toUpperCase()}
+              {(item.name || 'C').charAt(0).toUpperCase()}
             </Text>
           </View>
 

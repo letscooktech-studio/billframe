@@ -515,8 +515,9 @@ export default function DocumentDetailScreen() {
     ? theme.statusDanger
     : theme.statusDraft;
 
+  const statusRaw = doc.lifecycle_status || 'draft';
   const statusLabel =
-    doc.lifecycle_status.charAt(0).toUpperCase() + doc.lifecycle_status.slice(1);
+    statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -1211,7 +1212,7 @@ export default function DocumentDetailScreen() {
                             <View style={styles.paymentMethodRow}>
                               <CreditCard size={14} color={theme.brandAnchor} />
                               <Text style={[styles.paymentMethod, { color: theme.textPrimary }]}>
-                                {p.payment_method.replace('_', ' ').toUpperCase()}
+                                {(p.payment_method ? p.payment_method.replace('_', ' ') : 'PAYMENT').toUpperCase()}
                               </Text>
                             </View>
                             <Text style={[styles.paymentDate, { color: theme.textSecondary }]}>

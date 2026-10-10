@@ -223,7 +223,7 @@ export function calculateCustomerStatement(params: {
       (endDate === undefined || pay.payment_date <= endDate);
 
     if (isInsidePeriod) {
-      const methodLabel = pay.payment_method.replace('_', ' ').toUpperCase();
+      const methodLabel = (pay.payment_method ? pay.payment_method.replace('_', ' ') : 'PAYMENT').toUpperCase();
       const desc = pay.reference
         ? `Payment (${methodLabel}) • Ref: ${pay.reference}`
         : `Payment (${methodLabel})`;

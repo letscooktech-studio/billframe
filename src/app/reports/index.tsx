@@ -355,7 +355,7 @@ export default function ReportsScreen() {
                     ]}
                   >
                     <Text style={[styles.categoryName, { color: theme.textPrimary }]}>
-                      {c.category.toUpperCase()}
+                      {(c.category || 'EXPENSE').toUpperCase()}
                     </Text>
                     <Text style={[styles.categoryAmount, { color: theme.textPrimary }]}>
                       {formatMoney({ amountMinor: toBigIntSafe(c.total_minor), currency }, locale)}

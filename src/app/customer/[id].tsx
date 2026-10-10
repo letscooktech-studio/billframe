@@ -165,7 +165,7 @@ export default function CustomerDetailScreen() {
             <View style={styles.profileHeader}>
               <View style={styles.avatar}>
                 <Text style={[styles.avatarText, { color: theme.brandAnchor }]}>
-                  {customer.name.charAt(0).toUpperCase()}
+                  {(customer.name || 'C').charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View style={styles.profileMain}>
@@ -286,7 +286,7 @@ export default function CustomerDetailScreen() {
                   <View style={styles.docLeft}>
                     <Text style={[styles.docNumber, { color: theme.textPrimary }]}>{d.document_number}</Text>
                     <Text style={[styles.docType, { color: theme.textMuted }]}>
-                      {d.doc_type.toUpperCase()} • {new Date(d.issue_date).toLocaleDateString()}
+                      {(d.doc_type || 'DOCUMENT').toUpperCase()} • {d.issue_date ? new Date(d.issue_date).toLocaleDateString() : ''}
                     </Text>
                   </View>
                   <View style={styles.docRight}>
