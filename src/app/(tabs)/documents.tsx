@@ -269,7 +269,8 @@ export default function DocumentsScreen() {
       ? formatMoney({ amountMinor: BigInt(item.total_minor), currency: item.currency }, locale)
       : undefined;
     const dateStr = formatDateDisplay(item.issue_date);
-    const subtitle = `${formatDocTypeName(item.doc_type)} · ${item.customer_name}${dateStr ? ` · ${dateStr}` : ''}`;
+    const clientPart = item.customer_name && item.customer_name !== 'null' ? item.customer_name : 'No client assigned';
+    const subtitle = `${formatDocTypeName(item.doc_type)} · ${clientPart}${dateStr ? ` · ${dateStr}` : ''}`;
 
     return (
       <DocumentRow

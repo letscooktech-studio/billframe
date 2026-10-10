@@ -69,11 +69,13 @@ export const CURRENCIES: Record<string, CurrencyMetadata> = {
 
 export const DEFAULT_CURRENCY = 'USD';
 
-export function getCurrencyMetadata(code: string): CurrencyMetadata {
-  return CURRENCIES[code.toUpperCase()] || {
-    code: code.toUpperCase(),
-    name: code.toUpperCase(),
-    symbol: code.toUpperCase(),
+export function getCurrencyMetadata(code?: string | null): CurrencyMetadata {
+  const safeCode = (code && typeof code === 'string' ? code.trim().toUpperCase() : '') || DEFAULT_CURRENCY;
+  return CURRENCIES[safeCode] || {
+    code: safeCode,
+    name: safeCode,
+    symbol: safeCode,
     minorUnits: 2,
   };
 }
+

@@ -303,7 +303,8 @@ export default function HomeScreen() {
                     ? formatMoney({ amountMinor: BigInt(doc.total_minor), currency: doc.currency }, documentLocale)
                     : undefined;
                   const dateStr = formatDateDisplay(doc.issue_date || doc.updated_at);
-                  const subtitle = `${doc.customer_name} · ${dateStr}`;
+                  const clientPart = doc.customer_name && doc.customer_name !== 'null' ? doc.customer_name : 'No client assigned';
+                  const subtitle = `${clientPart} · ${dateStr}`;
 
                   return (
                     <DocumentRow

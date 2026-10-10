@@ -34,20 +34,22 @@ export function roundHalfUp(numerator: bigint, denominator: bigint): bigint {
 /**
  * Creates a Money value object.
  */
-export function createMoney(amountMinor: bigint, currency: string): Money {
+export function createMoney(amountMinor: bigint, currency?: string | null): Money {
+  const safeCurr = (currency && typeof currency === 'string' ? currency.trim().toUpperCase() : '') || 'USD';
   return {
     amountMinor,
-    currency: currency.toUpperCase(),
+    currency: safeCurr,
   };
 }
 
 /**
  * Creates a zero-value Money object for a given currency.
  */
-export function zeroMoney(currency: string): Money {
+export function zeroMoney(currency?: string | null): Money {
+  const safeCurr = (currency && typeof currency === 'string' ? currency.trim().toUpperCase() : '') || 'USD';
   return {
     amountMinor: 0n,
-    currency: currency.toUpperCase(),
+    currency: safeCurr,
   };
 }
 
@@ -157,10 +159,12 @@ export function parseDecimalStringToMoney(input: string, currency: string): Mone
 /**
  * Converts a Money object into a standard decimal string (e.g. "19.95" or "500").
  */
-export function moneyToDecimalString(m: Money): string {
+export function moneyToDecimalString(m?: Money | null): string {
+  if (!m) return '0.00';
   const meta = getCurrencyMetadata(m.currency);
-  const absAmount = m.amountMinor < 0n ? -m.amountMinor : m.amountMinor;
-  const sign = m.amountMinor < 0n ? '-' : '';
+  const amountMinor = typeof m.amountMinor === 'bigint' ? m.amountMinor : 0n;
+  const absAmount = amountMinor < 0n ? -amountMinor : amountMinor;
+  const sign = amountMinor < 0n ? '-' : '';
 
   if (meta.minorUnits === 0) {
     return `${sign}${absAmount.toString()}`;
@@ -176,13 +180,14 @@ export function moneyToDecimalString(m: Money): string {
 /**
  * Formats Money for UI display using Intl.NumberFormat according to document locale.
  */
-export function formatMoney(m: Money, documentLocale: string = 'en-US'): string {
+export function formatMoney(m?: Money | null, documentLocale: string = 'en-US'): string {
+  if (!m) return '$0.00';
   const meta = getCurrencyMetadata(m.currency);
   const decimalStr = moneyToDecimalString(m);
   const numValue = Number(decimalStr);
 
   try {
-    return new Intl.NumberFormat(documentLocale, {
+    return new Intl.NumberFormat(documentLocale || 'en-US', {
       style: 'currency',
       currency: meta.code,
       minimumFractionDigits: meta.minorUnits,

@@ -81,7 +81,7 @@ export default function MoneyScreen() {
       }>('SELECT default_currency, default_document_locale FROM business_profiles WHERE is_active = 1 LIMIT 1;');
 
       if (profile && isMounted()) {
-        setCurrency(profile.default_currency);
+        setCurrency(profile.default_currency || 'USD');
         setLocale(profile.default_document_locale || 'en-US');
       }
 
