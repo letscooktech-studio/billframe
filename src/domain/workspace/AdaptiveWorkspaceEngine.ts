@@ -18,6 +18,14 @@ import {
 
 export type { BusinessType };
 
+export type PrimaryIntent =
+  | 'business_documents'
+  | 'invoices_payments'
+  | 'operations'
+  | 'complete_workspace';
+
+export type OnboardingState = 'not_started' | 'in_progress' | 'completed' | 'skipped';
+
 export interface WorkspacePreferences {
   id: string;
   businessProfileId: string;
@@ -37,6 +45,13 @@ export interface WorkspacePreferences {
   profileVersion?: number;
   workspaceConfigVersion?: number;
   geographyDatasetVersion?: string;
+
+  // ── Onboarding 3.0 Extensions ──
+  primaryIntent?: PrimaryIntent;
+  favoriteDocumentTypes?: string[];
+  selectedDocumentFamilies?: string[];
+  onboardingStep?: number;
+  onboardingState?: OnboardingState;
 }
 
 export interface FeatureUsageRecord {
@@ -68,11 +83,16 @@ export const DEFAULT_WORKSPACE_PREFERENCES: Omit<WorkspacePreferences, 'id' | 'b
   layoutLocked: false,
   primaryModules: [],
   onboardingCompleted: false,
-  onboardingVersion: 1,
+  onboardingVersion: 3,
   onboardingCompletedAt: null,
   profileVersion: 1,
   workspaceConfigVersion: 1,
   geographyDatasetVersion: '2026.01',
+  primaryIntent: 'business_documents',
+  favoriteDocumentTypes: [],
+  selectedDocumentFamilies: [],
+  onboardingStep: 1,
+  onboardingState: 'not_started',
 };
 
 export const BUSINESS_TYPE_PRESET_ACTIONS: Record<BusinessType, string[]> = {

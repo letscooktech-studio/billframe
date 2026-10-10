@@ -4,7 +4,7 @@
  * Supports all 8 expense categories from schema.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, AlertCircle } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { DatabaseManager } from '../../data/database/DatabaseManager';
 import {
   ExpenseRepository,
   ExpenseCategory,
@@ -46,8 +47,23 @@ export default function AddExpenseScreen() {
   const [category, setCategory] = useState<ExpenseCategory>('materials');
   const [description, setDescription] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('INR');
   const [isBillable, setIsBillable] = useState(false);
+
+  useEffect(() => {
+    async function loadCurrency() {
+      try {
+        const db = await DatabaseManager.getDatabaseAsync();
+        const profile = await db.getFirstAsync<{ default_currency: string }>(
+          'SELECT default_currency FROM business_profiles WHERE is_active = 1 LIMIT 1;'
+        );
+        if (profile?.default_currency) {
+          setCurrency(profile.default_currency);
+        }
+      } catch {}
+    }
+    loadCurrency();
+  }, []);
 
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);

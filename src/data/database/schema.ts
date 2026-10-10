@@ -28,6 +28,19 @@ CREATE TABLE IF NOT EXISTS business_profiles (
   phone_country_iso2 TEXT,
   phone_e164 TEXT,
   upi_vpa TEXT,
+  website TEXT,
+  tagline TEXT,
+  signatory_name TEXT,
+  signatory_title TEXT,
+  bank_name TEXT,
+  bank_account_number TEXT,
+  bank_ifsc TEXT,
+  bank_branch TEXT,
+  bank_account_type TEXT,
+  header_style TEXT DEFAULT 'modern',
+  footer_show_signature INTEGER DEFAULT 1,
+  footer_show_stamp INTEGER DEFAULT 1,
+  footer_show_address INTEGER DEFAULT 1,
   logo_uri TEXT,
   default_currency TEXT NOT NULL DEFAULT 'USD',
   default_document_locale TEXT NOT NULL DEFAULT 'en-US',
@@ -339,6 +352,11 @@ CREATE TABLE IF NOT EXISTS workspace_preferences (
   profile_version INTEGER NOT NULL DEFAULT 1,
   workspace_config_version INTEGER NOT NULL DEFAULT 1,
   geography_dataset_version TEXT NOT NULL DEFAULT '2026.01',
+  primary_intent TEXT NOT NULL DEFAULT 'business_documents',
+  favorite_document_types_json TEXT NOT NULL DEFAULT '[]',
+  selected_document_families_json TEXT NOT NULL DEFAULT '[]',
+  onboarding_state TEXT NOT NULL DEFAULT 'not_started',
+  onboarding_step INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -520,5 +538,84 @@ CREATE TABLE IF NOT EXISTS invoice_collection_metadata (
   collection_notes TEXT,
   updated_at INTEGER NOT NULL
 );
+
+-- 28. Template Definitions (System & Custom Templates)
+CREATE TABLE IF NOT EXISTS template_definitions (
+  code TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  category TEXT NOT NULL CHECK(category IN ('general', 'corporate', 'pos', 'creative', 'technical', 'service')),
+  thumbnail_uri TEXT,
+  default_config_json TEXT NOT NULL DEFAULT '{}',
+  is_system INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+-- 29. Template Customizations (Business Brand & Style Overrides)
+CREATE TABLE IF NOT EXISTS template_customizations (
+  id TEXT PRIMARY KEY NOT NULL,
+  template_code TEXT NOT NULL REFERENCES template_definitions(code) ON DELETE CASCADE,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  brand_color TEXT NOT NULL DEFAULT '#171717',
+  secondary_color TEXT NOT NULL DEFAULT '#6B6B6B',
+  font_family TEXT NOT NULL DEFAULT 'Inter, system-ui, sans-serif',
+  logo_position TEXT NOT NULL DEFAULT 'left',
+  show_logo INTEGER NOT NULL DEFAULT 1,
+  show_tax_breakdown INTEGER NOT NULL DEFAULT 1,
+  show_payment_qr INTEGER NOT NULL DEFAULT 1,
+  show_signature INTEGER NOT NULL DEFAULT 1,
+  show_terms INTEGER NOT NULL DEFAULT 1,
+  custom_declaration TEXT,
+  custom_footer_notes TEXT,
+  column_visibility_json TEXT NOT NULL DEFAULT '{}',
+  updated_at INTEGER NOT NULL,
+  CONSTRAINT uq_template_profile UNIQUE(template_code, business_profile_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_template_custom_bus ON template_customizations(business_profile_id);
+
+-- 30. Template Assignments (Default Template per Document Type)
+CREATE TABLE IF NOT EXISTS template_assignments (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  doc_type TEXT NOT NULL,
+  template_code TEXT NOT NULL REFERENCES template_definitions(code) ON DELETE RESTRICT,
+  updated_at INTEGER NOT NULL,
+  CONSTRAINT uq_assignment_profile_type UNIQUE(business_profile_id, doc_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_template_assign_bus ON template_assignments(business_profile_id);
+
+-- 31. Custom Field Definitions
+CREATE TABLE IF NOT EXISTS custom_field_definitions (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  field_key TEXT NOT NULL,
+  label TEXT NOT NULL,
+  data_type TEXT NOT NULL,
+  default_value TEXT,
+  is_required INTEGER NOT NULL DEFAULT 0,
+  print_visibility INTEGER NOT NULL DEFAULT 1,
+  allowed_doc_types_json TEXT NOT NULL DEFAULT '[]',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  CONSTRAINT uq_custom_field UNIQUE(business_profile_id, field_key)
+);
+
+-- 32. Custom Block Definitions
+CREATE TABLE IF NOT EXISTS custom_block_definitions (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  block_name TEXT NOT NULL,
+  block_type TEXT NOT NULL,
+  fields_json TEXT NOT NULL DEFAULT '[]',
+  allowed_doc_types_json TEXT NOT NULL DEFAULT '[]',
+  section_placement TEXT NOT NULL DEFAULT 'body',
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 `;
+
 

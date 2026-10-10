@@ -1,17 +1,22 @@
 /**
- * BOTTOM TAB BAR NAVIGATION
- * Disciplined 5-tab canonical structure adhering to Billframe master architecture:
- * 1. Home (Command Center)
- * 2. Documents (Invoices, Estimates, Receipts, SOWs)
- * 3. Contacts (Clients, Customers, Vendors)
- * 4. Money (Collections, Payments, Expenses, Statements)
- * 5. Settings (Profile, Taxes, Gateways, App Lock, Backups)
+ * BOTTOM TAB BAR NAVIGATION — 5 PERMANENT DESTINATIONS
+ * Standardized across Billframe 2.0 master navigation architecture:
+ * 1. Home (Business overview, outstanding, quick actions)
+ * 2. Documents (Document creation, categories, history, templates)
+ * 3. Clients (Customer directory, balances, statements, client actions)
+ * 4. Work (Operational workspace: jobs, inventory, projects, expenses)
+ * 5. All (Categorized directory of all app tools and settings)
+ * 
+ * Strict invariants:
+ * - Tab order remains permanently fixed (never dynamically reordered)
+ * - Restrained monochrome icons and active indicators
+ * - Preserves existing underlying route names for 100% backward compatibility
  */
 
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { useColorScheme, Platform } from 'react-native';
-import { Home, FileText, Users, CreditCard, Settings } from 'lucide-react-native';
+import { Home, FileText, Users, Briefcase, LayoutGrid } from 'lucide-react-native';
 import { colors } from '../../design/tokens';
 
 export default function TabLayout() {
@@ -23,12 +28,12 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.brandAnchor,
-        tabBarInactiveTintColor: theme.textSecondary,
+        tabBarInactiveTintColor: theme.textMuted,
         tabBarStyle: {
           backgroundColor: theme.surface,
           borderTopColor: theme.borderSubtle,
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 64,
+          height: Platform.OS === 'ios' ? 88 : 66,
           paddingBottom: Platform.OS === 'ios' ? 28 : 10,
           paddingTop: 8,
           elevation: 0,
@@ -56,22 +61,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="contacts"
         options={{
-          title: 'Contacts',
+          title: 'Clients',
           tabBarIcon: ({ color }) => <Users color={color} size={22} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="money"
         options={{
-          title: 'Money',
-          tabBarIcon: ({ color }) => <CreditCard color={color} size={22} strokeWidth={2} />,
+          title: 'Work',
+          tabBarIcon: ({ color }) => <Briefcase color={color} size={22} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <Settings color={color} size={22} strokeWidth={2} />,
+          title: 'All',
+          tabBarIcon: ({ color }) => <LayoutGrid color={color} size={22} strokeWidth={2} />,
         }}
       />
 

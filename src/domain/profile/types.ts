@@ -24,6 +24,18 @@ export interface BusinessProfile {
   upi_vpa?: string | null;
   contact_person?: string | null;
   website?: string | null;
+  tagline?: string | null;
+  signatory_name?: string | null;
+  signatory_title?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
+  bank_ifsc?: string | null;
+  bank_branch?: string | null;
+  bank_account_type?: string | null;
+  header_style?: 'modern' | 'classic' | 'minimal' | null;
+  footer_show_signature?: boolean | null;
+  footer_show_stamp?: boolean | null;
+  footer_show_address?: boolean | null;
   logo_uri?: string | null;
   default_currency: string;
   default_document_locale: string;

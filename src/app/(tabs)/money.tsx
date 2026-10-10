@@ -28,8 +28,10 @@ import {
   QrCode,
   DollarSign,
   Plus,
+  Package,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { AuroraBackground } from '../../components/common/AuroraBackground';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DocumentRepository } from '../../data/repositories/DocumentRepository';
 import { formatMoney, createMoney } from '../../domain/money/Money';
@@ -152,143 +154,165 @@ export default function MoneyScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <ScrollView
-        style={styles.scrollArea}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Money</Text>
-            <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-              Financial Hub & Collections
-            </Text>
-          </View>
-
-          {/* Balance Cards Summary */}
-          <View style={styles.summaryGrid}>
-            {/* Outstanding Card */}
-            <View style={[styles.summaryCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-              <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Outstanding Receivables</Text>
-              <Text style={[styles.summaryAmount, { color: theme.textPrimary }]}>
-                {formatMoney({ amountMinor: outstandingMinor, currency }, locale)}
+    <AuroraBackground section="work" intensity="subtle">
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.container}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Work</Text>
+              <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
+                Operations, Inventory & Financial Control
               </Text>
-              {overdueCount > 0 && (
-                <View style={styles.overdueBadge}>
-                  <AlertCircle color={theme.statusDanger} size={13} />
-                  <Text style={[styles.overdueText, { color: theme.statusDanger }]}>
-                    {overdueCount} overdue
+            </View>
+
+            {/* Balance Cards Summary */}
+            <View style={styles.summaryGrid}>
+              {/* Outstanding Card */}
+              <View style={[styles.summaryCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+                <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Outstanding Receivables</Text>
+                <Text style={[styles.summaryAmount, { color: theme.textPrimary }]}>
+                  {formatMoney({ amountMinor: outstandingMinor, currency }, locale)}
+                </Text>
+                {overdueCount > 0 && (
+                  <View style={styles.overdueBadge}>
+                    <AlertCircle color={theme.statusDanger} size={13} />
+                    <Text style={[styles.overdueText, { color: theme.statusDanger }]}>
+                      {overdueCount} overdue
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Collected vs Expense Row */}
+              <View style={styles.twoColRow}>
+                <View style={[styles.summaryCardSmall, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+                  <Text style={[styles.summaryLabelSmall, { color: theme.textSecondary }]}>Collected This Month</Text>
+                  <Text style={[styles.summaryAmountSmall, { color: theme.statusSuccess }]}>
+                    {formatMoney({ amountMinor: paidThisMonthMinor, currency }, locale)}
                   </Text>
                 </View>
-              )}
+
+                <View style={[styles.summaryCardSmall, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+                  <Text style={[styles.summaryLabelSmall, { color: theme.textSecondary }]}>Expenses This Month</Text>
+                  <Text style={[styles.summaryAmountSmall, { color: theme.textPrimary }]}>
+                    {formatMoney({ amountMinor: expensesThisMonthMinor, currency }, locale)}
+                  </Text>
+                </View>
+              </View>
             </View>
 
-            {/* Collected vs Expense Row */}
-            <View style={styles.twoColRow}>
-              <View style={[styles.summaryCardSmall, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-                <Text style={[styles.summaryLabelSmall, { color: theme.textSecondary }]}>Collected This Month</Text>
-                <Text style={[styles.summaryAmountSmall, { color: theme.statusSuccess }]}>
-                  {formatMoney({ amountMinor: paidThisMonthMinor, currency }, locale)}
-                </Text>
-              </View>
+            {/* Operational Modules & Work Tools */}
+            <View style={styles.hubGrid}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.hubCard,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
+                ]}
+                onPress={() => router.push('/catalog')}
+                accessibilityRole="button"
+                accessibilityLabel="Open Catalog and Products"
+              >
+                <View style={[styles.hubIconBox, { backgroundColor: theme.surfaceSecondary }]}>
+                  <Package color={theme.brandAnchor} size={20} />
+                </View>
+                <View style={styles.hubTextWrap}>
+                  <Text style={[styles.hubCardTitle, { color: theme.textPrimary }]}>Item Catalog & Inventory</Text>
+                  <Text style={[styles.hubCardDesc, { color: theme.textSecondary }]}>
+                    Products, services, HSN/SAC codes & unit prices
+                  </Text>
+                </View>
+                <ChevronRight color={theme.textMuted} size={18} />
+              </Pressable>
 
-              <View style={[styles.summaryCardSmall, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-                <Text style={[styles.summaryLabelSmall, { color: theme.textSecondary }]}>Expenses This Month</Text>
-                <Text style={[styles.summaryAmountSmall, { color: theme.textPrimary }]}>
-                  {formatMoney({ amountMinor: expensesThisMonthMinor, currency }, locale)}
-                </Text>
-              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.hubCard,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
+                ]}
+                onPress={() => router.push('/expenses')}
+                accessibilityRole="button"
+                accessibilityLabel="Open Expenses"
+              >
+                <View style={[styles.hubIconBox, { backgroundColor: theme.surfaceSecondary }]}>
+                  <Receipt color={theme.brandAnchor} size={20} />
+                </View>
+                <View style={styles.hubTextWrap}>
+                  <Text style={[styles.hubCardTitle, { color: theme.textPrimary }]}>Expenses & Receipts</Text>
+                  <Text style={[styles.hubCardDesc, { color: theme.textSecondary }]}>
+                    Track business receipts, categories & operational spend
+                  </Text>
+                </View>
+                <ChevronRight color={theme.textMuted} size={18} />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.hubCard,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
+                ]}
+                onPress={() => router.push('/collections')}
+                accessibilityRole="button"
+                accessibilityLabel="Open Collections Hub"
+              >
+                <View style={[styles.hubIconBox, { backgroundColor: theme.surfaceSecondary }]}>
+                  <Clock color={theme.brandAnchor} size={20} />
+                </View>
+                <View style={styles.hubTextWrap}>
+                  <Text style={[styles.hubCardTitle, { color: theme.textPrimary }]}>Collections & Receivables</Text>
+                  <Text style={[styles.hubCardDesc, { color: theme.textSecondary }]}>
+                    Aging analysis, payment reminders & overdue tracking
+                  </Text>
+                </View>
+                <ChevronRight color={theme.textMuted} size={18} />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.hubCard,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
+                ]}
+                onPress={() => router.push('/reports')}
+                accessibilityRole="button"
+                accessibilityLabel="Open Reports"
+              >
+                <View style={[styles.hubIconBox, { backgroundColor: theme.surfaceSecondary }]}>
+                  <FileSpreadsheet color={theme.brandAnchor} size={20} />
+                </View>
+                <View style={styles.hubTextWrap}>
+                  <Text style={[styles.hubCardTitle, { color: theme.textPrimary }]}>Reports & Tax Summary</Text>
+                  <Text style={[styles.hubCardDesc, { color: theme.textSecondary }]}>
+                    Revenue, cash flow statements & GST/Tax summaries
+                  </Text>
+                </View>
+                <ChevronRight color={theme.textMuted} size={18} />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.hubCard,
+                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
+                ]}
+                onPress={() => router.push('/settings/payments')}
+                accessibilityRole="button"
+                accessibilityLabel="Payment Gateway and UPI Settings"
+              >
+                <View style={[styles.hubIconBox, { backgroundColor: theme.surfaceSecondary }]}>
+                  <QrCode color={theme.brandAnchor} size={20} />
+                </View>
+                <View style={styles.hubTextWrap}>
+                  <Text style={[styles.hubCardTitle, { color: theme.textPrimary }]}>Payment Gateways & UPI</Text>
+                  <Text style={[styles.hubCardDesc, { color: theme.textSecondary }]}>
+                    Offline UPI QR codes, Razorpay, Cashfree & Stripe
+                  </Text>
+                </View>
+                <ChevronRight color={theme.textMuted} size={18} />
+              </Pressable>
             </View>
-          </View>
-
-          {/* Quick Hub Navigation Cards */}
-          <View style={styles.hubGrid}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.hubCard,
-                { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
-              ]}
-              onPress={() => router.push('/collections')}
-              accessibilityRole="button"
-              accessibilityLabel="Open Collections Hub"
-            >
-              <View style={[styles.hubIconBox, { backgroundColor: theme.surfaceSecondary }]}>
-                <Clock color={theme.brandAnchor} size={20} />
-              </View>
-              <View style={styles.hubTextWrap}>
-                <Text style={[styles.hubCardTitle, { color: theme.textPrimary }]}>Collections Hub</Text>
-                <Text style={[styles.hubCardDesc, { color: theme.textSecondary }]}>
-                  Aging analysis, payment reminders & overdue tracking
-                </Text>
-              </View>
-              <ChevronRight color={theme.textMuted} size={18} />
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.hubCard,
-                { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
-              ]}
-              onPress={() => router.push('/expenses')}
-              accessibilityRole="button"
-              accessibilityLabel="Open Expenses"
-            >
-              <View style={[styles.hubIconBox, { backgroundColor: theme.surfaceSecondary }]}>
-                <Receipt color={theme.brandAnchor} size={20} />
-              </View>
-              <View style={styles.hubTextWrap}>
-                <Text style={[styles.hubCardTitle, { color: theme.textPrimary }]}>Expenses</Text>
-                <Text style={[styles.hubCardDesc, { color: theme.textSecondary }]}>
-                  Track business receipts, categories & operational spend
-                </Text>
-              </View>
-              <ChevronRight color={theme.textMuted} size={18} />
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.hubCard,
-                { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
-              ]}
-              onPress={() => router.push('/reports')}
-              accessibilityRole="button"
-              accessibilityLabel="Open Reports"
-            >
-              <View style={[styles.hubIconBox, { backgroundColor: theme.surfaceSecondary }]}>
-                <FileSpreadsheet color={theme.brandAnchor} size={20} />
-              </View>
-              <View style={styles.hubTextWrap}>
-                <Text style={[styles.hubCardTitle, { color: theme.textPrimary }]}>Reports & Tax Summary</Text>
-                <Text style={[styles.hubCardDesc, { color: theme.textSecondary }]}>
-                  Revenue, cash flow statements & GST/Tax summaries
-                </Text>
-              </View>
-              <ChevronRight color={theme.textMuted} size={18} />
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.hubCard,
-                { backgroundColor: theme.surface, borderColor: theme.borderSubtle, opacity: pressed ? 0.85 : 1 },
-              ]}
-              onPress={() => router.push('/settings/payments')}
-              accessibilityRole="button"
-              accessibilityLabel="Payment Gateway and UPI Settings"
-            >
-              <View style={[styles.hubIconBox, { backgroundColor: theme.surfaceSecondary }]}>
-                <QrCode color={theme.brandAnchor} size={20} />
-              </View>
-              <View style={styles.hubTextWrap}>
-                <Text style={[styles.hubCardTitle, { color: theme.textPrimary }]}>Payment Gateways & UPI</Text>
-                <Text style={[styles.hubCardDesc, { color: theme.textSecondary }]}>
-                  Offline UPI QR codes, Razorpay, Cashfree & Stripe
-                </Text>
-              </View>
-              <ChevronRight color={theme.textMuted} size={18} />
-            </Pressable>
-          </View>
 
           {/* Outstanding Documents Section */}
           <View style={styles.sectionHeader}>
@@ -388,12 +412,14 @@ export default function MoneyScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   scrollArea: {
     flex: 1,

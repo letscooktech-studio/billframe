@@ -12,11 +12,13 @@ import { quantityScaledToString } from '../../../domain/documents/quantity';
 import { escapeHtml, formatDate, getBaseCss } from './commonStyles';
 import { DirectUpiEngine } from '../../../domain/payments/upi/DirectUpiEngine';
 import { QrCodeGenerator } from '../../../domain/payments/upi/QrCodeGenerator';
+import { TemplateCustomization } from '../types';
 
 export function renderExecutiveTemplate(
   doc: FullDocument,
   business: BusinessProfile,
-  paperSize: 'a4' | 'letter' = 'a4'
+  paperSize: 'a4' | 'letter' = 'a4',
+  customization?: TemplateCustomization
 ): string {
   const currency = doc.currency || 'USD';
 
@@ -89,11 +91,20 @@ export function renderExecutiveTemplate(
     `;
   }
 
+  const brandColor = customization?.brand_color || '#111827';
+  const secondaryColor = customization?.secondary_color || '#4b5563';
+  const showLogo = customization?.show_logo !== false && !!business.logo_uri;
+  const showQr = customization?.show_payment_qr !== false;
+  const showTerms = customization?.show_terms !== false;
+  const customDeclaration = customization?.custom_declaration;
+  const customFooterNotes = customization?.custom_footer_notes;
+
   let upiSection = '';
   if (
     doc.doc_type === 'invoice' &&
     business.upi_vpa &&
-    (doc.balance_minor ?? doc.total_minor) > 0
+    (doc.balance_minor ?? doc.total_minor) > 0 &&
+    showQr
   ) {
     try {
       const balanceMinorBig = BigInt(doc.balance_minor ?? doc.total_minor);
@@ -106,7 +117,7 @@ export function renderExecutiveTemplate(
         transactionNote: `Invoice ${doc.document_number}`,
       });
 
-      const qrSvg = QrCodeGenerator.generateSvg(conversion.upiUri, 96, { color: '#111827', backgroundColor: '#ffffff' });
+      const qrSvg = QrCodeGenerator.generateSvg(conversion.upiUri, 96, { color: brandColor, backgroundColor: '#ffffff' });
 
       const amountSub = conversion.isConverted
         ? `Scan to pay ₹${moneyToDecimalString(createMoney(conversion.inrAmountMinor!, 'INR'))} INR (${escapeHtml(conversion.conversionSummary || '')})`
@@ -140,7 +151,7 @@ export function renderExecutiveTemplate(
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          border-bottom: 2px solid #111827;
+          border-bottom: 2px solid ${brandColor};
           padding-bottom: 20px;
           margin-bottom: 24px;
         }
@@ -149,7 +160,7 @@ export function renderExecutiveTemplate(
           font-size: 26px;
           font-weight: 800;
           letter-spacing: -0.5px;
-          color: #111827;
+          color: ${brandColor};
           margin: 0 0 4px 0;
         }
 
@@ -304,7 +315,7 @@ export function renderExecutiveTemplate(
           justify-content: space-between;
           padding: 8px 10px;
           margin-top: 10px;
-          background: #111827;
+          background: ${brandColor};
           color: #ffffff;
           font-size: 13px;
           font-weight: 700;
@@ -324,6 +335,7 @@ export function renderExecutiveTemplate(
       <!-- Header -->
       <div class="exec-header">
         <div>
+          ${showLogo ? `<div style="margin-bottom: 8px;"><img src="${escapeHtml(business.logo_uri!)}" style="max-height: 48px; max-width: 140px; object-fit: contain;" alt="Logo" /></div>` : ''}
           <h1 class="exec-title">${escapeHtml(docTitle)}</h1>
           <div class="exec-doc-num">${escapeHtml(doc.document_number)}</div>
         </div>
@@ -400,16 +412,23 @@ export function renderExecutiveTemplate(
             </div>
           ` : ''}
 
-          ${doc.terms ? `
+          ${(doc.terms && showTerms) ? `
             <div class="exec-notes-box">
-              <strong style="display: block; font-size: 10px; text-transform: uppercase; color: #111827; margin-bottom: 2px;">Terms & Conditions</strong>
+              <strong style="display: block; font-size: 10px; text-transform: uppercase; color: ${brandColor}; margin-bottom: 2px;">Terms & Conditions</strong>
               ${escapeHtml(doc.terms)}
+            </div>
+          ` : ''}
+
+          ${customDeclaration ? `
+            <div class="exec-notes-box">
+              <strong style="display: block; font-size: 10px; text-transform: uppercase; color: ${brandColor}; margin-bottom: 2px;">Declaration</strong>
+              ${escapeHtml(customDeclaration)}
             </div>
           ` : ''}
 
           ${doc.payment_instructions ? `
             <div class="exec-notes-box">
-              <strong style="display: block; font-size: 10px; text-transform: uppercase; color: #111827; margin-bottom: 2px;">Payment Instructions</strong>
+              <strong style="display: block; font-size: 10px; text-transform: uppercase; color: ${brandColor}; margin-bottom: 2px;">Payment Instructions</strong>
               ${escapeHtml(doc.payment_instructions)}
             </div>
           ` : ''}
@@ -450,6 +469,12 @@ export function renderExecutiveTemplate(
           </div>
         </div>
       </div>
+
+      ${customFooterNotes ? `
+        <div style="margin-top: 24px; text-align: center; font-size: 11px; color: ${secondaryColor}; border-top: 1px dashed #d1d5db; padding-top: 8px;">
+          ${escapeHtml(customFooterNotes)}
+        </div>
+      ` : ''}
     </body>
     </html>
   `;

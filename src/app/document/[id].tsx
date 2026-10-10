@@ -45,6 +45,8 @@ import {
   RotateCcw,
   Edit3,
   AlertCircle,
+  LayoutTemplate,
+  MoreVertical,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { DocumentRepository, FullDocument } from '../../data/repositories/DocumentRepository';
@@ -55,6 +57,9 @@ import { DirectUpiEngine } from '../../domain/payments/upi/DirectUpiEngine';
 import { ExchangeRateEngine } from '../../domain/money/ExchangeRateEngine';
 import { UpiQrCode } from '../../components/common/UpiQrCode';
 import { PdfService } from '../../services/pdf/PdfService';
+import { PdfTemplateType } from '../../services/pdf/types';
+import { TemplateRepository, TemplateDefinitionRecord } from '../../data/repositories/TemplateRepository';
+import { TemplatePickerModal } from '../../features/templates/TemplatePickerModal';
 import { createMoney, formatMoney, moneyToDecimalString } from '../../domain/money/Money';
 import { quantityScaledToString } from '../../features/items/ItemEditorModal';
 import { PaymentRecordModal } from '../../features/payments/PaymentRecordModal';
@@ -83,6 +88,11 @@ export default function DocumentDetailScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOperating, setIsOperating] = useState(false);
+
+  // Document presentation template state
+  const [selectedTemplate, setSelectedTemplate] = useState<PdfTemplateType>('standard');
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [availableTemplates, setAvailableTemplates] = useState<TemplateDefinitionRecord[]>([]);
 
   // Payee / Vendor UPI customization & inline setup state
   const [customPayeeVpa, setCustomPayeeVpa] = useState('');
@@ -126,6 +136,17 @@ export default function DocumentDetailScreen() {
       }
       if (activeProfile?.legal_name || activeProfile?.name) {
         setInlineNameInput(activeProfile.legal_name || activeProfile.name);
+      }
+
+      if (activeProfile && documentData) {
+        try {
+          const assigned = await TemplateRepository.getAssignedTemplate(activeProfile.id, documentData.doc_type);
+          setSelectedTemplate(assigned);
+          const tList = await TemplateRepository.getAvailableTemplates();
+          setAvailableTemplates(tList);
+        } catch {
+          // fallback
+        }
       }
 
       if (documentData && documentData.doc_type === 'invoice') {
@@ -310,7 +331,7 @@ export default function DocumentDetailScreen() {
     }
   }
 
-  async function handleSharePdf() {
+  async function handleSharePdf(overrideTemplate?: PdfTemplateType) {
     if (!doc) return;
     setIsOperating(true);
     try {
@@ -319,13 +340,20 @@ export default function DocumentDetailScreen() {
         showAlert('Profile Needed', 'Please complete your business profile in Settings before exporting PDF.');
         return;
       }
-      await PdfService.shareDocumentPdfAsync(doc, biz, 'standard');
+      const templateToUse = (typeof overrideTemplate === 'string' ? overrideTemplate : null) || selectedTemplate || 'standard';
+      await PdfService.shareDocumentPdfAsync(doc, biz, templateToUse);
     } catch (err: any) {
       showAlert('PDF Export Failed', err.message || 'Could not compile PDF.');
     } finally {
       setIsOperating(false);
     }
   }
+
+  const handleSetDefaultTemplate = async (templateCode: PdfTemplateType) => {
+    if (!doc || !profile) return;
+    await TemplateRepository.assignTemplate(profile.id, doc.doc_type, templateCode);
+    setSelectedTemplate(templateCode);
+  };
 
   async function handleDuplicate() {
     if (isSubmittingRef.current) return;
@@ -436,6 +464,41 @@ export default function DocumentDetailScreen() {
     );
   }
 
+  const handleMoreMenuPress = () => {
+    const options: any[] = [
+      { text: 'Duplicate Document', onPress: handleDuplicate },
+      { text: 'Change Template', onPress: () => setShowTemplateModal(true) },
+    ];
+
+    if (doc?.customer_id) {
+      options.push({
+        text: 'View Customer Statement',
+        onPress: () => router.push(`/customer/${doc.customer_id}` as any),
+      });
+    }
+
+    if (isDraft) {
+      options.push({
+        text: 'Delete Draft',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Delete Draft',
+            'Are you sure you want to delete this draft? This action cannot be undone.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: handleDeleteDraft },
+            ]
+          );
+        },
+      });
+    }
+
+    options.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert('Document Options', doc?.document_number || 'Options', options);
+  };
+
   const grandTotalMoney = createMoney(BigInt(doc.total_minor), doc.currency);
   const paidMoney = createMoney(BigInt(doc.total_paid_minor), doc.currency);
   const balanceMoney = createMoney(BigInt(doc.balance_minor), doc.currency);
@@ -498,14 +561,34 @@ export default function DocumentDetailScreen() {
             </Pressable>
           )}
           <Pressable
-            style={[styles.editButton, isDraft ? { marginLeft: 8 } : null]}
-            onPress={handleSharePdf}
+            style={[styles.editButton, { marginRight: 8 }]}
+            onPress={() => setShowTemplateModal(true)}
+            disabled={isOperating}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Document presentation & template studio"
+          >
+            <LayoutTemplate color={theme.brandAnchor} size={20} />
+          </Pressable>
+          <Pressable
+            style={[styles.editButton, { marginRight: 8 }]}
+            onPress={() => handleSharePdf()}
             disabled={isOperating}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Share PDF document"
           >
             <Share2 color={theme.brandAnchor} size={20} />
+          </Pressable>
+          <Pressable
+            style={styles.editButton}
+            onPress={handleMoreMenuPress}
+            disabled={isOperating}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="More options"
+          >
+            <MoreVertical color={theme.brandAnchor} size={20} />
           </Pressable>
         </View>
       </View>
@@ -1214,12 +1297,12 @@ export default function DocumentDetailScreen() {
                   onPress={handleIssue}
                   disabled={isOperating}
                   accessibilityRole="button"
-                  accessibilityLabel={isInvoice ? 'Issue official invoice' : 'Issue official estimate'}
+                  accessibilityLabel={isInvoice ? 'Issue invoice' : 'Issue estimate'}
                   accessibilityHint="Freezes document numbers and locks financial calculations"
                 >
                   <FileCheck color={theme.brandAnchorText} size={18} />
                   <Text style={[styles.primaryActionText, { color: theme.brandAnchorText }]}>
-                    {isInvoice ? 'Issue Official Invoice' : 'Issue Official Estimate'}
+                    {isInvoice ? 'Issue Invoice' : 'Issue Estimate'}
                   </Text>
                 </Pressable>
 
@@ -1254,20 +1337,6 @@ export default function DocumentDetailScreen() {
                 >
                   <Copy color={theme.textPrimary} size={18} />
                   <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Duplicate Draft</Text>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.dangerActionBtn,
-                    { borderColor: theme.statusDanger, opacity: isOperating ? 0.6 : 1 },
-                  ]}
-                  onPress={handleDeleteDraft}
-                  disabled={isOperating}
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete draft"
-                >
-                  <Trash2 color={theme.statusDanger} size={16} />
-                  <Text style={[styles.dangerActionText, { color: theme.statusDanger }]}>Delete Draft</Text>
                 </Pressable>
               </>
             )}
@@ -1334,19 +1403,35 @@ export default function DocumentDetailScreen() {
                   <Text style={[styles.primaryActionText, { color: theme.brandAnchorText }]}>Convert to Invoice</Text>
                 </Pressable>
 
-                <Pressable
-                  style={[
-                    styles.secondaryActionBtn,
-                    { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
-                  ]}
-                  onPress={handleSharePdf}
-                  disabled={isOperating}
-                  accessibilityRole="button"
-                  accessibilityLabel="Share estimate PDF"
-                >
-                  <Share2 color={theme.textPrimary} size={18} />
-                  <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Share Estimate PDF</Text>
-                </Pressable>
+                <View style={styles.buttonRow}>
+                  <Pressable
+                    style={[
+                      styles.flexButton,
+                      { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
+                    ]}
+                    onPress={() => setShowTemplateModal(true)}
+                    disabled={isOperating}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose estimate template"
+                  >
+                    <LayoutTemplate color={theme.textPrimary} size={16} />
+                    <Text style={[styles.secondaryActionText, { color: theme.textPrimary, fontSize: 13 }]}>Template</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.flexButton,
+                      { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
+                    ]}
+                    onPress={() => handleSharePdf()}
+                    disabled={isOperating}
+                    accessibilityRole="button"
+                    accessibilityLabel="Share estimate PDF"
+                  >
+                    <Share2 color={theme.textPrimary} size={16} />
+                    <Text style={[styles.secondaryActionText, { color: theme.textPrimary, fontSize: 13 }]}>Share PDF</Text>
+                  </Pressable>
+                </View>
 
                 <Pressable
                   style={[
@@ -1380,19 +1465,35 @@ export default function DocumentDetailScreen() {
                   <Text style={[styles.primaryActionText, { color: theme.brandAnchorText }]}>Convert to Invoice</Text>
                 </Pressable>
 
-                <Pressable
-                  style={[
-                    styles.secondaryActionBtn,
-                    { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
-                  ]}
-                  onPress={handleSharePdf}
-                  disabled={isOperating}
-                  accessibilityRole="button"
-                  accessibilityLabel="Share estimate PDF"
-                >
-                  <Share2 color={theme.textPrimary} size={18} />
-                  <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Share Estimate PDF</Text>
-                </Pressable>
+                <View style={styles.buttonRow}>
+                  <Pressable
+                    style={[
+                      styles.flexButton,
+                      { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
+                    ]}
+                    onPress={() => setShowTemplateModal(true)}
+                    disabled={isOperating}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose estimate template"
+                  >
+                    <LayoutTemplate color={theme.textPrimary} size={16} />
+                    <Text style={[styles.secondaryActionText, { color: theme.textPrimary, fontSize: 13 }]}>Template</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.flexButton,
+                      { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
+                    ]}
+                    onPress={() => handleSharePdf()}
+                    disabled={isOperating}
+                    accessibilityRole="button"
+                    accessibilityLabel="Share estimate PDF"
+                  >
+                    <Share2 color={theme.textPrimary} size={16} />
+                    <Text style={[styles.secondaryActionText, { color: theme.textPrimary, fontSize: 13 }]}>Share PDF</Text>
+                  </Pressable>
+                </View>
 
                 <Pressable
                   style={[
@@ -1430,19 +1531,35 @@ export default function DocumentDetailScreen() {
                   </Pressable>
                 )}
 
-                <Pressable
-                  style={[
-                    styles.secondaryActionBtn,
-                    { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
-                  ]}
-                  onPress={handleSharePdf}
-                  disabled={isOperating}
-                  accessibilityRole="button"
-                  accessibilityLabel="Share invoice PDF"
-                >
-                  <Share2 color={theme.textPrimary} size={18} />
-                  <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Share Invoice PDF</Text>
-                </Pressable>
+                <View style={styles.buttonRow}>
+                  <Pressable
+                    style={[
+                      styles.flexButton,
+                      { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
+                    ]}
+                    onPress={() => setShowTemplateModal(true)}
+                    disabled={isOperating}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose invoice presentation template"
+                  >
+                    <LayoutTemplate color={theme.textPrimary} size={16} />
+                    <Text style={[styles.secondaryActionText, { color: theme.textPrimary, fontSize: 13 }]}>Template</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.flexButton,
+                      { borderColor: theme.borderSubtle, backgroundColor: theme.surface, opacity: isOperating ? 0.6 : 1 },
+                    ]}
+                    onPress={() => handleSharePdf()}
+                    disabled={isOperating}
+                    accessibilityRole="button"
+                    accessibilityLabel="Share invoice PDF"
+                  >
+                    <Share2 color={theme.textPrimary} size={16} />
+                    <Text style={[styles.secondaryActionText, { color: theme.textPrimary, fontSize: 13 }]}>Share PDF</Text>
+                  </Pressable>
+                </View>
 
                 <Pressable
                   style={[
@@ -1545,6 +1662,20 @@ export default function DocumentDetailScreen() {
           onClose={() => setShowTaxModal(false)}
           explanation={taxExplanation}
           currency={doc.currency}
+        />
+      )}
+
+      {/* Document Template Presentation Studio Modal */}
+      {doc && (
+        <TemplatePickerModal
+          visible={showTemplateModal}
+          onClose={() => setShowTemplateModal(false)}
+          selectedTemplate={selectedTemplate}
+          availableTemplates={availableTemplates}
+          docType={doc.doc_type}
+          onSelectTemplate={(code) => setSelectedTemplate(code)}
+          onSetAsDefault={handleSetDefaultTemplate}
+          onShareWithTemplate={(code) => handleSharePdf(code)}
         />
       )}
     </SafeAreaView>

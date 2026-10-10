@@ -682,4 +682,236 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 9,
+    name: 'v9_document_studio_templates_and_custom_blocks',
+    checksum: '35eebc03ac38864e2fee17b0ba1326a007d63ac30939d8e12583942ae133a4e7',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      // 1. Template Definitions Table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS template_definitions (
+          code TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT NOT NULL,
+          category TEXT NOT NULL,
+          thumbnail_uri TEXT,
+          default_config_json TEXT NOT NULL,
+          is_system INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS template_customizations (
+          id TEXT PRIMARY KEY NOT NULL,
+          template_code TEXT NOT NULL REFERENCES template_definitions(code) ON DELETE CASCADE,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          brand_color TEXT NOT NULL DEFAULT '#171717',
+          secondary_color TEXT NOT NULL DEFAULT '#6B6B6B',
+          font_family TEXT NOT NULL DEFAULT 'Inter, system-ui, sans-serif',
+          logo_position TEXT NOT NULL DEFAULT 'left',
+          show_logo INTEGER NOT NULL DEFAULT 1,
+          show_tax_breakdown INTEGER NOT NULL DEFAULT 1,
+          show_payment_qr INTEGER NOT NULL DEFAULT 1,
+          show_signature INTEGER NOT NULL DEFAULT 1,
+          show_terms INTEGER NOT NULL DEFAULT 1,
+          custom_declaration TEXT,
+          custom_footer_notes TEXT,
+          column_visibility_json TEXT NOT NULL DEFAULT '{}',
+          updated_at INTEGER NOT NULL,
+          CONSTRAINT uq_template_profile UNIQUE(template_code, business_profile_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS template_assignments (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          doc_type TEXT NOT NULL,
+          template_code TEXT NOT NULL REFERENCES template_definitions(code) ON DELETE RESTRICT,
+          updated_at INTEGER NOT NULL,
+          CONSTRAINT uq_assignment_profile_type UNIQUE(business_profile_id, doc_type)
+        );
+
+        CREATE TABLE IF NOT EXISTS custom_field_definitions (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          field_key TEXT NOT NULL,
+          label TEXT NOT NULL,
+          data_type TEXT NOT NULL,
+          default_value TEXT,
+          is_required INTEGER NOT NULL DEFAULT 0,
+          print_visibility INTEGER NOT NULL DEFAULT 1,
+          allowed_doc_types_json TEXT NOT NULL DEFAULT '[]',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          CONSTRAINT uq_custom_field UNIQUE(business_profile_id, field_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS custom_block_definitions (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+          block_name TEXT NOT NULL,
+          block_type TEXT NOT NULL,
+          fields_json TEXT NOT NULL DEFAULT '[]',
+          allowed_doc_types_json TEXT NOT NULL DEFAULT '[]',
+          section_placement TEXT NOT NULL DEFAULT 'body',
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_template_custom_bus ON template_customizations(business_profile_id);
+        CREATE INDEX IF NOT EXISTS idx_template_assign_bus ON template_assignments(business_profile_id);
+      `);
+
+      // 2. Seed System Template Definitions
+      const systemTemplates = [
+        { code: 'standard', name: 'Standard Corporate', description: 'Clean, balanced corporate hierarchy suitable for B2B and professional services.', category: 'general', color: '#171717', secondary: '#6B6B6B' },
+        { code: 'executive', name: 'Executive Ink', description: 'Deep navy accents, structured summary card, and prominent payment block.', category: 'corporate', color: '#102A43', secondary: '#2563EB' },
+        { code: 'compact', name: 'Commerce Compact', description: 'Space-efficient, high-density format designed for wholesale and multi-item orders.', category: 'pos', color: '#1E293B', secondary: '#475569' },
+        { code: 'modern', name: 'Modern Editorial', description: 'Contemporary typography, generous whitespace, and sleek horizontal dividers.', category: 'creative', color: '#2563EB', secondary: '#64748B' },
+        { code: 'minimal', name: 'Monochrome Minimal', description: 'Pure black-and-white elegance with zero printer ink waste and razor-sharp contrast.', category: 'general', color: '#000000', secondary: '#333333' },
+        { code: 'ledger_navy', name: 'Ledger Navy', description: 'Deep navy and precise blue accents optimized for GST invoices and statements.', category: 'corporate', color: '#102A43', secondary: '#2563EB' },
+        { code: 'executive_ink', name: 'Executive Ink Black', description: 'High-contrast black, white, and hairline dividers for corporate contracts.', category: 'corporate', color: '#111827', secondary: '#475569' },
+        { code: 'architectural_grid', name: 'Architectural Grid', description: 'Strong measurement columns and technical alignment for contractors and engineers.', category: 'technical', color: '#1C1917', secondary: '#57534E' },
+        { code: 'modern_editorial', name: 'Modern Editorial Slate', description: 'Refined typography and minimal horizontal rules for agencies and consultants.', category: 'creative', color: '#263445', secondary: '#64748B' },
+        { code: 'commerce_compact', name: 'Commerce High-Density', description: 'High-density item columns and compact row height for wholesale distribution.', category: 'pos', color: '#0F172A', secondary: '#334155' },
+        { code: 'service_record', name: 'Service Record Sheet', description: 'Distinct technician, asset reference, and labor/materials sections.', category: 'service', color: '#1E3A8A', secondary: '#3B82F6' },
+        { code: 'monochrome_minimal', name: 'Pure Monochrome', description: 'Zero ink waste, high readability for field printing and thermal replication.', category: 'general', color: '#000000', secondary: '#404040' },
+      ];
+
+      const now = Date.now();
+      for (const t of systemTemplates) {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO template_definitions (
+             code, name, description, category, thumbnail_uri, default_config_json, is_system, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, NULL, ?, 1, ?, ?);`,
+          [t.code, t.name, t.description, t.category, JSON.stringify({ brandColor: t.color, secondaryColor: t.secondary }), now, now]
+        );
+      }
+    },
+  },
+  {
+    version: 10,
+    name: 'v10_universal_document_engine',
+    checksum: 'b94e72f105829a3e61839db084c67104e689320d75a1478201b5634d2890aef4',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      // 1. Create custom_document_types and document_instances tables
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS custom_document_types (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL,
+          code TEXT NOT NULL,
+          name TEXT NOT NULL,
+          doc_class TEXT NOT NULL,
+          category TEXT NOT NULL,
+          description TEXT,
+          icon TEXT,
+          schema_json TEXT NOT NULL,
+          default_template TEXT NOT NULL DEFAULT 'letterhead',
+          is_system INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          CONSTRAINT uq_doctype_code UNIQUE(business_profile_id, code)
+        );
+
+        CREATE TABLE IF NOT EXISTS document_instances (
+          id TEXT PRIMARY KEY NOT NULL,
+          business_profile_id TEXT NOT NULL,
+          type_id TEXT NOT NULL,
+          doc_class TEXT NOT NULL,
+          document_number TEXT NOT NULL,
+          title TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'draft',
+          issue_date INTEGER NOT NULL,
+          party_name TEXT,
+          party_details_json TEXT,
+          content_json TEXT NOT NULL,
+          template_code TEXT NOT NULL DEFAULT 'letterhead',
+          branding_json TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_doc_instances_bus ON document_instances(business_profile_id);
+        CREATE INDEX IF NOT EXISTS idx_doc_instances_type ON document_instances(type_id);
+        CREATE INDEX IF NOT EXISTS idx_doc_instances_status ON document_instances(status);
+        CREATE INDEX IF NOT EXISTS idx_custom_doc_types_bus ON custom_document_types(business_profile_id);
+      `);
+
+      // 2. Seed system templates for letterhead and work orders into template_definitions
+      const now = Date.now();
+      const studioTemplates = [
+        { code: 'letterhead', name: 'Executive Letterhead', description: 'Clean letterhead layout with header crest, candidate/recipient card, narrative body, and dual signatures.', category: 'corporate', color: '#0F172A', secondary: '#2563EB' },
+        { code: 'work_order', name: 'Operations Job Card', description: 'Technical operational layout with site details, scheduled milestones, task checklists, and supervisor authorization.', category: 'technical', color: '#1E293B', secondary: '#F59E0B' },
+        { code: 'custom_studio', name: 'Universal Studio Preset', description: 'Dynamic multi-section layout adapting to arbitrary custom fields and tables.', category: 'general', color: '#111827', secondary: '#4F46E5' },
+      ];
+
+      for (const t of studioTemplates) {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO template_definitions (
+             code, name, description, category, thumbnail_uri, default_config_json, is_system, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, NULL, ?, 1, ?, ?);`,
+          [t.code, t.name, t.description, t.category, JSON.stringify({ brandColor: t.color, secondaryColor: t.secondary }), now, now]
+        );
+      }
+    },
+  },
+  {
+    version: 11,
+    name: 'v11_brand_kit_and_org_identity',
+    checksum: 'c2e45bf9a1352e85059d04ba42e2a8647008ff773b185b3b3cbcead1bf167909',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      // 1. Safely extend business_profiles with brand kit & banking fields
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'website', 'website TEXT');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'tagline', 'tagline TEXT');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'signatory_name', 'signatory_name TEXT');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'signatory_title', 'signatory_title TEXT');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'bank_name', 'bank_name TEXT');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'bank_account_number', 'bank_account_number TEXT');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'bank_ifsc', 'bank_ifsc TEXT');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'bank_branch', 'bank_branch TEXT');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'bank_account_type', 'bank_account_type TEXT');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'header_style', "header_style TEXT DEFAULT 'modern'");
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'footer_show_signature', 'footer_show_signature INTEGER DEFAULT 1');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'footer_show_stamp', 'footer_show_stamp INTEGER DEFAULT 1');
+      await addColumnIfNotExistsAsync(db, 'business_profiles', 'footer_show_address', 'footer_show_address INTEGER DEFAULT 1');
+    },
+  },
+  {
+    version: 12,
+    name: 'v12_onboarding_v3_preferences',
+    checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      // Safely extend workspace_preferences for Onboarding 3.0 intent and document favorites
+      await addColumnIfNotExistsAsync(
+        db,
+        'workspace_preferences',
+        'primary_intent',
+        "primary_intent TEXT NOT NULL DEFAULT 'business_documents'"
+      );
+      await addColumnIfNotExistsAsync(
+        db,
+        'workspace_preferences',
+        'favorite_document_types_json',
+        "favorite_document_types_json TEXT NOT NULL DEFAULT '[]'"
+      );
+      await addColumnIfNotExistsAsync(
+        db,
+        'workspace_preferences',
+        'selected_document_families_json',
+        "selected_document_families_json TEXT NOT NULL DEFAULT '[]'"
+      );
+      await addColumnIfNotExistsAsync(
+        db,
+        'workspace_preferences',
+        'onboarding_state',
+        "onboarding_state TEXT NOT NULL DEFAULT 'not_started'"
+      );
+      await addColumnIfNotExistsAsync(
+        db,
+        'workspace_preferences',
+        'onboarding_step',
+        'onboarding_step INTEGER NOT NULL DEFAULT 1'
+      );
+    },
+  },
 ];

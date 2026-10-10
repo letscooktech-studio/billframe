@@ -72,7 +72,7 @@ export interface DocumentRow {
   signature_date: number | null;
   place_of_supply?: string | null;
   supply_type?: string | null;
-  reverse_charge?: number;
+  reverse_charge?: number | boolean;
   parent_document_id: string | null;
   is_archived: number;
   created_at: number;
@@ -87,6 +87,7 @@ export interface DocumentItemRow {
   item_notes: string | null;
   category?: string | null;
   hsn_sac_code?: string | null;
+  hsn_sac?: string | null;
   quantity_scaled: number;
   unit_name: string;
   unit_price_minor: number;
@@ -880,7 +881,7 @@ export class DocumentRepository {
     }>(
       `SELECT id, total_minor, deposit_minor, due_date
        FROM documents
-       WHERE doc_type = 'invoice'
+       WHERE doc_type IN ('invoice', 'tax_invoice', 'bill_of_supply', 'export_invoice')
          AND lifecycle_status = 'issued'
          AND is_archived = 0;`
     );
@@ -956,7 +957,7 @@ export class DocumentRepository {
               c.name AS customer_name, c.phone AS customer_phone, c.email AS customer_email
        FROM documents d
        LEFT JOIN customers c ON d.customer_id = c.id
-       WHERE d.doc_type = 'invoice'
+       WHERE d.doc_type IN ('invoice', 'tax_invoice', 'bill_of_supply', 'export_invoice')
          AND d.lifecycle_status = 'issued'
          AND d.is_archived = 0
        ORDER BY d.issue_date DESC;`

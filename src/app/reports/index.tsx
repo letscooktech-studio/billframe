@@ -92,7 +92,7 @@ export default function ReportsScreen() {
       // Invoiced in period
       let invSql = `SELECT COALESCE(SUM(total_minor), 0) AS sum_total
                     FROM documents
-                    WHERE doc_type = 'invoice' AND lifecycle_status != 'draft' AND lifecycle_status != 'void' AND is_archived = 0`;
+                    WHERE doc_type IN ('invoice', 'tax_invoice', 'bill_of_supply', 'export_invoice') AND lifecycle_status != 'draft' AND lifecycle_status != 'void' AND is_archived = 0`;
       const invParams: any[] = [];
       if (start) {
         invSql += ' AND issue_date >= ?';
@@ -153,7 +153,7 @@ export default function ReportsScreen() {
             ), 0)
           ), 0) AS outstanding
          FROM documents d
-         WHERE d.doc_type = 'invoice' AND d.lifecycle_status = 'issued' AND d.is_archived = 0;`
+         WHERE d.doc_type IN ('invoice', 'tax_invoice', 'bill_of_supply', 'export_invoice') AND d.lifecycle_status = 'issued' AND d.is_archived = 0;`
       );
       setOutstandingMinor(toBigIntSafe(Math.max(0, outRow?.outstanding || 0)));
 
@@ -162,7 +162,7 @@ export default function ReportsScreen() {
       const overdueDocs = await db.getAllAsync<{ id: string; total_minor: number; due_date: number }>(
         `SELECT d.id, d.total_minor, d.due_date
          FROM documents d
-         WHERE d.doc_type = 'invoice'
+         WHERE d.doc_type IN ('invoice', 'tax_invoice', 'bill_of_supply', 'export_invoice')
            AND d.lifecycle_status = 'issued'
            AND d.due_date IS NOT NULL
            AND d.due_date < ?
@@ -193,7 +193,7 @@ export default function ReportsScreen() {
                 COALESCE(SUM(d.total_minor), 0) AS total_invoiced_minor
          FROM customers c
          JOIN documents d ON d.customer_id = c.id
-         WHERE d.doc_type = 'invoice' AND d.lifecycle_status != 'draft' AND d.lifecycle_status != 'void' AND d.is_archived = 0
+         WHERE d.doc_type IN ('invoice', 'tax_invoice', 'bill_of_supply', 'export_invoice') AND d.lifecycle_status != 'draft' AND d.lifecycle_status != 'void' AND d.is_archived = 0
          GROUP BY c.id
          ORDER BY total_invoiced_minor DESC
          LIMIT 5;`

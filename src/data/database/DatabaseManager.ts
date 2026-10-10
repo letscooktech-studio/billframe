@@ -30,8 +30,27 @@ export class DatabaseManager {
     if (isWeb) {
       if (!this.webFallback) {
         const memDb = new InMemorySQLiteDatabase();
+        if (typeof window !== 'undefined' && window.localStorage) {
+          try {
+            const saved = window.localStorage.getItem('billframe_web_db_state');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              memDb.state = { ...memDb.state, ...parsed };
+            }
+          } catch {}
+        }
         await this.initDatabaseAsync(memDb as any);
         this.webFallback = memDb;
+
+        if (typeof window !== 'undefined' && window.localStorage && typeof setInterval !== 'undefined') {
+          setInterval(() => {
+            try {
+              if (DatabaseManager.webFallback) {
+                window.localStorage.setItem('billframe_web_db_state', JSON.stringify(DatabaseManager.webFallback.state));
+              }
+            } catch {}
+          }, 1000);
+        }
       }
       return this.webFallback as any;
     }

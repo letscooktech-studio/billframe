@@ -275,6 +275,36 @@ export default function WorkspaceSettingsScreen() {
                 trackColor={{ false: theme.borderSubtle, true: theme.borderFocused }}
               />
             </View>
+
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: theme.borderSubtle }]}>
+              <View style={styles.textContainer}>
+                <Text style={[styles.rowTitle, { color: theme.textPrimary }]}>Track Inventory & Catalog</Text>
+                <Text style={[styles.rowSubtitle, { color: theme.textSecondary }]}>
+                  Manage stock levels, SKU tracking, and item catalogs
+                </Text>
+              </View>
+              <Switch
+                value={prefs.trackInventory}
+                onValueChange={(val) => updatePreference('trackInventory', val)}
+                thumbColor={Platform.OS === 'android' ? (prefs.trackInventory ? theme.brandAnchor : '#CCC') : undefined}
+                trackColor={{ false: theme.borderSubtle, true: theme.borderFocused }}
+              />
+            </View>
+
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: theme.borderSubtle }]}>
+              <View style={styles.textContainer}>
+                <Text style={[styles.rowTitle, { color: theme.textPrimary }]}>Recurring Billing & Retainers</Text>
+                <Text style={[styles.rowSubtitle, { color: theme.textSecondary }]}>
+                  Support periodic subscription invoices and monthly retainers
+                </Text>
+              </View>
+              <Switch
+                value={prefs.recurringBilling}
+                onValueChange={(val) => updatePreference('recurringBilling', val)}
+                thumbColor={Platform.OS === 'android' ? (prefs.recurringBilling ? theme.brandAnchor : '#CCC') : undefined}
+                trackColor={{ false: theme.borderSubtle, true: theme.borderFocused }}
+              />
+            </View>
           </View>
 
           {/* Reset Action */}

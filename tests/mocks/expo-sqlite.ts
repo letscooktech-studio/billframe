@@ -32,6 +32,13 @@ export interface MockDbState {
   payment_refunds: any[];
   reminder_events: any[];
   invoice_collection_metadata: any[];
+  template_definitions: any[];
+  template_customizations: any[];
+  template_assignments: any[];
+  custom_field_definitions: any[];
+  custom_block_definitions: any[];
+  custom_document_types: any[];
+  document_instances: any[];
 }
 
 export class MockSQLiteDatabase {
@@ -63,6 +70,13 @@ export class MockSQLiteDatabase {
     payment_refunds: [],
     reminder_events: [],
     invoice_collection_metadata: [],
+    template_definitions: [],
+    template_customizations: [],
+    template_assignments: [],
+    custom_field_definitions: [],
+    custom_block_definitions: [],
+    custom_document_types: [],
+    document_instances: [],
   };
 
   reset() {
@@ -94,6 +108,13 @@ export class MockSQLiteDatabase {
       payment_refunds: [],
       reminder_events: [],
       invoice_collection_metadata: [],
+      template_definitions: [],
+      template_customizations: [],
+      template_assignments: [],
+      custom_field_definitions: [],
+      custom_block_definitions: [],
+      custom_document_types: [],
+      document_instances: [],
     };
   }
 
@@ -137,7 +158,53 @@ export class MockSQLiteDatabase {
       const id = params[params.length - 1];
       const p = this.state.business_profiles.find((b) => b.id === id);
       if (p) {
-        if (params.length >= 21) {
+        if (params.length >= 35) {
+          const [
+            name, legalName, taxId, email, phone, addr1, city, stateVal, postal,
+            country, countryIso2, subCode, subName, phoneIso2, phoneE164, upiVpa,
+            website, tagline, signatoryName, signatoryTitle,
+            bankName, bankAcct, bankIfsc, bankBranch, bankAcctType,
+            headerStyle, footSig, footStamp, footAddr,
+            curr, docLocale, notes, terms, logoUri, updated_at
+          ] = params;
+          Object.assign(p, {
+            name,
+            legal_name: legalName,
+            tax_id: taxId,
+            email,
+            phone,
+            address_line1: addr1,
+            city,
+            state: stateVal,
+            postal_code: postal,
+            country,
+            country_iso2: countryIso2,
+            subdivision_code: subCode,
+            subdivision_name: subName,
+            phone_country_iso2: phoneIso2,
+            phone_e164: phoneE164,
+            upi_vpa: upiVpa,
+            website,
+            tagline,
+            signatory_name: signatoryName,
+            signatory_title: signatoryTitle,
+            bank_name: bankName,
+            bank_account_number: bankAcct,
+            bank_ifsc: bankIfsc,
+            bank_branch: bankBranch,
+            bank_account_type: bankAcctType,
+            header_style: headerStyle,
+            footer_show_signature: footSig,
+            footer_show_stamp: footStamp,
+            footer_show_address: footAddr,
+            default_currency: curr,
+            default_document_locale: docLocale,
+            default_notes: notes,
+            default_payment_terms: terms,
+            logo_uri: logoUri,
+            updated_at,
+          });
+        } else if (params.length >= 21) {
           const [name, legalName, taxId, email, phone, addr1, city, stateVal, postal, country, countryIso2, subCode, subName, phoneIso2, phoneE164, upiVpa, curr, notes, terms, updated_at] = params;
           Object.assign(p, {
             name,
@@ -798,21 +865,59 @@ export class MockSQLiteDatabase {
 
     // 24. Workspace Preferences Upsert
     if (s.startsWith('INSERT INTO workspace_preferences')) {
-      const [
-        id, business_profile_id, business_type, sales_type,
-        is_gst_registered, track_inventory, track_jobs,
-        partial_payments, recurring_billing, adaptive_enabled,
-        layout_locked, primary_modules_json, onboarding_completed,
-        created_at, updated_at
-      ] = params;
+      const id = params[0];
+      const business_profile_id = params[1];
+      const business_type = params[2];
+      const sales_type = params[3];
+      const is_gst_registered = params[4];
+      const track_inventory = params[5];
+      const track_jobs = params[6];
+      const partial_payments = params[7];
+      const recurring_billing = params[8];
+      const adaptive_enabled = params[9];
+      const layout_locked = params[10];
+      const primary_modules_json = params[11];
+      const onboarding_completed = params[12];
+      const onboarding_version = params[13];
+      const onboarding_completed_at = params[14];
+      const profile_version = params[15];
+      const workspace_config_version = params[16];
+      const geography_dataset_version = params[17];
+      const primary_intent = params[18] ?? 'business_documents';
+      const favorite_document_types_json = params[19] ?? '[]';
+      const selected_document_families_json = params[20] ?? '[]';
+      const onboarding_state = params[21] ?? 'not_started';
+      const onboarding_step = params[22] ?? 1;
+      const created_at = params[23] ?? Date.now();
+      const updated_at = params[24] ?? Date.now();
 
       const idx = this.state.workspace_preferences.findIndex((w) => w.id === id);
       const record = {
-        id, business_profile_id, business_type, sales_type,
-        is_gst_registered, track_inventory, track_jobs,
-        partial_payments, recurring_billing, adaptive_enabled,
-        layout_locked, primary_modules_json, onboarding_completed,
-        created_at, updated_at
+        id,
+        business_profile_id,
+        business_type,
+        sales_type,
+        is_gst_registered,
+        track_inventory,
+        track_jobs,
+        partial_payments,
+        recurring_billing,
+        adaptive_enabled,
+        layout_locked,
+        primary_modules_json,
+        onboarding_completed,
+        onboarding_version,
+        onboarding_completed_at,
+        profile_version,
+        workspace_config_version,
+        geography_dataset_version,
+        primary_intent,
+        favorite_document_types_json,
+        selected_document_families_json,
+        onboarding_state,
+        onboarding_step,
+        created_at,
+        updated_at,
       };
       if (idx >= 0) {
         this.state.workspace_preferences[idx] = record;
@@ -969,11 +1074,119 @@ export class MockSQLiteDatabase {
       return { lastInsertRowId: 0, changes: 1 };
     }
 
+    // 27. Template definitions insert
+    if (s.includes('INTO template_definitions')) {
+      const [code, name, description, category, default_config_json, is_system, created_at, updated_at] = params;
+      const existing = this.state.template_definitions.find((t) => t.code === code);
+      if (!existing) {
+        this.state.template_definitions.push({
+          code, name, description, category, thumbnail_uri: null, default_config_json, is_system, created_at, updated_at
+        });
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 28. Template customizations insert or update
+    if (s.includes('INTO template_customizations')) {
+      const [
+        id, template_code, business_profile_id, brand_color, secondary_color,
+        font_family, logo_position, show_logo, show_tax_breakdown, show_payment_qr,
+        show_signature, show_terms, custom_declaration, custom_footer_notes,
+        column_visibility_json, updated_at
+      ] = params;
+      const idx = this.state.template_customizations.findIndex(
+        (c) => c.template_code === template_code && c.business_profile_id === business_profile_id
+      );
+      const record = {
+        id, template_code, business_profile_id, brand_color, secondary_color,
+        font_family, logo_position, show_logo, show_tax_breakdown, show_payment_qr,
+        show_signature, show_terms, custom_declaration, custom_footer_notes,
+        column_visibility_json, updated_at
+      };
+      if (idx >= 0) {
+        this.state.template_customizations[idx] = record;
+      } else {
+        this.state.template_customizations.push(record);
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 29. Template assignments insert or update
+    if (s.includes('INTO template_assignments')) {
+      const [id, business_profile_id, doc_type, template_code, updated_at] = params;
+      const idx = this.state.template_assignments.findIndex(
+        (a) => a.business_profile_id === business_profile_id && a.doc_type === doc_type
+      );
+      const record = { id, business_profile_id, doc_type, template_code, updated_at };
+      if (idx >= 0) {
+        this.state.template_assignments[idx] = record;
+      } else {
+        this.state.template_assignments.push(record);
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 30. Custom document types insert or update
+    if (s.includes('INTO custom_document_types')) {
+      const [id, business_profile_id, code, name, doc_class, category, description, icon, schema_json, default_template, is_system, created_at, updated_at] = params;
+      const idx = this.state.custom_document_types.findIndex((t) => t.id === id || (t.business_profile_id === business_profile_id && t.code === code));
+      const record = { id, business_profile_id, code, name, doc_class, category, description, icon, schema_json, default_template, is_system: Number(is_system) || 0, created_at, updated_at };
+      if (idx >= 0) {
+        this.state.custom_document_types[idx] = record;
+      } else {
+        this.state.custom_document_types.push(record);
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 31. Custom document types delete
+    if (s.startsWith('DELETE FROM custom_document_types WHERE id = ?')) {
+      const [id] = params;
+      this.state.custom_document_types = this.state.custom_document_types.filter((t) => t.id !== id);
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+
+    // 32. Document instances insert or update
+    if (s.includes('INTO document_instances')) {
+      const [id, business_profile_id, type_id, doc_class, document_number, title, status, issue_date, party_name, party_details_json, content_json, template_code, branding_json, created_at, updated_at] = params;
+      const idx = this.state.document_instances.findIndex((d) => d.id === id);
+      const record = { id, business_profile_id, type_id, doc_class, document_number, title, status, issue_date, party_name, party_details_json, content_json, template_code, branding_json, created_at, updated_at };
+      if (idx >= 0) {
+        this.state.document_instances[idx] = record;
+      } else {
+        this.state.document_instances.push(record);
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // 33. Document instances delete
+    if (s.startsWith('DELETE FROM document_instances WHERE id = ?')) {
+      const [id] = params;
+      this.state.document_instances = this.state.document_instances.filter((d) => d.id !== id);
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+
     return { lastInsertRowId: 0, changes: 0 };
   }
 
   async getFirstAsync<T>(sql: string, params: any[] = []): Promise<T | null> {
     const s = sql.trim();
+
+    // Template assignment
+    if (s.includes('FROM template_assignments WHERE business_profile_id = ? AND doc_type = ?')) {
+      const [busId, docType] = params;
+      return (this.state.template_assignments.find(
+        (a) => a.business_profile_id === busId && a.doc_type === docType
+      ) as T) || null;
+    }
+
+    // Template customization
+    if (s.includes('FROM template_customizations WHERE business_profile_id = ? AND template_code = ?')) {
+      const [busId, code] = params;
+      return (this.state.template_customizations.find(
+        (c) => c.business_profile_id === busId && c.template_code === code
+      ) as T) || null;
+    }
 
     // Business Profile
     if (s.includes('FROM business_profiles')) {
@@ -1163,6 +1376,22 @@ export class MockSQLiteDatabase {
     if (s.includes('FROM invoice_collection_metadata WHERE document_id = ?')) {
       const [docId] = params;
       return (this.state.invoice_collection_metadata.find((m) => m.document_id === docId) as T) || null;
+    }
+
+    // Custom Document Type by ID or Code
+    if (s.includes('FROM custom_document_types WHERE id = ?')) {
+      const [id] = params;
+      return (this.state.custom_document_types.find((t) => t.id === id) as T) || null;
+    }
+    if (s.includes('FROM custom_document_types WHERE code = ?')) {
+      const [code] = params;
+      return (this.state.custom_document_types.find((t) => t.code === code) as T) || null;
+    }
+
+    // Document Instance by ID
+    if (s.includes('FROM document_instances WHERE id = ?')) {
+      const [id] = params;
+      return (this.state.document_instances.find((d) => d.id === id) as T) || null;
     }
 
     return null;
@@ -1372,7 +1601,13 @@ export class MockSQLiteDatabase {
     // Documents query with optional customer join
     if (s.includes('FROM documents')) {
       let docs = this.state.documents.filter((d) => d.is_archived === 0);
-      if (s.includes("doc_type = 'invoice'")) {
+      if (s.includes('doc_type IN')) {
+        const inMatch = s.match(/doc_type\s+IN\s*\(([^)]+)\)/i);
+        if (inMatch) {
+          const types = inMatch[1].split(',').map((t) => t.trim().replace(/'/g, ''));
+          docs = docs.filter((d) => types.includes(d.doc_type));
+        }
+      } else if (s.includes("doc_type = 'invoice'")) {
         docs = docs.filter((d) => d.doc_type === 'invoice');
       } else if (s.includes('doc_type = ?')) {
         const typeParam = params.find((p) => typeof p === 'string' && ['invoice', 'estimate', 'receipt', 'credit_note', 'proforma', 'delivery_note', 'work_order'].includes(p));
@@ -1433,6 +1668,48 @@ export class MockSQLiteDatabase {
       return (this.state.payment_provider_connections.filter(
         (c) => c.business_profile_id === busId
       ) as unknown as T[]);
+    }
+
+    // Template definitions
+    if (s.includes('FROM template_definitions')) {
+      return this.state.template_definitions.slice() as T[];
+    }
+
+    // Template customizations
+    if (s.includes('FROM template_customizations')) {
+      if (params.length > 0) {
+        return this.state.template_customizations.filter((c) => c.business_profile_id === params[0]) as T[];
+      }
+      return this.state.template_customizations.slice() as T[];
+    }
+
+    // Template assignments
+    if (s.includes('FROM template_assignments')) {
+      if (params.length > 0) {
+        return this.state.template_assignments.filter((a) => a.business_profile_id === params[0]) as T[];
+      }
+      return this.state.template_assignments.slice() as T[];
+    }
+
+    // Custom document types
+    if (s.includes('FROM custom_document_types')) {
+      if (s.includes('WHERE business_profile_id = ? OR is_system = 1')) {
+        const [busId] = params;
+        return this.state.custom_document_types.filter(
+          (t) => t.business_profile_id === busId || t.is_system === 1 || t.business_profile_id === 'system'
+        ) as T[];
+      }
+      return this.state.custom_document_types.slice() as T[];
+    }
+
+    // Document instances
+    if (s.includes('FROM document_instances')) {
+      let insts = this.state.document_instances.slice();
+      if (params.length > 0) {
+        const busId = params[0];
+        insts = insts.filter((d) => d.business_profile_id === busId);
+      }
+      return insts.sort((a, b) => (b.issue_date || 0) - (a.issue_date || 0)) as T[];
     }
 
     return [];

@@ -67,9 +67,10 @@ export default function QuickBillScreen() {
         const activeProfile = await BusinessProfileRepository.getActiveProfile();
         if (activeProfile) {
           setProfile(activeProfile);
-          const initialCurr = activeProfile.default_currency || (activeProfile.country_iso2 === 'IN' ? 'INR' : 'USD');
+          const isIndia = activeProfile.country_iso2 === 'IN' || activeProfile.country === 'IN' || Boolean(activeProfile.upi_vpa);
+          const initialCurr = isIndia ? 'INR' : (activeProfile.default_currency || 'USD');
           setCurrency(initialCurr);
-          if (initialCurr === 'INR' || activeProfile.country_iso2 === 'IN' || activeProfile.upi_vpa) {
+          if (initialCurr === 'INR' || isIndia || activeProfile.upi_vpa) {
             setPaymentMethod('upi');
             setIsPaidNow(true);
           }
@@ -301,6 +302,7 @@ export default function QuickBillScreen() {
             onPress: () => {
               setCurrency('INR');
               setAmountStr(inrAmountFormatted);
+              executeIssueBill(targetCustomer!, quickUpiResult.inrAmountMinor!, itemDescription);
             },
           },
           {

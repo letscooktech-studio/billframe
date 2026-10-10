@@ -3,6 +3,95 @@
  * Pure offline CSS with zero external web fonts or CDN dependencies.
  */
 
+import { BusinessProfile } from '../../../domain/profile/types';
+import { TemplateCustomization } from '../types';
+
+export interface DocumentThemeTokens {
+  accentColor: string;
+  secondaryColor: string;
+  tableHeaderBg: string;
+  tableBorder: string;
+  dividerRule: string;
+  badgeBg: string;
+  badgeText: string;
+  isMonochrome: boolean;
+}
+
+/**
+ * Resolves customer-specified brand colors and template style choices.
+ * Supports Gold/Black master default, Monochrome minimal, and custom corporate palettes.
+ */
+export function resolveDocumentTheme(
+  business: BusinessProfile,
+  customization?: TemplateCustomization
+): DocumentThemeTokens {
+  const customColor = customization?.brand_color || (business as any).brand_color;
+  const templateCode = customization?.template_code || '';
+
+  if (templateCode === 'monochrome_minimal' || (business as any).document_theme === 'monochrome') {
+    return {
+      accentColor: '#000000',
+      secondaryColor: '#475569',
+      tableHeaderBg: '#F8FAFC',
+      tableBorder: '#E2E8F0',
+      dividerRule: '2px solid #000000',
+      badgeBg: '#F1F5F9',
+      badgeText: '#0F172A',
+      isMonochrome: true,
+    };
+  }
+
+  if (customColor && customColor !== '#000000' && customColor !== '#C59B27') {
+    return {
+      accentColor: customColor,
+      secondaryColor: customization?.secondary_color || customColor,
+      tableHeaderBg: '#F8FAFC',
+      tableBorder: '#E2E8F0',
+      dividerRule: `2px solid ${customColor}`,
+      badgeBg: 'rgba(0, 0, 0, 0.05)',
+      badgeText: customColor,
+      isMonochrome: false,
+    };
+  }
+
+  // Default: Gold / Black Enterprise Master (#C59B27)
+  return {
+    accentColor: '#C59B27',
+    secondaryColor: '#8A6D1C',
+    tableHeaderBg: '#FDFBF7',
+    tableBorder: '#E8E1D5',
+    dividerRule: '2px solid #C59B27',
+    badgeBg: 'rgba(197, 155, 39, 0.12)',
+    badgeText: '#8A6D1C',
+    isMonochrome: false,
+  };
+}
+
+/**
+ * Renders a responsive brand logo container preserving native aspect ratio.
+ * Supports wide wordmarks (up to 240px), square crests, tall seals, and transparent logos.
+ */
+export function renderResponsiveLogoHtml(
+  logoUri?: string | null,
+  accentColor: string = '#C59B27',
+  orgInitials: string = 'BF'
+): string {
+  if (logoUri) {
+    return `
+      <div class="brand-logo-container" style="max-width: 240px; max-height: 75px; min-height: 40px; display: inline-flex; align-items: center; justify-content: flex-start; box-sizing: border-box;">
+        <img src="${logoUri}" alt="Logo" class="brand-logo-img" style="max-width: 240px; max-height: 75px; width: auto; height: auto; object-fit: contain; object-position: left center; display: block;" />
+      </div>
+    `;
+  }
+
+  return `
+    <div class="brand-monogram-box" style="width: 52px; height: 52px; border: 1.5px solid ${accentColor}; border-radius: 4px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; background: #FFFFFF; color: ${accentColor}; box-sizing: border-box;">
+      <div style="font-size: 15px; line-height: 1; font-weight: 900; margin-bottom: 2px;">✦</div>
+      <div style="font-size: 9px; font-weight: 800; letter-spacing: 0.5px;">${escapeHtml(orgInitials)}</div>
+    </div>
+  `;
+}
+
 export function escapeHtml(str?: string | null): string {
   if (!str) return '';
   return str
@@ -21,6 +110,99 @@ export function formatDate(timestamp?: number | null): string {
     month: 'short',
     day: 'numeric',
   });
+}
+
+/**
+ * Unified Print CSS providing safe printable margins for A4 and Letter,
+ * media print separation, and ZERO overflow clipping.
+ */
+export function getUnifiedPrintCss(
+  paperSize: 'a4' | 'letter' = 'a4',
+  theme: DocumentThemeTokens = resolveDocumentTheme({} as any)
+): string {
+  const isLetter = paperSize === 'letter';
+  const pageMargin = isLetter ? '0.5in 0.45in 0.55in 0.45in' : '12mm 12mm 14mm 12mm';
+  const pageSize = isLetter ? 'letter portrait' : 'A4 portrait';
+
+  return `
+    @page {
+      size: ${pageSize};
+      margin: ${pageMargin};
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #000000;
+      background: #FFFFFF;
+      font-size: 11px;
+      line-height: 1.45;
+      width: 100%;
+      overflow: visible;
+      -webkit-font-smoothing: antialiased;
+    }
+    @media print {
+      body {
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+        width: 100% !important;
+        overflow: visible !important;
+      }
+      .document-sheet, .letter-container, .wo-container, .po-container, .invoice-container {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        background: transparent !important;
+      }
+      .avoid-break {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      thead {
+        display: table-header-group !important;
+      }
+      tfoot {
+        display: table-footer-group !important;
+      }
+    }
+    @media screen {
+      body {
+        padding: 24px 16px;
+        background: #0F172A;
+        display: flex;
+        justify-content: center;
+      }
+      .document-sheet, .letter-container, .wo-container, .po-container, .invoice-container {
+        background: #FFFFFF;
+        max-width: 840px;
+        width: 100%;
+        padding: 32px 36px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: auto;
+    }
+    th, td {
+      word-break: break-word;
+    }
+  `;
 }
 
 export function getBaseCss(paperSize: 'a4' | 'letter' = 'a4'): string {

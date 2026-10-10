@@ -1,7 +1,12 @@
 /**
- * BILLFRAME DESIGN TOKENS
- * Strict, restrained neutral visual system adhering to the Billframe Product Specification.
- * No gradients, no glassmorphism, no neon glows, no random floating cards.
+ * BILLFRAME DESIGN TOKENS — ARCTIC AURORA DESIGN SYSTEM
+ * Frozen neutral palette, typography, spacing, and centralized Arctic Aurora color families.
+ * 
+ * Strict invariants:
+ * - Neutral-first background and surfaces
+ * - Monochrome typography and icons
+ * - Exactly two chromatic colors per Aurora palette
+ * - Subdued, atmospheric upper-viewport lighting
  */
 
 export const spacing = {
@@ -19,6 +24,8 @@ export const spacing = {
   xxl: 24,
   /** 32dp */
   xxxl: 32,
+  /** 40dp */
+  huge: 40,
 } as const;
 
 export const radii = {
@@ -28,10 +35,12 @@ export const radii = {
   sm: 8,
   /** 12dp - Containers, dialogs */
   md: 12,
-  /** 16dp - Bottom sheet top corners */
+  /** 16dp - Bottom sheet top corners, cards */
   lg: 16,
   /** 20dp - Large bottom sheets, modals */
   xl: 20,
+  /** 24dp - Premium cards */
+  xxl: 24,
   /** 9999dp - Exclusively for status badges / pills */
   pill: 9999,
   /** 9999dp - Circular avatars / pills */
@@ -85,6 +94,7 @@ export interface ThemeColors {
   background: string;
   surface: string;
   surfaceSecondary: string;
+  surfaceElevated: string;
   borderSubtle: string;
   borderFocused: string;
   textPrimary: string;
@@ -105,6 +115,7 @@ export const colors: { light: ThemeColors; dark: ThemeColors } = {
     background: '#F7F7F6',
     surface: '#FFFFFF',
     surfaceSecondary: '#EFEFED',
+    surfaceElevated: '#E5E5E3',
     borderSubtle: '#E5E5E3',
     borderFocused: '#171717',
     textPrimary: '#171717',
@@ -119,17 +130,18 @@ export const colors: { light: ThemeColors; dark: ThemeColors } = {
     statusDanger: '#B91C1C',
   },
   dark: {
-    background: '#111111',
-    surface: '#181818',
-    surfaceSecondary: '#222222',
-    borderSubtle: '#2A2A2A',
-    borderFocused: '#F5F5F5',
-    textPrimary: '#F5F5F5',
-    textSecondary: '#A1A1A1',
-    textMuted: '#666666',
-    brandAnchor: '#F5F5F5',
-    brandAnchorText: '#111111',
-    statusDraft: '#A1A1A1',
+    background: '#0D0E10',
+    surface: '#17191D',
+    surfaceSecondary: '#202227',
+    surfaceElevated: '#272A30',
+    borderSubtle: '#303238',
+    borderFocused: '#F5F5F6',
+    textPrimary: '#F5F5F6',
+    textSecondary: '#A8AAB0',
+    textMuted: '#777B83',
+    brandAnchor: '#F5F5F6',
+    brandAnchorText: '#0D0E10',
+    statusDraft: '#A8AAB0',
     statusIssued: '#3B82F6',
     statusSuccess: '#22C55E',
     statusWarning: '#F59E0B',
@@ -137,6 +149,45 @@ export const colors: { light: ThemeColors; dark: ThemeColors } = {
   },
 };
 
+/**
+ * ARCTIC AURORA COLOR FAMILIES
+ * Exactly two chromatic colors per section.
+ * Renders atmospheric Northern Lights lighting across the upper 20-30% of the viewport.
+ */
+export type AuroraSection =
+  | 'home'
+  | 'documents'
+  | 'clients'
+  | 'work'
+  | 'all'
+  | 'template_studio'
+  | 'onboarding'
+  | 'sales_billing'
+  | 'purchases'
+  | 'collections'
+  | 'reports'
+  | 'security_data';
+
+export interface AuroraPalette {
+  readonly primary: string;
+  readonly secondary: string;
+  readonly name: string;
+}
+
+export const AURORA_PALETTES: Record<AuroraSection, AuroraPalette> = {
+  home: { primary: '#143A69', secondary: '#39335F', name: 'Arctic Blue & Slate Violet' },
+  documents: { primary: '#33275E', secondary: '#514078', name: 'Deep Indigo & Muted Plum' },
+  clients: { primary: '#124A50', secondary: '#2A445D', name: 'Polar Teal & Blue Gray' },
+  work: { primary: '#543B2B', secondary: '#574C4A', name: 'Bronze Graphite & Muted Graphite' },
+  all: { primary: '#34334F', secondary: '#50506C', name: 'Charcoal Indigo & Soft Slate Violet' },
+  template_studio: { primary: '#45346F', secondary: '#244C79', name: 'Muted Amethyst & Midnight Blue' },
+  onboarding: { primary: '#21446C', secondary: '#24505B', name: 'Ocean Navy & Deep Teal' },
+  sales_billing: { primary: '#213D65', secondary: '#3D3E69', name: 'Deep Cobalt & Muted Indigo' },
+  purchases: { primary: '#493A35', secondary: '#4C535D', name: 'Copper Slate & Steel Gray' },
+  collections: { primary: '#174448', secondary: '#2E4257', name: 'Deep Petrol & Slate Navy' },
+  reports: { primary: '#2B4561', secondary: '#45435F', name: 'Blue Graphite & Muted Violet' },
+  security_data: { primary: '#303B45', secondary: '#374B55', name: 'Graphite & Deep Steel' },
+};
 
 /** Minimum touch target size required by Android Accessibility Guidelines */
 export const MIN_TOUCH_TARGET = 48;

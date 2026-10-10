@@ -16,9 +16,11 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Plus, Users, ChevronRight, Phone, Mail, Building } from 'lucide-react-native';
+import { Search, Plus, Users, ChevronRight, Phone, Mail, Building, FileText } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { AuroraBackground } from '../../components/common/AuroraBackground';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
+import { formatMoney } from '../../domain/money/Money';
 
 interface ContactItem {
   id: string;
@@ -27,6 +29,8 @@ interface ContactItem {
   email: string | null;
   phone: string | null;
   total_invoices: number;
+  balance_due_minor: number;
+  total_billed_minor: number;
 }
 
 export default function ContactsScreen() {
@@ -35,7 +39,6 @@ export default function ContactsScreen() {
   const theme = colorScheme === 'dark' ? colors.dark : colors.light;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'clients'>('all');
   const [contacts, setContacts] = useState<ContactItem[]>([]);
 
   const loadContacts = useCallback(async () => {
@@ -44,7 +47,9 @@ export default function ContactsScreen() {
 
       let query = `
         SELECT c.id, c.name, c.business_name, c.email, c.phone,
-               COUNT(d.id) AS total_invoices
+               COUNT(d.id) AS total_invoices,
+               COALESCE(SUM(CASE WHEN d.lifecycle_status IN ('issued', 'overdue') THEN d.balance_minor ELSE 0 END), 0) AS balance_due_minor,
+               COALESCE(SUM(d.total_minor), 0) AS total_billed_minor
         FROM customers c
         LEFT JOIN documents d ON c.id = d.customer_id AND d.is_archived = 0
         WHERE c.is_archived = 0
@@ -72,120 +77,133 @@ export default function ContactsScreen() {
     }, [loadContacts])
   );
 
-  const renderItem = ({ item }: { item: ContactItem }) => (
-    <Pressable
-      style={({ pressed }) => [
-        styles.rowItem,
-        {
-          backgroundColor: theme.surface,
-          borderBottomColor: theme.borderSubtle,
-          opacity: pressed ? 0.8 : 1,
-        },
-      ]}
-      onPress={() => router.push(`/customer/${item.id}`)}
-      accessibilityRole="button"
-      accessibilityLabel={`${item.name}, ${item.business_name || ''}`}
-    >
-      <View style={styles.rowMain}>
-        <View style={[styles.avatar, { backgroundColor: theme.surfaceSecondary }]}>
-          <Text style={[styles.avatarText, { color: theme.brandAnchor }]}>
-            {item.name.charAt(0).toUpperCase()}
-          </Text>
-        </View>
+  const renderItem = ({ item }: { item: ContactItem }) => {
+    const hasBalance = item.balance_due_minor > 0;
 
-        <View style={styles.rowInfo}>
-          <Text style={[styles.contactName, { color: theme.textPrimary }]}>{item.name}</Text>
-          {item.business_name ? (
-            <Text style={[styles.businessName, { color: theme.textSecondary }]}>{item.business_name}</Text>
-          ) : null}
-          <Text style={[styles.contactMeta, { color: theme.textMuted }]}>
-            {[item.email, item.phone].filter(Boolean).join(' • ') || 'No contact info'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.rowRight}>
-        <View style={[styles.invoiceBadge, { backgroundColor: theme.surfaceSecondary }]}>
-          <Text style={[styles.invoiceBadgeText, { color: theme.textSecondary }]}>
-            {item.total_invoices} {item.total_invoices === 1 ? 'doc' : 'docs'}
-          </Text>
-        </View>
-        <ChevronRight color={theme.textMuted} size={16} />
-      </View>
-    </Pressable>
-  );
-
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Contacts</Text>
-            <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-              {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'} saved
+    return (
+      <Pressable
+        style={({ pressed }) => [
+          styles.rowItem,
+          {
+            backgroundColor: theme.surface,
+            borderBottomColor: theme.borderSubtle,
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+        onPress={() => router.push(`/customer/${item.id}`)}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${item.business_name || ''}`}
+      >
+        <View style={styles.rowMain}>
+          <View style={[styles.avatar, { backgroundColor: theme.surfaceSecondary }]}>
+            <Text style={[styles.avatarText, { color: theme.brandAnchor }]}>
+              {item.name.charAt(0).toUpperCase()}
             </Text>
           </View>
-          <Pressable
-            style={[styles.addButton, { backgroundColor: theme.brandAnchor }]}
-            onPress={() => router.push('/customer/edit')}
-            accessibilityRole="button"
-            accessibilityLabel="Add new contact"
-          >
-            <Plus color={theme.brandAnchorText} size={18} strokeWidth={2.5} />
-            <Text style={[styles.addButtonText, { color: theme.brandAnchorText }]}>Add Contact</Text>
-          </Pressable>
+
+          <View style={styles.rowInfo}>
+            <Text style={[styles.contactName, { color: theme.textPrimary }]}>{item.name}</Text>
+            {item.business_name ? (
+              <Text style={[styles.businessName, { color: theme.textSecondary }]}>{item.business_name}</Text>
+            ) : null}
+            <Text style={[styles.contactMeta, { color: theme.textMuted }]}>
+              {[item.email, item.phone].filter(Boolean).join(' • ') || 'No contact details'}
+            </Text>
+          </View>
         </View>
 
-        {/* Search */}
-        <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-          <Search color={theme.textSecondary} size={18} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.textPrimary }]}
-            placeholder="Search by name, company, email, phone..."
-            placeholderTextColor={theme.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+        <View style={styles.rowRight}>
+          <View style={styles.rightMetrics}>
+            {hasBalance ? (
+              <Text style={[styles.balanceDueText, { color: theme.statusWarning }]}>
+                Due: {formatMoney({ amountMinor: BigInt(item.balance_due_minor), currency: 'INR' }, 'en-IN')}
+              </Text>
+            ) : (
+              <Text style={[styles.billedText, { color: theme.textSecondary }]}>
+                {item.total_invoices} {item.total_invoices === 1 ? 'document' : 'documents'}
+              </Text>
+            )}
+          </View>
+          <ChevronRight color={theme.textMuted} size={16} />
+        </View>
+      </Pressable>
+    );
+  };
+
+  return (
+    <AuroraBackground section="clients" intensity="subtle">
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Clients</Text>
+              <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
+                {contacts.length} {contacts.length === 1 ? 'client' : 'clients'} registered
+              </Text>
+            </View>
+            <Pressable
+              style={[styles.addButton, { backgroundColor: theme.brandAnchor }]}
+              onPress={() => router.push('/customer/edit')}
+              accessibilityRole="button"
+              accessibilityLabel="Add new client"
+            >
+              <Plus color={theme.brandAnchorText} size={18} strokeWidth={2.5} />
+              <Text style={[styles.addButtonText, { color: theme.brandAnchorText }]}>Add Client</Text>
+            </Pressable>
+          </View>
+
+          {/* Search */}
+          <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+            <Search color={theme.textSecondary} size={18} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.textPrimary }]}
+              placeholder="Search by name, company, email, phone..."
+              placeholderTextColor={theme.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
+          {/* List */}
+          <FlatList
+            data={contacts}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={[styles.emptyContainer, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+                <Users color={theme.textMuted} size={40} strokeWidth={1.5} />
+                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+                  {searchQuery ? 'No matching clients' : 'No clients yet'}
+                </Text>
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  {searchQuery
+                    ? 'Try a different search term.'
+                    : 'Add clients to issue tax invoices, track balances, and generate account statements.'}
+                </Text>
+                {!searchQuery && (
+                  <Pressable
+                    style={[styles.emptyButton, { backgroundColor: theme.brandAnchor }]}
+                    onPress={() => router.push('/customer/edit')}
+                  >
+                    <Text style={[styles.emptyButtonText, { color: theme.brandAnchorText }]}>Add First Client</Text>
+                  </Pressable>
+                )}
+              </View>
+            }
           />
         </View>
-
-        {/* List */}
-        <FlatList
-          data={contacts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={[styles.emptyContainer, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-              <Users color={theme.textMuted} size={40} strokeWidth={1.5} />
-              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                {searchQuery ? 'No matching contacts' : 'No contacts yet'}
-              </Text>
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                {searchQuery
-                  ? 'Try a different search term.'
-                  : 'Add your clients and customers to quickly bill and generate statements.'}
-              </Text>
-              {!searchQuery && (
-                <Pressable
-                  style={[styles.emptyButton, { backgroundColor: theme.brandAnchor }]}
-                  onPress={() => router.push('/customer/edit')}
-                >
-                  <Text style={[styles.emptyButtonText, { color: theme.brandAnchorText }]}>Add First Contact</Text>
-                </Pressable>
-              )}
-            </View>
-          }
-        />
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
@@ -284,6 +302,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  rightMetrics: {
+    alignItems: 'flex-end',
+  },
+  balanceDueText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  billedText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   invoiceBadge: {
     paddingHorizontal: spacing.sm,

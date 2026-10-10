@@ -9,11 +9,13 @@ import { BusinessProfile } from '../../../domain/profile/types';
 import { formatMoney } from '../../../domain/money/Money';
 import { quantityScaledToString } from '../../../domain/documents/quantity';
 import { escapeHtml, formatDate, getBaseCss } from './commonStyles';
+import { TemplateCustomization } from '../types';
 
 export function renderModernTemplate(
   doc: FullDocument,
   business: BusinessProfile,
-  paperSize: 'a4' | 'letter' = 'a4'
+  paperSize: 'a4' | 'letter' = 'a4',
+  customization?: TemplateCustomization
 ): string {
   const currency = doc.currency || 'USD';
 

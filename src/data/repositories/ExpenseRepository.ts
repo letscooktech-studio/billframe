@@ -56,8 +56,11 @@ export class ExpenseRepository {
     const db = await DatabaseManager.getDatabaseAsync();
     const id = input.id || `exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = Date.now();
-    const businessProfileId = input.businessProfileId || 'default_business_profile';
-    const currency = input.currency || 'USD';
+    const profile = await db.getFirstAsync<{ id: string; default_currency: string }>(
+      'SELECT id, default_currency FROM business_profiles WHERE is_active = 1 LIMIT 1;'
+    );
+    const businessProfileId = input.businessProfileId || profile?.id || 'default_business_profile';
+    const currency = input.currency || profile?.default_currency || 'INR';
     const expenseDate = input.expenseDate || now;
     const isBillable = input.isBillable ? 1 : 0;
 

@@ -20,7 +20,7 @@ describe('Database Migrations Engine Tests', () => {
   it('runs all sequential migrations on a fresh install', async () => {
     const newlyApplied = await MigrationRunner.runMigrationsAsync(mockDb as any);
 
-    expect(newlyApplied.length).toBe(8);
+    expect(newlyApplied.length).toBe(12);
     expect(newlyApplied[0].version).toBe(1);
     expect(newlyApplied[0].name).toBe('v1_baseline_tables');
     expect(newlyApplied[1].version).toBe(2);
@@ -37,9 +37,17 @@ describe('Database Migrations Engine Tests', () => {
     expect(newlyApplied[6].name).toBe('v7_upi_and_payment_connections');
     expect(newlyApplied[7].version).toBe(8);
     expect(newlyApplied[7].name).toBe('v8_sanitize_provider_connections_and_financial_entities');
+    expect(newlyApplied[8].version).toBe(9);
+    expect(newlyApplied[8].name).toBe('v9_document_studio_templates_and_custom_blocks');
+    expect(newlyApplied[9].version).toBe(10);
+    expect(newlyApplied[9].name).toBe('v10_universal_document_engine');
+    expect(newlyApplied[10].version).toBe(11);
+    expect(newlyApplied[10].name).toBe('v11_brand_kit_and_org_identity');
+    expect(newlyApplied[11].version).toBe(12);
+    expect(newlyApplied[11].name).toBe('v12_onboarding_v3_preferences');
 
     const history = await MigrationRunner.getAppliedMigrationsAsync(mockDb as any);
-    expect(history.length).toBe(8);
+    expect(history.length).toBe(12);
     expect(history[0].version).toBe(1);
     expect(history[1].version).toBe(2);
     expect(history[2].version).toBe(3);
@@ -48,6 +56,10 @@ describe('Database Migrations Engine Tests', () => {
     expect(history[5].version).toBe(6);
     expect(history[6].version).toBe(7);
     expect(history[7].version).toBe(8);
+    expect(history[8].version).toBe(9);
+    expect(history[9].version).toBe(10);
+    expect(history[10].version).toBe(11);
+    expect(history[11].version).toBe(12);
   });
 
   it('is completely idempotent when run multiple times', async () => {
@@ -105,8 +117,8 @@ describe('Database Migrations Engine Tests', () => {
     // Run migration runner
     const newlyApplied = await MigrationRunner.runMigrationsAsync(mockDb as any);
 
-    // Versions 3, 4, 5, 6, 7, and 8 should be applied
-    expect(newlyApplied.length).toBe(6);
+    // Versions 3, 4, 5, 6, 7, 8, 9, 10, 11, and 12 should be applied
+    expect(newlyApplied.length).toBe(10);
     expect(newlyApplied[0].version).toBe(3);
     expect(newlyApplied[0].name).toBe('v3_expand_payments_forward_compatible');
     expect(newlyApplied[1].version).toBe(4);
@@ -119,6 +131,12 @@ describe('Database Migrations Engine Tests', () => {
     expect(newlyApplied[4].name).toBe('v7_upi_and_payment_connections');
     expect(newlyApplied[5].version).toBe(8);
     expect(newlyApplied[5].name).toBe('v8_sanitize_provider_connections_and_financial_entities');
+    expect(newlyApplied[6].version).toBe(9);
+    expect(newlyApplied[6].name).toBe('v9_document_studio_templates_and_custom_blocks');
+    expect(newlyApplied[7].version).toBe(10);
+    expect(newlyApplied[7].name).toBe('v10_universal_document_engine');
+    expect(newlyApplied[8].version).toBe(11);
+    expect(newlyApplied[8].name).toBe('v11_brand_kit_and_org_identity');
 
     // Existing customer and invoice records must be completely intact
     expect(mockDb.state.customers.find((c) => c.id === 'cust_pre')).toBeDefined();

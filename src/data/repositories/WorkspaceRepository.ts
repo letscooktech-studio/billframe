@@ -57,6 +57,11 @@ export class WorkspaceRepository {
         profile_version?: number;
         workspace_config_version?: number;
         geography_dataset_version?: string;
+        primary_intent?: string;
+        favorite_document_types_json?: string;
+        selected_document_families_json?: string;
+        onboarding_state?: string;
+        onboarding_step?: number;
       }>(
         'SELECT * FROM workspace_preferences WHERE business_profile_id = ? LIMIT 1;',
         [profileId]
@@ -77,6 +82,20 @@ export class WorkspaceRepository {
         primaryModules = DEFAULT_WORKSPACE_PREFERENCES.primaryModules;
       }
 
+      let favoriteDocumentTypes: string[] = [];
+      try {
+        favoriteDocumentTypes = JSON.parse(row.favorite_document_types_json || '[]');
+      } catch {
+        favoriteDocumentTypes = [];
+      }
+
+      let selectedDocumentFamilies: string[] = [];
+      try {
+        selectedDocumentFamilies = JSON.parse(row.selected_document_families_json || '[]');
+      } catch {
+        selectedDocumentFamilies = [];
+      }
+
       return {
         id: row.id,
         businessProfileId: row.business_profile_id,
@@ -91,11 +110,16 @@ export class WorkspaceRepository {
         layoutLocked: row.layout_locked === 1,
         primaryModules,
         onboardingCompleted: row.onboarding_completed === 1,
-        onboardingVersion: row.onboarding_version ?? 1,
+        onboardingVersion: row.onboarding_version ?? 3,
         onboardingCompletedAt: row.onboarding_completed_at ?? null,
         profileVersion: row.profile_version ?? 1,
         workspaceConfigVersion: row.workspace_config_version ?? 1,
         geographyDatasetVersion: row.geography_dataset_version ?? '2026.01',
+        primaryIntent: (row.primary_intent as any) || 'business_documents',
+        favoriteDocumentTypes,
+        selectedDocumentFamilies,
+        onboardingState: (row.onboarding_state as any) || (row.onboarding_completed === 1 ? 'completed' : 'not_started'),
+        onboardingStep: row.onboarding_step ?? 1,
       };
     } catch {
       return {
@@ -124,6 +148,8 @@ export class WorkspaceRepository {
 
     const now = Date.now();
     const primaryJson = JSON.stringify(merged.primaryModules || []);
+    const favoritesJson = JSON.stringify(merged.favoriteDocumentTypes || []);
+    const familiesJson = JSON.stringify(merged.selectedDocumentFamilies || []);
 
     await db.runAsync(
       `INSERT INTO workspace_preferences (
@@ -133,8 +159,10 @@ export class WorkspaceRepository {
          layout_locked, primary_modules_json, onboarding_completed,
          onboarding_version, onboarding_completed_at, profile_version,
          workspace_config_version, geography_dataset_version,
+         primary_intent, favorite_document_types_json, selected_document_families_json,
+         onboarding_state, onboarding_step,
          created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          business_type = excluded.business_type,
          sales_type = excluded.sales_type,
@@ -152,6 +180,11 @@ export class WorkspaceRepository {
          profile_version = excluded.profile_version,
          workspace_config_version = excluded.workspace_config_version,
          geography_dataset_version = excluded.geography_dataset_version,
+         primary_intent = excluded.primary_intent,
+         favorite_document_types_json = excluded.favorite_document_types_json,
+         selected_document_families_json = excluded.selected_document_families_json,
+         onboarding_state = excluded.onboarding_state,
+         onboarding_step = excluded.onboarding_step,
          updated_at = excluded.updated_at;`,
       [
         merged.id,
@@ -167,17 +200,36 @@ export class WorkspaceRepository {
         merged.layoutLocked ? 1 : 0,
         primaryJson,
         merged.onboardingCompleted ? 1 : 0,
-        merged.onboardingVersion ?? 1,
+        merged.onboardingVersion ?? 3,
         merged.onboardingCompletedAt ?? (merged.onboardingCompleted ? now : null),
         merged.profileVersion ?? 1,
         merged.workspaceConfigVersion ?? 1,
         merged.geographyDatasetVersion ?? '2026.01',
+        merged.primaryIntent || 'business_documents',
+        favoritesJson,
+        familiesJson,
+        merged.onboardingState || (merged.onboardingCompleted ? 'completed' : 'not_started'),
+        merged.onboardingStep ?? 1,
         now,
         now,
       ]
     );
 
     return merged;
+  }
+
+  /**
+   * Resumes or updates in-progress onboarding state atomically.
+   */
+  public static async updateOnboardingProgressAsync(
+    progress: Partial<WorkspacePreferences>,
+    targetProfileId?: string
+  ): Promise<WorkspacePreferences> {
+    return this.savePreferencesAsync({
+      ...progress,
+      businessProfileId: targetProfileId,
+      onboardingState: 'in_progress',
+    });
   }
 
   /**

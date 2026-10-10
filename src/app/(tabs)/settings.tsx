@@ -1,9 +1,3 @@
-/**
- * SETTINGS HUB
- * Focused, organized configurations and preferences for business operations:
- * Profile, Taxes, Payment Methods, Security, Backups, and Sovereign Privacy.
- */
-
 import React, { useState } from 'react';
 import {
   StyleSheet,
@@ -27,8 +21,17 @@ import {
   ChevronRight,
   Sparkles,
   Sliders,
+  Zap,
+  Palette,
+  Clock,
+  QrCode,
+  Package,
+  Receipt,
+  FileSpreadsheet,
+  Users,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { AuroraBackground } from '../../components/common/AuroraBackground';
 
 interface SettingItemProps {
   icon: React.ReactNode;
@@ -46,8 +49,8 @@ export default function SettingsScreen() {
 
   const handleAbout = () => {
     Alert.alert(
-      'Billframe',
-      'Version 1.0.0 (Android API 36 Native Build)\n\n• Sovereign, 100% Local-First Invoicing\n• Offline-First SQLite Persistence\n• Canonical BigInt Integer Money Core\n• Direct Zero-Fee UPI & Regional Tax Packs\n• Zero Mandatory Cloud Accounts or Telemetry',
+      'Billframe 2.0',
+      'Version 2.0.0 (Android Native Build)\n\n• Sovereign, 100% Local-First Business Document OS\n• Offline-First SQLite Persistence\n• Canonical BigInt Integer Money Core\n• Direct Zero-Fee UPI & Regional Tax Packs\n• Zero Mandatory Cloud Accounts or Telemetry',
       [{ text: 'Close', style: 'default' }]
     );
   };
@@ -90,96 +93,150 @@ export default function SettingsScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <ScrollView
-        style={styles.scrollArea}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Settings</Text>
-            <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-              Workspace Configuration & Preferences
-            </Text>
-          </View>
+    <AuroraBackground section="all" intensity="subtle">
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.container}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>All Features</Text>
+              <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
+                Complete Workspace Directory & Settings
+              </Text>
+            </View>
 
-          {/* Business Group */}
-          <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>BUSINESS & INVOICING</Text>
-          <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-            {renderItem({
-              icon: <Building2 color={theme.brandAnchor} size={20} />,
-              title: 'Business Profile',
-              subtitle: 'Business name, address, phone, email & document prefixes',
-              onPress: () => router.push('/onboarding/setup'),
-            })}
-            {renderItem({
-              icon: <Sliders color={theme.brandAnchor} size={20} />,
-              title: 'Tax Engine & Rules',
-              subtitle: 'Regional tax framework, GST/VAT rates & HSN/SAC search',
-              onPress: () => router.push('/settings/workspace'),
-            })}
-            {renderItem({
-              icon: <CreditCard color={theme.brandAnchor} size={20} />,
-              title: 'Payment Methods & Gateways',
-              subtitle: 'Direct UPI VPA, Razorpay, Cashfree & Stripe connections',
-              onPress: () => router.push('/settings/payments'),
-              isLast: true,
-            })}
-          </View>
+            {/* Section 1: Sales & Documents */}
+            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>SALES & DOCUMENTS</Text>
+            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              {renderItem({
+                icon: <FileText color={theme.brandAnchor} size={20} />,
+                title: 'Invoices & Estimates',
+                subtitle: 'Official tax invoices, quotes & proforma documents',
+                onPress: () => router.push('/(tabs)/documents'),
+              })}
+              {renderItem({
+                icon: <Zap color={theme.brandAnchor} size={20} />,
+                title: '30s Quick Bill',
+                subtitle: 'Instant counter billing with dynamic offline UPI QR code',
+                badge: 'Fast',
+                onPress: () => router.push('/quick-bill'),
+              })}
+              {renderItem({
+                icon: <Palette color={theme.brandAnchor} size={20} />,
+                title: 'Template Studio',
+                subtitle: 'Customize PDF typography, layout, brand colors & Rule 46 tables',
+                badge: 'Studio',
+                onPress: () => router.push('/templates' as any),
+                isLast: true,
+              })}
+            </View>
 
-          {/* Security & Data Group */}
-          <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>SECURITY & DATA</Text>
-          <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-            {renderItem({
-              icon: <Lock color={theme.brandAnchor} size={20} />,
-              title: 'App Lock & Security PIN',
-              subtitle: 'Biometrics and PIN lock on application resume',
-              onPress: () => router.push('/security-pin'),
-            })}
-            {renderItem({
-              icon: <Database color={theme.brandAnchor} size={20} />,
-              title: 'Backup & Restore',
-              subtitle: 'Export encrypted SQLite database or restore from file',
-              onPress: () => router.push('/backup'),
-            })}
-            {renderItem({
-              icon: <Sparkles color={theme.brandAnchor} size={20} />,
-              title: 'Customize Onboarding',
-              subtitle: 'Re-run business persona and regional location setup',
-              onPress: () => router.push('/onboarding'),
-              isLast: true,
-            })}
-          </View>
+            {/* Section 2: Payments & Collections */}
+            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>PAYMENTS & COLLECTIONS</Text>
+            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              {renderItem({
+                icon: <Clock color={theme.brandAnchor} size={20} />,
+                title: 'Collections Hub',
+                subtitle: 'Accounts receivable aging, payment reminders & overdue tracking',
+                onPress: () => router.push('/collections'),
+              })}
+              {renderItem({
+                icon: <QrCode color={theme.brandAnchor} size={20} />,
+                title: 'Payment Gateways & UPI',
+                subtitle: 'Direct UPI VPA, QR codes, Razorpay, Cashfree & Stripe',
+                onPress: () => router.push('/settings/payments'),
+                isLast: true,
+              })}
+            </View>
 
-          {/* Privacy & System Group */}
-          <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>SYSTEM & PRIVACY</Text>
-          <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-            {renderItem({
-              icon: <Shield color={theme.brandAnchor} size={20} />,
-              title: 'Sovereign Privacy Commitment',
-              subtitle: 'Zero telemetry, zero cloud tracking, 100% on-device',
-              onPress: handlePrivacy,
-            })}
-            {renderItem({
-              icon: <Info color={theme.brandAnchor} size={20} />,
-              title: 'About Billframe',
-              subtitle: 'Version 1.0.0 (API 36 native build)',
-              badge: 'v1.0.0',
-              onPress: handleAbout,
-              isLast: true,
-            })}
+            {/* Section 3: Business Operations */}
+            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>BUSINESS OPERATIONS</Text>
+            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              {renderItem({
+                icon: <Package color={theme.brandAnchor} size={20} />,
+                title: 'Item Catalog & Inventory',
+                subtitle: 'Products, services, HSN/SAC codes & unit pricing',
+                onPress: () => router.push('/catalog'),
+              })}
+              {renderItem({
+                icon: <Receipt color={theme.brandAnchor} size={20} />,
+                title: 'Expense Records',
+                subtitle: 'Categorized business expenses, receipts & operational outflows',
+                onPress: () => router.push('/expenses'),
+              })}
+              {renderItem({
+                icon: <FileSpreadsheet color={theme.brandAnchor} size={20} />,
+                title: 'Financial Reports & Tax',
+                subtitle: 'Profit & loss, cash flow, GST summary & sales tax export',
+                onPress: () => router.push('/reports'),
+                isLast: true,
+              })}
+            </View>
+
+            {/* Section 4: Data & System Configuration */}
+            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>DATA & SYSTEM</Text>
+            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              {renderItem({
+                icon: <Building2 color={theme.brandAnchor} size={20} />,
+                title: 'Business Profile',
+                subtitle: 'Business identity, address, GSTIN/PAN & numbering sequences',
+                onPress: () => router.push('/onboarding/setup'),
+              })}
+              {renderItem({
+                icon: <Palette color={theme.brandAnchor} size={20} />,
+                title: 'Organization Brand Kit',
+                subtitle: 'Company logo, letterhead presets, brand identity & footer defaults',
+                badge: 'Brand Kit',
+                onPress: () => router.push('/templates/edit' as any),
+              })}
+              {renderItem({
+                icon: <Sliders color={theme.brandAnchor} size={20} />,
+                title: 'Tax Engine & Rules',
+                subtitle: 'Regional tax configuration, IGST/CGST/SGST & thresholds',
+                onPress: () => router.push('/settings/workspace'),
+              })}
+              {renderItem({
+                icon: <Lock color={theme.brandAnchor} size={20} />,
+                title: 'Security & App Lock',
+                subtitle: 'Device biometrics and PIN lock on application resume',
+                onPress: () => router.push('/security-pin'),
+              })}
+              {renderItem({
+                icon: <Database color={theme.brandAnchor} size={20} />,
+                title: 'Backup & Restore',
+                subtitle: 'Encrypted SQLite database backup export & restore',
+                onPress: () => router.push('/backup'),
+              })}
+              {renderItem({
+                icon: <Shield color={theme.brandAnchor} size={20} />,
+                title: 'Sovereign Privacy',
+                subtitle: 'Zero cloud tracking, zero analytics, 100% on-device data',
+                onPress: handlePrivacy,
+              })}
+              {renderItem({
+                icon: <Info color={theme.brandAnchor} size={20} />,
+                title: 'About Billframe',
+                subtitle: 'Version 2.0.0 (Android Native Build)',
+                badge: 'v2.0',
+                onPress: handleAbout,
+                isLast: true,
+              })}
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   scrollArea: {
     flex: 1,

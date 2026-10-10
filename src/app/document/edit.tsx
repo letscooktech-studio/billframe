@@ -20,6 +20,7 @@ import {
   BackHandler,
   Modal,
   Alert,
+  Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -69,6 +70,8 @@ import {
 import { TaxExplainabilityEngine } from '../../domain/tax/TaxExplainability';
 import { TaxExplanationModal } from '../../features/tax/TaxExplanationModal';
 import { showAlert } from '../../utils/alert';
+import { BusinessProfile } from '../../domain/profile/types';
+import { LogoUploader } from '../../components/common/LogoUploader';
 
 const COMMON_CURRENCIES = [
   { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
@@ -102,6 +105,7 @@ export default function DocumentEditScreen() {
 
   // Form State
   const [docId, setDocId] = useState<string>(existingId || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [businessProfileId, setBusinessProfileId] = useState<string>('default_business_profile');
   const [currency, setCurrency] = useState<string>('USD');
   const [documentLocale, setDocumentLocale] = useState<string>('en-US');
@@ -168,6 +172,11 @@ export default function DocumentEditScreen() {
   // Load initial data
   useEffect(() => {
     async function loadInitial() {
+      const activeProf = await BusinessProfileRepository.getActiveProfile();
+      if (activeProf) {
+        setBusinessProfile(activeProf);
+      }
+
       if (existingId) {
         const existing = await DocumentRepository.getById(existingId);
         if (existing) {
@@ -527,18 +536,16 @@ export default function DocumentEditScreen() {
     setHasAttemptedIssue(true);
     setServerErrorMessage(null);
 
-    // 1. Resolve client (selected customer or inline typed name)
+    // 1. Resolve client (selected customer, inline typed name, or graceful default)
     let activeCustomer = customer;
-    const effectiveName = (customer?.name || inlineCustomerName).trim();
+    let effectiveName = (customer?.name || inlineCustomerName).trim();
 
     if (!effectiveName) {
-      const msg = `Client or business name is required before issuing this official ${docType}.`;
-      setServerErrorMessage(msg);
-      showAlert('Client Name Required', msg);
-      return;
+      effectiveName = 'Walk-in Customer';
+      setInlineCustomerName('Walk-in Customer');
     }
 
-    // Auto-create customer record if typed inline and not yet saved
+    // Auto-create customer record if typed inline or defaulted and not yet saved
     if (!activeCustomer) {
       try {
         activeCustomer = await CustomerRepository.create({
@@ -557,21 +564,21 @@ export default function DocumentEditScreen() {
       }
     }
 
-    // 2. Resolve line items: if list is empty but quick inputs are filled, auto-add
+    // 2. Resolve line items: if quick item inputs are filled, auto-add to activeItems
     let activeItems = [...items];
-    if (activeItems.length === 0 && quickItemDesc.trim() && quickItemPrice.trim()) {
+    if (quickItemDesc.trim() && quickItemPrice.trim()) {
       try {
         const qtyScaled = parseQuantityStringToScaled(quickItemQty.trim() || '1');
         const priceMoney = parseDecimalStringToMoney(quickItemPrice.trim() || '0', currency);
         if (qtyScaled > 0n && priceMoney.amountMinor >= 0n) {
           const autoItem: LineItemInput = {
-            id: `item_${Date.now()}_0`,
+            id: `item_${Date.now()}_${activeItems.length}`,
             description: quickItemDesc.trim(),
             quantityScaled: qtyScaled,
             unitName: quickItemUnit.trim() || 'item',
             unitPriceMinor: priceMoney.amountMinor,
           };
-          activeItems = [autoItem];
+          activeItems = [...activeItems, autoItem];
           setItems(activeItems);
           setQuickItemDesc('');
           setQuickItemQty('1');
@@ -647,6 +654,7 @@ export default function DocumentEditScreen() {
       const msg = err.message || 'Failed to issue document';
       setServerErrorMessage(msg);
       showAlert('Unable to Issue Document', msg);
+    } finally {
       setIsIssuing(false);
       isSubmittingRef.current = false;
     }
@@ -820,6 +828,19 @@ export default function DocumentEditScreen() {
                 <Text style={[styles.errorBannerText, { color: theme.statusDanger }]}>{serverErrorMessage}</Text>
               </View>
             )}
+
+            {/* Organization Logo & Brand Mark */}
+            <LogoUploader
+              logoUri={businessProfile?.logo_uri}
+              profileId={businessProfile?.id}
+              autoSaveProfile={true}
+              compact={false}
+              label="Organization Logo & Brand Mark"
+              description="Displays in the gold header frame on this invoice and all exported PDFs."
+              onLogoChange={(newUri) => {
+                setBusinessProfile((prev) => (prev ? { ...prev, logo_uri: newUri } : null));
+              }}
+            />
 
             {/* 1. Customer Section (Universally Required) */}
             <View style={styles.sectionBlock}>
@@ -1794,6 +1815,15 @@ export default function DocumentEditScreen() {
                 {/* Header */}
                 <View style={styles.previewHeaderRow}>
                   <View>
+                    {businessProfile?.logo_uri ? (
+                      <View style={{ marginBottom: 6 }}>
+                        <Image
+                          source={{ uri: businessProfile.logo_uri }}
+                          style={{ width: 48, height: 48, borderRadius: 4 }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                    ) : null}
                     <Text style={[styles.previewDocType, { color: theme.textPrimary }]}>
                       {docType.toUpperCase()}
                     </Text>

@@ -26,7 +26,15 @@ export type DocumentType =
   | 'delivery_note'
   | 'work_order'
   | 'proposal'
-  | 'sow';
+  | 'sow'
+  | 'tax_invoice'
+  | 'bill_of_supply'
+  | 'export_invoice'
+  | 'quotation'
+  | 'purchase_order'
+  | 'delivery_challan'
+  | 'debit_note'
+  | 'payment_voucher';
 
 /**
  * Orthogonal document lifecycle statuses

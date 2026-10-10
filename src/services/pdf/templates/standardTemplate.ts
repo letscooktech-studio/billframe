@@ -11,11 +11,13 @@ import { quantityScaledToString } from '../../../domain/documents/quantity';
 import { escapeHtml, formatDate, getBaseCss } from './commonStyles';
 import { DirectUpiEngine } from '../../../domain/payments/upi/DirectUpiEngine';
 import { QrCodeGenerator } from '../../../domain/payments/upi/QrCodeGenerator';
+import { TemplateCustomization } from '../types';
 
 export function renderStandardTemplate(
   doc: FullDocument,
   business: BusinessProfile,
-  paperSize: 'a4' | 'letter' = 'a4'
+  paperSize: 'a4' | 'letter' = 'a4',
+  customization?: TemplateCustomization
 ): string {
   const currency = doc.currency || 'USD';
 
@@ -95,11 +97,21 @@ export function renderStandardTemplate(
     statusBadge = '<span class="badge badge-draft">Draft</span>';
   }
 
+  const brandColor = customization?.brand_color || '#0f172a';
+  const secondaryColor = customization?.secondary_color || '#475569';
+  const showLogo = customization?.show_logo !== false && !!business.logo_uri;
+  const showQr = customization?.show_payment_qr !== false;
+  const showTerms = customization?.show_terms !== false;
+  const showSignature = customization?.show_signature !== false;
+  const customDeclaration = customization?.custom_declaration;
+  const customFooterNotes = customization?.custom_footer_notes;
+
   let upiSection = '';
   if (
     doc.doc_type === 'invoice' &&
     business.upi_vpa &&
-    (doc.balance_minor ?? doc.total_minor) > 0
+    (doc.balance_minor ?? doc.total_minor) > 0 &&
+    showQr
   ) {
     try {
       const balanceMinorBig = BigInt(doc.balance_minor ?? doc.total_minor);
@@ -111,7 +123,7 @@ export function renderStandardTemplate(
         transactionRef: doc.document_number,
         transactionNote: `Invoice ${doc.document_number}`,
       });
-      const qrSvg = QrCodeGenerator.generateSvg(conversion.upiUri, 110, { color: '#0f172a', backgroundColor: '#ffffff' });
+      const qrSvg = QrCodeGenerator.generateSvg(conversion.upiUri, 110, { color: brandColor, backgroundColor: '#ffffff' });
 
       const amountDisplay = conversion.isConverted
         ? `<div style="font-size: 11px; color: #059669; font-weight: 700; margin-top: 2px;">Pay: ₹${moneyToDecimalString(createMoney(conversion.inrAmountMinor!, 'INR'))} INR <span style="font-size: 10px; color: #64748b; font-weight: normal;">(${escapeHtml(conversion.conversionSummary || '')})</span></div>`
@@ -120,9 +132,9 @@ export function renderStandardTemplate(
       upiSection = `
         <div style="margin-top: 14px; margin-bottom: 14px; padding: 12px 14px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: space-between;">
           <div>
-            <div style="font-weight: 700; color: #0f172a; font-size: 12px; margin-bottom: 3px;">Scan &amp; Pay via UPI (0% Fee)</div>
+            <div style="font-weight: 700; color: ${brandColor}; font-size: 12px; margin-bottom: 3px;">Scan &amp; Pay via UPI (0% Fee)</div>
             <div style="font-size: 11px; color: #475569;">GPay, PhonePe, Paytm, BHIM, or any UPI app</div>
-            <div style="font-size: 11px; color: #0f172a; font-weight: 600; margin-top: 5px;">UPI ID: ${escapeHtml(business.upi_vpa)}</div>
+            <div style="font-size: 11px; color: ${brandColor}; font-weight: 600; margin-top: 5px;">UPI ID: ${escapeHtml(business.upi_vpa)}</div>
             ${amountDisplay}
           </div>
           <div style="background-color: #ffffff; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; display: inline-block;">
@@ -148,7 +160,7 @@ export function renderStandardTemplate(
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          border-bottom: 2px solid #0f172a;
+          border-bottom: 2px solid ${brandColor};
           padding-bottom: 20px;
           margin-bottom: 20px;
         }
@@ -156,7 +168,7 @@ export function renderStandardTemplate(
         .biz-title {
           font-size: 20px;
           font-weight: 800;
-          color: #0f172a;
+          color: ${brandColor};
           letter-spacing: -0.3px;
         }
 
@@ -167,7 +179,7 @@ export function renderStandardTemplate(
         .doc-title-main {
           font-size: 24px;
           font-weight: 900;
-          color: #0f172a;
+          color: ${brandColor};
           letter-spacing: 0.5px;
           line-height: 1.1;
         }
@@ -184,7 +196,7 @@ export function renderStandardTemplate(
         }
 
         .meta-table td.label {
-          color: #64748b;
+          color: ${secondaryColor};
           font-weight: 600;
         }
 
@@ -209,7 +221,7 @@ export function renderStandardTemplate(
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          color: #64748b;
+          color: ${secondaryColor};
           margin-bottom: 6px;
         }
       </style>
@@ -219,6 +231,7 @@ export function renderStandardTemplate(
         <!-- Header -->
         <div class="header-layout">
           <div>
+            ${showLogo ? `<div style="margin-bottom: 8px;"><img src="${escapeHtml(business.logo_uri!)}" style="max-height: 48px; max-width: 140px; object-fit: contain;" alt="Logo" /></div>` : ''}
             <div class="biz-title">${escapeHtml(business.name)}</div>
             ${business.legal_name && business.legal_name !== business.name ? `<div style="color: #64748b; font-size: 12px;">${escapeHtml(business.legal_name)}</div>` : ''}
             ${business.address_line1 ? `<div style="margin-top: 4px; color: #475569;">${escapeHtml(business.address_line1)}</div>` : ''}
@@ -334,7 +347,7 @@ export function renderStandardTemplate(
         ${upiSection}
 
         <!-- Payment Instructions & Notes -->
-        ${(doc.payment_instructions || doc.notes || doc.terms) ? `
+        ${(doc.payment_instructions || doc.notes || (doc.terms && showTerms)) ? `
           <div class="footer-block">
             ${doc.payment_instructions ? `
               <div style="margin-bottom: 12px;">
@@ -348,7 +361,7 @@ export function renderStandardTemplate(
                 <div style="margin-top: 3px; white-space: pre-line; color: #475569;">${escapeHtml(doc.notes)}</div>
               </div>
             ` : ''}
-            ${doc.terms ? `
+            ${(doc.terms && showTerms) ? `
               <div style="margin-bottom: 8px;">
                 <strong style="color: #334155; font-size: 12px;">Terms & Conditions:</strong>
                 <div style="margin-top: 3px; white-space: pre-line; color: #64748b; font-size: 10.5px;">${escapeHtml(doc.terms)}</div>
@@ -357,14 +370,29 @@ export function renderStandardTemplate(
           </div>
         ` : ''}
 
+        <!-- Custom Declaration -->
+        ${customDeclaration ? `
+          <div style="margin-top: 14px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 11.5px; color: ${secondaryColor};">
+            <strong style="color: ${brandColor};">Declaration:</strong>
+            <div style="margin-top: 2px; white-space: pre-line;">${escapeHtml(customDeclaration)}</div>
+          </div>
+        ` : ''}
+
         <!-- Signature Section if applicable -->
-        ${doc.signature_uri ? `
+        ${(doc.signature_uri && showSignature) ? `
           <div class="signature-box">
             <div class="signature-inner">
               <div style="color: #059669; margin-bottom: 4px; font-size: 12px;">Accepted &amp; Signed</div>
               ${doc.signature_date ? `<div>${formatDate(doc.signature_date)}</div>` : ''}
               <div style="margin-top: 4px; color: #64748b;">Authorized Signature</div>
             </div>
+          </div>
+        ` : ''}
+
+        <!-- Custom Footer Notes -->
+        ${customFooterNotes ? `
+          <div style="margin-top: 20px; text-align: center; font-size: 11px; color: ${secondaryColor}; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
+            ${escapeHtml(customFooterNotes)}
           </div>
         ` : ''}
       </div>

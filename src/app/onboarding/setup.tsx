@@ -21,6 +21,7 @@ import { ArrowLeft, Save, Building2, Check, AlertCircle } from 'lucide-react-nat
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DirectUpiEngine } from '../../domain/payments/upi/DirectUpiEngine';
+import { LogoUploader } from '../../components/common/LogoUploader';
 
 const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'CAD', 'AUD', 'JPY', 'SGD', 'AED'];
 
@@ -43,6 +44,7 @@ export default function BusinessSetupScreen() {
   const [currency, setCurrency] = useState('USD');
   const [upiVpa, setUpiVpa] = useState('');
   const [upiError, setUpiError] = useState<string | null>(null);
+  const [logoUri, setLogoUri] = useState<string | null>(null);
   const [defaultNotes, setDefaultNotes] = useState('');
   const [defaultTerms, setDefaultTerms] = useState('');
 
@@ -75,6 +77,7 @@ export default function BusinessSetupScreen() {
           setCountry(profile.country || 'US');
           setCurrency(profile.default_currency || 'USD');
           setUpiVpa(profile.upi_vpa || '');
+          setLogoUri(profile.logo_uri || null);
           setDefaultNotes(profile.default_notes || '');
           setDefaultTerms(profile.default_payment_terms || '');
         }
@@ -121,7 +124,8 @@ export default function BusinessSetupScreen() {
           name = ?, legal_name = ?, tax_id = ?, email = ?, phone = ?,
           address_line1 = ?, city = ?, state = ?, postal_code = ?, country = ?,
           phone_country_iso2 = ?, phone_e164 = ?, upi_vpa = ?,
-          default_currency = ?, default_notes = ?, default_payment_terms = ?, updated_at = ?
+          default_currency = ?, default_notes = ?, default_payment_terms = ?,
+          logo_uri = ?, updated_at = ?
          WHERE id = ?;`,
         [
           name.trim(),
@@ -140,6 +144,7 @@ export default function BusinessSetupScreen() {
           currency,
           defaultNotes.trim() || null,
           defaultTerms.trim() || null,
+          logoUri || null,
           now,
           profileId,
         ]
@@ -210,6 +215,13 @@ export default function BusinessSetupScreen() {
             {/* Business Info */}
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
               <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>COMPANY DETAILS</Text>
+
+              <LogoUploader
+                logoUri={logoUri}
+                profileId={profileId}
+                autoSaveProfile={true}
+                onLogoChange={(newUri) => setLogoUri(newUri)}
+              />
 
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Business Name *</Text>
               <TextInput

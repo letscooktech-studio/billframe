@@ -16,11 +16,13 @@ import {
   useColorScheme,
   Modal,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, FileText, Plus, ChevronRight, QrCode, Zap, FilePlus2, X } from 'lucide-react-native';
+import { Search, FileText, Plus, ChevronRight, QrCode, Zap, FilePlus2, X, Palette, Receipt } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { AuroraBackground } from '../../components/common/AuroraBackground';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
 import { BusinessProfile } from '../../domain/profile/types';
@@ -47,7 +49,7 @@ export default function DocumentsScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'invoice' | 'estimate' | 'receipt'>('all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'draft' | 'issued'>('all');
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [locale, setLocale] = useState('en-US');
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
@@ -68,30 +70,35 @@ export default function DocumentsScreen() {
       let items: DocumentListItem[] = [];
 
       if (selectedType === 'receipt') {
-        try {
-          let rQuery = `
-            SELECT r.id, 'receipt' AS doc_type, r.receipt_number AS document_number,
-                   COALESCE(c.name, 'Customer') AS customer_name,
-                   COALESCE(p.amount_minor, 0) AS total_minor,
-                   0 AS balance_minor,
-                   COALESCE(d.currency, 'INR') AS currency,
-                   'paid' AS lifecycle_status,
-                   r.issue_date
-            FROM receipts r
-            LEFT JOIN payments p ON r.payment_id = p.id
-            LEFT JOIN documents d ON r.invoice_id = d.id
-            LEFT JOIN customers c ON d.customer_id = c.id
-          `;
-          const rParams: any[] = [];
-          if (searchQuery.trim()) {
-            rQuery += ' WHERE (r.receipt_number LIKE ? OR c.name LIKE ? OR p.reference LIKE ?)';
-            const wild = `%${searchQuery.trim()}%`;
-            rParams.push(wild, wild, wild);
-          }
-          rQuery += ' ORDER BY r.issue_date DESC';
-          items = await db.getAllAsync<DocumentListItem>(rQuery, rParams);
-        } catch {
+        if (selectedStatus === 'draft') {
+          // Receipts cannot be drafts
           items = [];
+        } else {
+          try {
+            let rQuery = `
+              SELECT r.id, 'receipt' AS doc_type, r.receipt_number AS document_number,
+                     COALESCE(c.name, 'Customer') AS customer_name,
+                     COALESCE(p.amount_minor, 0) AS total_minor,
+                     0 AS balance_minor,
+                     COALESCE(d.currency, 'INR') AS currency,
+                     'paid' AS lifecycle_status,
+                     r.issue_date
+              FROM receipts r
+              LEFT JOIN payments p ON r.payment_id = p.id
+              LEFT JOIN documents d ON r.invoice_id = d.id
+              LEFT JOIN customers c ON d.customer_id = c.id
+            `;
+            const rParams: any[] = [];
+            if (searchQuery.trim()) {
+              rQuery += ' WHERE (r.receipt_number LIKE ? OR c.name LIKE ? OR p.reference LIKE ?)';
+              const wild = `%${searchQuery.trim()}%`;
+              rParams.push(wild, wild, wild);
+            }
+            rQuery += ' ORDER BY r.issue_date DESC';
+            items = await db.getAllAsync<DocumentListItem>(rQuery, rParams);
+          } catch {
+            items = [];
+          }
         }
       } else {
         let query = `
@@ -108,9 +115,10 @@ export default function DocumentsScreen() {
           params.push(selectedType);
         }
 
-        if (selectedStatus !== 'all') {
-          query += ' AND d.lifecycle_status = ?';
-          params.push(selectedStatus);
+        if (selectedStatus === 'draft') {
+          query += " AND d.lifecycle_status = 'draft'";
+        } else if (selectedStatus === 'issued') {
+          query += " AND d.lifecycle_status IN ('issued', 'paid')";
         }
 
         if (searchQuery.trim()) {
@@ -154,7 +162,7 @@ export default function DocumentsScreen() {
         }
       }
 
-      // Strict client-side filter guarantee: NEVER show mismatched categories
+      // Strict client-side filter guarantee
       if (selectedType !== 'all') {
         items = items.filter((d) => d.doc_type === selectedType);
       }
@@ -260,71 +268,155 @@ export default function DocumentsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <View style={styles.container}>
-        {/* Screen Header */}
-        <View style={styles.header}>
-          <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Documents</Text>
-          <Pressable
-            style={[styles.createBtn, { backgroundColor: theme.brandAnchor }]}
-            accessibilityRole="button"
-            accessibilityLabel="Create document"
-            onPress={() => {
-              if (selectedType === 'estimate') {
-                router.push({ pathname: '/document/edit', params: { type: 'estimate' } });
-              } else if (selectedType === 'invoice') {
-                router.push({ pathname: '/document/edit', params: { type: 'invoice' } });
-              } else {
-                setShowCreateSheet(true);
-              }
-            }}
-          >
-            <Plus color={theme.brandAnchorText} size={18} strokeWidth={2.5} />
-          </Pressable>
-        </View>
-
-        {/* Search Bar */}
-        <View style={[styles.searchBox, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-          <Search color={theme.textSecondary} size={18} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.textPrimary }]}
-            placeholder="Search documents or customers..."
-            placeholderTextColor={theme.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCorrect={false}
-          />
-        </View>
-
-        {/* Type Filter Pills */}
-        <View style={styles.filterRow}>
-          {(['all', 'invoice', 'estimate', 'receipt'] as const).map((type) => {
-            const isSelected = selectedType === type;
-            return (
+    <AuroraBackground section="documents" intensity="subtle">
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          {/* Screen Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Documents</Text>
+              <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
+                Billing & Document Hub
+              </Text>
+            </View>
+            <View style={styles.headerRightActions}>
               <Pressable
-                key={type}
-                style={[
-                  styles.filterPill,
-                  {
-                    backgroundColor: isSelected ? theme.brandAnchor : theme.surface,
-                    borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
-                  },
-                ]}
-                onPress={() => setSelectedType(type)}
+                style={[styles.templateStudioBtn, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
                 accessibilityRole="button"
+                accessibilityLabel="Open Template Studio"
+                onPress={() => router.push('/templates' as any)}
               >
-                <Text
-                  style={[
-                    styles.filterPillText,
-                    { color: isSelected ? theme.brandAnchorText : theme.textPrimary },
-                  ]}
-                >
-                  {type === 'all' ? 'All' : type === 'invoice' ? 'Invoices' : type === 'estimate' ? 'Estimates' : 'Receipts'}
-                </Text>
+                <Palette color={theme.textPrimary} size={16} />
+                <Text style={[styles.templateStudioBtnText, { color: theme.textPrimary }]}>Studio</Text>
               </Pressable>
-            );
-          })}
-        </View>
+              <Pressable
+                style={[styles.createBtn, { backgroundColor: theme.brandAnchor }]}
+                accessibilityRole="button"
+                accessibilityLabel="Create document"
+                onPress={() => {
+                  if (selectedType === 'estimate') {
+                    router.push({ pathname: '/document/edit', params: { type: 'estimate' } });
+                  } else if (selectedType === 'invoice') {
+                    router.push({ pathname: '/document/edit', params: { type: 'invoice' } });
+                  } else {
+                    setShowCreateSheet(true);
+                  }
+                }}
+              >
+                <Plus color={theme.brandAnchorText} size={18} strokeWidth={2.5} />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Quick Categories Bar */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryScroll}
+            style={styles.categoryScrollView}
+          >
+            <Pressable
+              style={[styles.categoryCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}
+              onPress={() => router.push({ pathname: '/document/edit', params: { type: 'invoice' } })}
+            >
+              <FileText size={16} color={theme.textPrimary} />
+              <Text style={[styles.categoryCardTitle, { color: theme.textPrimary }]}>+ Invoice</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.categoryCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}
+              onPress={() => router.push({ pathname: '/document/edit', params: { type: 'estimate' } })}
+            >
+              <FilePlus2 size={16} color={theme.textPrimary} />
+              <Text style={[styles.categoryCardTitle, { color: theme.textPrimary }]}>+ Estimate</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.categoryCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}
+              onPress={() => router.push('/quick-bill')}
+            >
+              <Zap size={16} color={theme.brandAnchor} />
+              <Text style={[styles.categoryCardTitle, { color: theme.textPrimary }]}>⚡ Quick Bill</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.categoryCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}
+              onPress={() => router.push('/templates' as any)}
+            >
+              <Palette size={16} color={theme.textSecondary} />
+              <Text style={[styles.categoryCardTitle, { color: theme.textPrimary }]}>Templates</Text>
+            </Pressable>
+          </ScrollView>
+
+          {/* Search Bar */}
+          <View style={[styles.searchBox, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
+            <Search color={theme.textSecondary} size={18} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.textPrimary }]}
+              placeholder="Search documents or customers..."
+              placeholderTextColor={theme.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCorrect={false}
+            />
+          </View>
+
+          {/* Document Type Filter Tabs */}
+          <View style={styles.filterRow}>
+            {(['all', 'invoice', 'estimate', 'receipt'] as const).map((type) => {
+              const isSelected = selectedType === type;
+              return (
+                <Pressable
+                  key={type}
+                  style={[
+                    styles.filterPill,
+                    {
+                      backgroundColor: isSelected ? theme.brandAnchor : theme.surface,
+                      borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
+                    },
+                  ]}
+                  onPress={() => setSelectedType(type)}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      { color: isSelected ? theme.brandAnchorText : theme.textPrimary },
+                    ]}
+                  >
+                    {type === 'all' ? 'All' : type === 'invoice' ? 'Invoices' : type === 'estimate' ? 'Estimates' : 'Receipts'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Status Filter Tabs (All / Drafts / Issued) */}
+          <View style={styles.statusFilterRow}>
+            {(['all', 'draft', 'issued'] as const).map((status) => {
+              const isSelected = selectedStatus === status;
+              return (
+                <Pressable
+                  key={status}
+                  style={[
+                    styles.statusPill,
+                    {
+                      backgroundColor: isSelected ? theme.surfaceElevated : 'transparent',
+                      borderColor: isSelected ? theme.borderSubtle : 'transparent',
+                    },
+                  ]}
+                  onPress={() => setSelectedStatus(status)}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      { color: isSelected ? theme.textPrimary : theme.textMuted },
+                    ]}
+                  >
+                    {status === 'all' ? 'All Status' : status === 'draft' ? 'Drafts' : 'Issued'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
         {/* Documents List or Empty State */}
         {documents.length === 0 ? (
@@ -549,12 +641,14 @@ export default function DocumentsScreen() {
         </Modal>
       </View>
     </SafeAreaView>
+  </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
@@ -575,12 +669,71 @@ const styles = StyleSheet.create({
     fontWeight: typography.screenTitle.fontWeight,
     letterSpacing: -0.3,
   },
+  screenSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  templateStudioBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    height: 36,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  templateStudioBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   createBtn: {
     width: 36,
     height: 36,
     borderRadius: radii.sm,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  categoryScrollView: {
+    marginBottom: spacing.md,
+    maxHeight: 46,
+  },
+  categoryScroll: {
+    gap: spacing.sm,
+    paddingRight: spacing.md,
+  },
+  categoryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  categoryCardTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statusFilterRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  statusPill: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   searchBox: {
     flexDirection: 'row',

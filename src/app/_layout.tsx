@@ -10,7 +10,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, Image, useColorScheme } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -30,7 +30,17 @@ function RootLayoutInner() {
 
   const [dbReady, setDbReady] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
+
+  // Lifecycle-safe navigation: Dispatches only after the Stack navigator has cleanly mounted
+  useEffect(() => {
+    if (onboardingCompleted && pendingRoute) {
+      const target = pendingRoute;
+      setPendingRoute(null);
+      router.replace(target as any);
+    }
+  }, [onboardingCompleted, pendingRoute]);
 
   useEffect(() => {
     async function init() {
@@ -80,7 +90,12 @@ function RootLayoutInner() {
   if (!onboardingCompleted) {
     return (
       <OnboardingScreen
-        onCompleted={() => setOnboardingCompleted(true)}
+        onCompleted={(targetRoute?: string) => {
+          if (targetRoute) {
+            setPendingRoute(targetRoute);
+          }
+          setOnboardingCompleted(true);
+        }}
       />
     );
   }
@@ -96,6 +111,10 @@ function RootLayoutInner() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="document/edit" options={{ presentation: 'card' }} />
       <Stack.Screen name="document/[id]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="templates/index" options={{ presentation: 'card' }} />
+      <Stack.Screen name="templates/studio" options={{ presentation: 'card' }} />
+      <Stack.Screen name="templates/edit" options={{ presentation: 'card' }} />
+      <Stack.Screen name="templates/create-type" options={{ presentation: 'card' }} />
       <Stack.Screen name="receipt/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="customer/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="customer/edit" options={{ presentation: 'card' }} />

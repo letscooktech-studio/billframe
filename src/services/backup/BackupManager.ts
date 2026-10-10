@@ -47,6 +47,10 @@ export class BackupManager {
     const payment_refunds = await safeGetAll('SELECT * FROM payment_refunds;');
     const reminder_events = await safeGetAll('SELECT * FROM reminder_events;');
     const invoice_collection_metadata = await safeGetAll('SELECT * FROM invoice_collection_metadata;');
+    const template_customizations = await safeGetAll('SELECT * FROM template_customizations;');
+    const template_assignments = await safeGetAll('SELECT * FROM template_assignments;');
+    const custom_document_types = await safeGetAll('SELECT * FROM custom_document_types;');
+    const document_instances = await safeGetAll('SELECT * FROM document_instances;');
 
     const counts: BackupTableCounts = {
       business_profiles: business_profiles.length,
@@ -90,6 +94,10 @@ export class BackupManager {
       payment_refunds,
       reminder_events,
       invoice_collection_metadata,
+      template_customizations,
+      template_assignments,
+      custom_document_types,
+      document_instances,
     };
 
     // Calculate deterministic SHA-256 checksum over data payload
@@ -253,6 +261,23 @@ export class BackupManager {
               b.postal_code || null, b.country || 'US', b.logo_uri || null, b.default_currency || 'USD',
               b.default_document_locale || 'en-US', b.default_payment_terms || null,
               b.default_notes || null, b.is_active ?? 1, b.created_at, b.updated_at,
+            ]
+          );
+          await safeRun(
+            `UPDATE business_profiles SET
+              website = ?, tagline = ?, signatory_name = ?, signatory_title = ?,
+              bank_name = ?, bank_account_number = ?, bank_ifsc = ?, bank_branch = ?,
+              bank_account_type = ?, header_style = ?, footer_show_signature = ?,
+              footer_show_stamp = ?, footer_show_address = ?
+             WHERE id = ?;`,
+            [
+              (b as any).website || null, (b as any).tagline || null, (b as any).signatory_name || null, (b as any).signatory_title || null,
+              (b as any).bank_name || null, (b as any).bank_account_number || null, (b as any).bank_ifsc || null, (b as any).bank_branch || null,
+              (b as any).bank_account_type || null, (b as any).header_style || 'modern',
+              (b as any).footer_show_signature !== undefined ? (b as any).footer_show_signature : 1,
+              (b as any).footer_show_stamp !== undefined ? (b as any).footer_show_stamp : 1,
+              (b as any).footer_show_address !== undefined ? (b as any).footer_show_address : 1,
+              b.id,
             ]
           );
         }
@@ -522,6 +547,66 @@ export class BackupManager {
               meta.document_id, meta.expected_payment_date || null,
               meta.promise_to_pay_date || null, meta.collection_notes || null,
               meta.updated_at,
+            ]
+          );
+        }
+
+        // 21. Restore template customizations
+        for (const tc of (data as any).template_customizations || []) {
+          await safeRun(
+            `INSERT OR REPLACE INTO template_customizations (
+              id, template_code, business_profile_id, brand_color, secondary_color,
+              font_family, logo_position, show_logo, show_tax_breakdown, show_payment_qr,
+              show_signature, show_terms, custom_declaration, custom_footer_notes,
+              column_visibility_json, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              tc.id, tc.template_code, tc.business_profile_id, tc.brand_color, tc.secondary_color,
+              tc.font_family, tc.logo_position, tc.show_logo, tc.show_tax_breakdown, tc.show_payment_qr,
+              tc.show_signature, tc.show_terms, tc.custom_declaration || null, tc.custom_footer_notes || null,
+              tc.column_visibility_json || '{}', tc.updated_at,
+            ]
+          );
+        }
+
+        // 22. Restore template assignments
+        for (const ta of (data as any).template_assignments || []) {
+          await safeRun(
+            `INSERT OR REPLACE INTO template_assignments (
+              id, business_profile_id, doc_type, template_code, updated_at
+            ) VALUES (?, ?, ?, ?, ?);`,
+            [ta.id, ta.business_profile_id, ta.doc_type, ta.template_code, ta.updated_at]
+          );
+        }
+
+        // 23. Restore custom document types
+        for (const cdt of (data as any).custom_document_types || []) {
+          await safeRun(
+            `INSERT OR REPLACE INTO custom_document_types (
+              id, business_profile_id, code, name, doc_class, category, description,
+              icon, schema_json, default_template, is_system, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              cdt.id, cdt.business_profile_id, cdt.code, cdt.name, cdt.doc_class, cdt.category,
+              cdt.description || null, cdt.icon || null, cdt.schema_json, cdt.default_template || 'letterhead',
+              cdt.is_system || 0, cdt.created_at, cdt.updated_at,
+            ]
+          );
+        }
+
+        // 24. Restore document instances
+        for (const di of (data as any).document_instances || []) {
+          await safeRun(
+            `INSERT OR REPLACE INTO document_instances (
+              id, business_profile_id, type_id, doc_class, document_number, title,
+              status, issue_date, party_name, party_details_json, content_json,
+              template_code, branding_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              di.id, di.business_profile_id, di.type_id, di.doc_class, di.document_number, di.title,
+              di.status, di.issue_date, di.party_name || null, di.party_details_json || null,
+              di.content_json, di.template_code || 'letterhead', di.branding_json || null,
+              di.created_at, di.updated_at,
             ]
           );
         }

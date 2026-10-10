@@ -1,18 +1,18 @@
 /**
- * COMPULSORY ONBOARDING FLOW — 4-STEP MASTER ARCHITECTURE
+ * COMPULSORY ONBOARDING FLOW — ONBOARDING 3.0 MASTER REDESIGN
  * 
- * 100% Offline-First. Zero telemetry.
+ * 100% Offline-First. Zero cloud dependency.
  * 
- * Re-architected 4-step progressive setup:
- * 1. Workspace Type: Tailor Billframe to user's commercial model.
- * 2. Location & Jurisdiction: Country + Searchable Subdivision (No chip walls).
- * 3. Business Identity: Essential profile & invoice branding details.
- * 4. Workspace Preferences: Payment terms, operational toggles & launch confirmation.
- * 
- * Layout: Pinned bottom action dock with safe insets. Never occludes list items.
+ * 4-Step Progressive Journey:
+ * 1. Step 1: Your Work — Intent selection (Business Documents, Invoices & Billing, Operations, Complete Workspace).
+ * 2. Step 2: Your Business — Organization identity (Name, Industry, Country/Currency, Subdivision, Logo, Contact).
+ * 3. Step 3: Your Documents — Personalized document packs with pre-selected favorites & multi-select toggles.
+ * 4. Step 4: Ready to Create — Executive monochrome live preview card with real business name, logo & instant CTAs:
+ *    - "Create my first document" -> routes directly to the relevant document studio/editor.
+ *    - "Explore my workspace" -> routes to dashboard.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -27,9 +27,10 @@ import {
   Alert,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   colors,
   spacing,
@@ -39,15 +40,11 @@ import {
   MAX_CONTENT_WIDTH,
 } from '../design/tokens';
 import {
-  ChevronRight,
-  ChevronDown,
   ArrowRight,
   ArrowLeft,
   Check,
   Search,
-  Shield,
   Building2,
-  Lock,
   Briefcase,
   Store,
   Truck,
@@ -57,103 +54,144 @@ import {
   X,
   CreditCard,
   FileText,
+  ChevronDown,
+  ShieldCheck,
+  Layers,
+  GraduationCap,
+  HelpCircle,
 } from 'lucide-react-native';
 import { BusinessProfileRepository } from '../data/repositories/BusinessProfileRepository';
 import { WorkspaceRepository } from '../data/repositories/WorkspaceRepository';
+import {
+  PrimaryIntent,
+  OnboardingState,
+  WorkspacePreferences,
+} from '../domain/workspace/AdaptiveWorkspaceEngine';
 import { BusinessType } from '../domain/features/FeatureRegistry';
 import { COUNTRIES } from '../data/geography/countries';
 import { SUBDIVISIONS } from '../data/geography/subdivisions';
 import { CountryMetadata, SubdivisionMetadata } from '../data/geography/types';
 import { CountryFlag } from '../components/common/CountryFlag';
 import { normalizePhoneNumber } from '../data/geography/phone';
-import { PaymentTermsPreset } from '../domain/documents/types';
+import { LogoUploader } from '../components/common/LogoUploader';
+import {
+  getRecommendedDocumentsForOnboarding,
+  RecommendedDocumentItem,
+  ALL_ONBOARDING_DOCUMENTS,
+} from '../domain/documents/onboardingRecommendations';
 
-type SalesType = 'services' | 'products' | 'both';
+interface OnboardingScreenProps {
+  onCompleted?: (targetRoute?: string) => void;
+}
+
+interface IntentOption {
+  id: PrimaryIntent;
+  title: string;
+  subtitle: string;
+  description: string;
+  iconName: 'file' | 'card' | 'wrench' | 'sparkles';
+}
+
+const INTENT_OPTIONS: IntentOption[] = [
+  {
+    id: 'business_documents',
+    title: 'Business Documents',
+    subtitle: 'Contracts, job offers, letters, proposals & formal agreements',
+    description: 'Prepares corporate letterhead, HR agreements, non-disclosure & employment documentation.',
+    iconName: 'file',
+  },
+  {
+    id: 'invoices_payments',
+    title: 'Invoices & Billing',
+    subtitle: 'Tax invoices, bills of supply, receipts, estimates & payment collection',
+    description: 'Configures commercial sales billing, tax invoices, cash receipts and customer ledgers.',
+    iconName: 'card',
+  },
+  {
+    id: 'operations',
+    title: 'Operational Documents',
+    subtitle: 'Work orders, purchase orders, delivery notes, inspection logs',
+    description: 'Prepares field service cards, procurement orders, dispatch challans and material records.',
+    iconName: 'wrench',
+  },
+  {
+    id: 'complete_workspace',
+    title: 'Complete Workspace',
+    subtitle: 'All documents, full billing suite, inventory & operations',
+    description: 'Unlocks the full universal document engine with all administrative, billing, and field tools.',
+    iconName: 'sparkles',
+  },
+];
 
 interface BusinessTypeOption {
   id: BusinessType;
   title: string;
   subtitle: string;
-  iconName: 'briefcase' | 'wrench' | 'palette' | 'store' | 'truck' | 'building' | 'sparkles' | 'file';
 }
 
 const BUSINESS_TYPE_OPTIONS: BusinessTypeOption[] = [
   {
     id: 'freelancer',
-    title: 'Freelancer / Independent Creator',
-    subtitle: 'Direct client invoicing, milestone fees & project expenses',
-    iconName: 'palette',
+    title: 'Freelancer / Creator',
+    subtitle: 'Client projects, milestone fees & copyright contracts',
   },
   {
     id: 'service',
     title: 'Service Business / Consultant',
-    subtitle: 'Professional advisory, maintenance, hourly retainers & appointments',
-    iconName: 'briefcase',
+    subtitle: 'Professional services, retainers, client reports & invoices',
   },
   {
     id: 'agency',
-    title: 'Agency / Studio',
-    subtitle: 'Proposals, project estimates, retainers & team billing',
-    iconName: 'sparkles',
+    title: 'Agency / Studio / Tech',
+    subtitle: 'Employment agreements, proposals, client billing & retainers',
   },
   {
     id: 'contractor',
     title: 'Contractor / Trades',
-    subtitle: 'Job estimates, change orders, labor & materials tracking',
-    iconName: 'wrench',
+    subtitle: 'Field work orders, change orders, materials & job estimates',
   },
   {
     id: 'retail',
     title: 'Retail Store / Counter Sales',
-    subtitle: 'Fast counter sales, 30s Quick Bill, product catalog & walk-ins',
-    iconName: 'store',
+    subtitle: 'Fast sales, bills of supply, customer receipts & walk-ins',
   },
   {
     id: 'wholesale',
     title: 'Wholesale / B2B Trading',
-    subtitle: 'Bulk orders, delivery notes, credit terms & client ledgers',
-    iconName: 'truck',
+    subtitle: 'Bulk orders, dispatch challans, vendor POs & client ledgers',
   },
   {
     id: 'professional',
-    title: 'Professional Practice',
-    subtitle: 'Legal, accounting, medical, architecture & technical consulting',
-    iconName: 'building',
+    title: 'Professional / Institution',
+    subtitle: 'Legal, accounting, medical, school & academic documentation',
   },
   {
     id: 'other',
-    title: 'General Small Business',
-    subtitle: 'Clean invoices, receipts, payment tracking & customer management',
-    iconName: 'file',
+    title: 'General Business',
+    subtitle: 'Standard corporate forms, billing, receipts & ledgers',
   },
 ];
-
-const PAYMENT_TERMS_OPTIONS: Array<{ id: PaymentTermsPreset; label: string; desc: string }> = [
-  { id: 'due_on_receipt', label: 'Due on Receipt', desc: 'Payment expected immediately upon receipt' },
-  { id: 'net_7', label: 'Net 7', desc: 'Payment due within 7 days of issue' },
-  { id: 'net_15', label: 'Net 15', desc: 'Payment due within 15 days of issue' },
-  { id: 'net_30', label: 'Net 30', desc: 'Standard business terms: due in 30 days' },
-  { id: 'net_45', label: 'Net 45', desc: 'Payment due within 45 days of issue' },
-  { id: 'net_60', label: 'Net 60', desc: 'Corporate terms: due in 60 days' },
-];
-
-interface OnboardingScreenProps {
-  onCompleted?: () => void;
-}
 
 export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const insets = useSafeAreaInsets();
+
+  const [isLoadingDraft, setIsLoadingDraft] = useState<boolean>(true);
 
   // Active step (1 to 4)
   const [step, setStep] = useState<number>(1);
 
-  // ── Step 1: Workspace Type ──
-  const [businessType, setBusinessType] = useState<BusinessType>('freelancer');
-  const [salesType, setSalesType] = useState<SalesType>('services');
+  // ── Step 1: Your Work ──
+  const [primaryIntent, setPrimaryIntent] = useState<PrimaryIntent>('business_documents');
 
-  // ── Step 2: Location (Country & Subdivision) ──
+  // ── Step 2: Your Business ──
+  const [businessName, setBusinessName] = useState<string>('');
+  const [legalName, setLegalName] = useState<string>('');
+  const [businessType, setBusinessType] = useState<BusinessType>('agency');
+  const [logoUri, setLogoUri] = useState<string | null>(null);
+
   const [selectedCountry, setSelectedCountry] = useState<CountryMetadata>(() => {
     return COUNTRIES.find((c) => c.iso2 === 'IN') || COUNTRIES[0];
   });
@@ -161,33 +199,101 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
   const [showCountryModal, setShowCountryModal] = useState<boolean>(false);
 
   const [selectedSubdivision, setSelectedSubdivision] = useState<SubdivisionMetadata | null>(() => {
-    // Default to Maharashtra for India as a clean starter if IN
     return SUBDIVISIONS.find((s) => s.countryIso2 === 'IN' && s.code === 'IN-MH') || null;
   });
   const [customSubdivision, setCustomSubdivision] = useState<string>('');
   const [subdivisionSearch, setSubdivisionSearch] = useState<string>('');
   const [showSubdivisionModal, setShowSubdivisionModal] = useState<boolean>(false);
 
-  // ── Step 3: Business Identity ──
-  const [businessName, setBusinessName] = useState<string>('');
-  const [legalName, setLegalName] = useState<string>('');
+  // Optional contact details
+  const [showExtraContact, setShowExtraContact] = useState<boolean>(false);
+  const [city, setCity] = useState<string>('');
+  const [addressLine, setAddressLine] = useState<string>('');
+  const [postalCode, setPostalCode] = useState<string>('');
   const [phoneRaw, setPhoneRaw] = useState<string>('');
   const [email, setEmail] = useState<string>('');
-  const [addressLine, setAddressLine] = useState<string>('');
-  const [city, setCity] = useState<string>('');
-  const [postalCode, setPostalCode] = useState<string>('');
-  const [isTaxRegistered, setIsTaxRegistered] = useState<boolean>(false);
   const [taxId, setTaxId] = useState<string>('');
 
-  // ── Step 4: Workspace Preferences ──
-  const [paymentTerms, setPaymentTerms] = useState<PaymentTermsPreset>('net_30');
-  const [trackInventory, setTrackInventory] = useState<boolean>(false);
-  const [partialPayments, setPartialPayments] = useState<'often' | 'sometimes' | 'rarely'>('sometimes');
-  const [directUpiEnabled, setDirectUpiEnabled] = useState<boolean>(true);
+  // ── Step 3: Your Documents ──
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   // Operational State
   const [saving, setSaving] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string>('');
+
+  // ── Load Draft / Restore In-Progress Onboarding ──
+  useEffect(() => {
+    async function loadInitialState() {
+      try {
+        const [profile, prefs] = await Promise.all([
+          BusinessProfileRepository.getActiveProfile(),
+          WorkspaceRepository.getPreferencesAsync(),
+        ]);
+
+        if (prefs) {
+          if (prefs.primaryIntent) setPrimaryIntent(prefs.primaryIntent);
+          if (prefs.businessType) setBusinessType(prefs.businessType);
+          if (prefs.favoriteDocumentTypes && prefs.favoriteDocumentTypes.length > 0) {
+            setSelectedDocIds(prefs.favoriteDocumentTypes);
+          }
+          if (prefs.onboardingStep && prefs.onboardingStep > 1 && prefs.onboardingState === 'in_progress') {
+            setStep(prefs.onboardingStep);
+          }
+        }
+
+        if (profile) {
+          if (profile.name && profile.name !== 'My Business') {
+            setBusinessName(profile.name);
+          }
+          if (profile.legal_name) setLegalName(profile.legal_name);
+          if (profile.logo_uri) setLogoUri(profile.logo_uri);
+          if (profile.city) setCity(profile.city);
+          if (profile.address_line1) setAddressLine(profile.address_line1);
+          if (profile.postal_code) setPostalCode(profile.postal_code);
+          if (profile.phone) setPhoneRaw(profile.phone);
+          if (profile.email) setEmail(profile.email);
+          if (profile.tax_id) setTaxId(profile.tax_id);
+
+          if (profile.country_iso2) {
+            const c = COUNTRIES.find((item) => item.iso2 === profile.country_iso2);
+            if (c) setSelectedCountry(c);
+          }
+          if (profile.subdivision_code) {
+            const s = SUBDIVISIONS.find((item) => item.code === profile.subdivision_code);
+            if (s) setSelectedSubdivision(s);
+          } else if (profile.state) {
+            setCustomSubdivision(profile.state);
+          }
+        }
+      } catch (err) {
+        // Fallback gracefully to default initial state
+      } finally {
+        setIsLoadingDraft(false);
+      }
+    }
+    loadInitialState();
+  }, []);
+
+  // ── Document Recommendations ──
+  const recommendations = useMemo(() => {
+    return getRecommendedDocumentsForOnboarding(primaryIntent, businessType);
+  }, [primaryIntent, businessType]);
+
+  // Synchronize pre-selected document favorites when recommendation set changes
+  useEffect(() => {
+    if (selectedDocIds.length === 0 && recommendations.defaultSelectedIds.length > 0) {
+      setSelectedDocIds(recommendations.defaultSelectedIds);
+    }
+  }, [recommendations]);
+
+  // Top hero document for Step 4 Preview and primary CTA destination
+  const topHeroDocument = useMemo(() => {
+    if (selectedDocIds.length > 0) {
+      const match = recommendations.documents.find((d) => d.id === selectedDocIds[0]);
+      if (match) return match;
+    }
+    return recommendations.topHeroDocument;
+  }, [selectedDocIds, recommendations]);
 
   // Filter countries for country modal
   const filteredCountries = useMemo(() => {
@@ -224,7 +330,6 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
 
   const handleSelectCountry = (country: CountryMetadata) => {
     setSelectedCountry(country);
-    // Find first subdivision for this country if available
     const firstSub = SUBDIVISIONS.find((s) => s.countryIso2 === country.iso2);
     setSelectedSubdivision(firstSub || null);
     setCustomSubdivision('');
@@ -239,31 +344,98 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
     setSubdivisionSearch('');
   };
 
-  const handleNext = () => {
+  const toggleDocumentFavorite = (docId: string) => {
+    setSelectedDocIds((prev) => {
+      if (prev.includes(docId)) {
+        // Keep at least one selected document
+        if (prev.length <= 1) return prev;
+        return prev.filter((id) => id !== docId);
+      } else {
+        return [...prev, docId];
+      }
+    });
+  };
+
+  // ── Step Navigation & In-Progress Draft Persistence ──
+  const handleNext = async () => {
     setValidationError('');
+
     if (step === 1) {
+      // Persist draft for step 1
+      WorkspaceRepository.updateOnboardingProgressAsync({
+        primaryIntent,
+        onboardingStep: 2,
+      }).catch(() => {});
       setStep(2);
     } else if (step === 2) {
-      setStep(3);
-    } else if (step === 3) {
       if (!businessName.trim()) {
-        setValidationError('Business Name is required to issue documents.');
+        setValidationError('Organization / Business Name is required.');
         return;
       }
+
+      // Persist draft profile and step
+      try {
+        const activeProfile = await BusinessProfileRepository.getActiveProfile();
+        const profileId = activeProfile?.id || 'default_business_profile';
+        const subdivisionName = selectedSubdivision?.name || customSubdivision.trim() || undefined;
+
+        await BusinessProfileRepository.updateProfile({
+          id: profileId,
+          name: businessName.trim(),
+          legal_name: legalName.trim() || undefined,
+          country: selectedCountry.name,
+          country_iso2: selectedCountry.iso2,
+          subdivision_code: selectedSubdivision?.code || undefined,
+          subdivision_name: subdivisionName,
+          state: subdivisionName,
+          city: city.trim() || undefined,
+          address_line1: addressLine.trim() || undefined,
+          postal_code: postalCode.trim() || undefined,
+          phone: phoneRaw.trim() || undefined,
+          email: email.trim() || undefined,
+          tax_id: taxId.trim() || undefined,
+          logo_uri: logoUri,
+          default_currency: selectedCountry.currencyCode,
+          default_document_locale: selectedCountry.defaultLocale,
+        });
+
+        await WorkspaceRepository.updateOnboardingProgressAsync({
+          businessType,
+          onboardingStep: 3,
+        });
+      } catch {
+        // Silently continue
+      }
+
+      setStep(3);
+    } else if (step === 3) {
+      // Ensure at least one favorite document is picked
+      if (selectedDocIds.length === 0) {
+        setSelectedDocIds(recommendations.defaultSelectedIds);
+      }
+
+      WorkspaceRepository.updateOnboardingProgressAsync({
+        favoriteDocumentTypes: selectedDocIds.length > 0 ? selectedDocIds : recommendations.defaultSelectedIds,
+        onboardingStep: 4,
+      }).catch(() => {});
+
       setStep(4);
-    } else if (step === 4) {
-      handleFinish();
     }
   };
 
   const handleBack = () => {
     setValidationError('');
     if (step > 1) {
-      setStep(step - 1);
+      const prevStep = step - 1;
+      setStep(prevStep);
+      WorkspaceRepository.updateOnboardingProgressAsync({
+        onboardingStep: prevStep,
+      }).catch(() => {});
     }
   };
 
-  const handleFinish = async () => {
+  // ── Final Completion Handler ──
+  const handleFinish = async (targetRoute?: string) => {
     if (saving) return;
     setSaving(true);
     setValidationError('');
@@ -279,10 +451,10 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
         ? normalizePhoneNumber(phoneRaw, selectedCountry.iso2)
         : null;
 
-      // 1. Update business profile with comprehensive geography and contact details
+      // 1. Commit active business profile
       await BusinessProfileRepository.updateProfile({
         id: profileId,
-        name: businessName.trim() || 'My Business',
+        name: businessName.trim() || 'My Organization',
         legal_name: legalName.trim() || undefined,
         country: selectedCountry.name,
         country_iso2: selectedCountry.iso2,
@@ -298,589 +470,624 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
         email: email.trim() || undefined,
         default_currency: selectedCountry.currencyCode,
         default_document_locale: selectedCountry.defaultLocale,
-        default_payment_terms: paymentTerms,
-        tax_id: isTaxRegistered && taxId.trim() ? taxId.trim() : undefined,
+        tax_id: taxId.trim() || undefined,
+        logo_uri: logoUri,
       });
 
-      // 2. Initialize adaptive workspace preferences with atomic commit
+      // 2. Commit workspace preferences with onboardingCompleted: true
+      const finalDocIds = selectedDocIds.length > 0 ? selectedDocIds : recommendations.defaultSelectedIds;
       await WorkspaceRepository.completeOnboardingAsync({
         businessProfileId: profileId,
         businessType,
-        salesType: businessType === 'retail' || businessType === 'wholesale' ? 'products' : salesType,
-        isGstRegistered: isTaxRegistered,
-        trackInventory,
-        trackJobs: businessType === 'contractor',
-        partialPayments,
-        recurringBilling: businessType === 'agency' || businessType === 'service',
+        primaryIntent,
+        favoriteDocumentTypes: finalDocIds,
+        selectedDocumentFamilies: [primaryIntent],
+        onboardingState: 'completed',
+        onboardingCompleted: true,
+        onboardingVersion: 3,
+        onboardingCompletedAt: Date.now(),
+        onboardingStep: 4,
         adaptiveEnabled: true,
         layoutLocked: false,
-        onboardingCompleted: true,
-        onboardingVersion: 2,
-        onboardingCompletedAt: Date.now(),
-        profileVersion: 1,
-        workspaceConfigVersion: 1,
-        geographyDatasetVersion: '2026.01',
       });
 
+      // 3. Navigate directly to user destination
       if (onCompleted) {
-        onCompleted();
+        onCompleted(targetRoute);
       } else {
-        router.replace('/(tabs)');
+        if (targetRoute) {
+          router.replace(targetRoute as any);
+        } else {
+          router.replace('/(tabs)');
+        }
       }
     } catch (err: any) {
-      Alert.alert('Setup Error', err?.message || 'Failed to complete setup. Please try again.');
+      Alert.alert('Workspace Setup Error', err?.message || 'Failed to complete setup. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const renderTypeIcon = (iconName: BusinessTypeOption['iconName']) => {
-    const iconColor = theme.brandAnchor;
+  const renderIntentIcon = (iconName: IntentOption['iconName']) => {
     switch (iconName) {
-      case 'palette':
-        return <Palette color={iconColor} size={22} />;
-      case 'briefcase':
-        return <Briefcase color={iconColor} size={22} />;
-      case 'sparkles':
-        return <Sparkles color={iconColor} size={22} />;
+      case 'file':
+        return <FileText color="#FFFFFF" size={20} />;
+      case 'card':
+        return <CreditCard color="#FFFFFF" size={20} />;
       case 'wrench':
-        return <Wrench color={iconColor} size={22} />;
-      case 'store':
-        return <Store color={iconColor} size={22} />;
-      case 'truck':
-        return <Truck color={iconColor} size={22} />;
-      case 'building':
-        return <Building2 color={iconColor} size={22} />;
-      default:
-        return <FileText color={iconColor} size={22} />;
+        return <Wrench color="#FFFFFF" size={20} />;
+      case 'sparkles':
+        return <Sparkles color="#FFFFFF" size={20} />;
     }
   };
 
+  if (isLoadingDraft) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: '#0D0E10' }]}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text style={styles.loadingText}>Initializing Workspace...</Text>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0D0E10' }]} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
-        style={styles.keyboardContainer}
+        style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Top Header / Progress Indicator */}
-        <View style={[styles.topHeader, { borderBottomColor: theme.borderSubtle }]}>
-          {step > 1 ? (
-            <Pressable
-              onPress={handleBack}
-              style={styles.backButton}
-              accessibilityRole="button"
-              accessibilityLabel="Go back to previous step"
-            >
-              <ArrowLeft color={theme.textPrimary} size={22} />
-            </Pressable>
-          ) : (
-            <View style={{ width: 40 }} />
-          )}
-
-          <View style={styles.stepIndicatorWrap}>
-            <Text style={[styles.stepIndicatorText, { color: theme.brandAnchor }]}>
-              Step {step} of 4
-            </Text>
-            {/* Step progress bar */}
-            <View style={[styles.progressBarTrack, { backgroundColor: theme.surfaceSecondary }]}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    backgroundColor: theme.brandAnchor,
-                    width: `${(step / 4) * 100}%`,
-                  },
-                ]}
-              />
+        {/* ── Top Header & Progress Stepper ── */}
+        <View style={styles.headerBar}>
+          <View style={styles.brandRow}>
+            <View style={styles.brandMark}>
+              <Text style={styles.brandMarkText}>BF</Text>
+            </View>
+            <Text style={styles.brandTitle}>BILLFRAME</Text>
+            <View style={styles.versionBadge}>
+              <Text style={styles.versionBadgeText}>3.0</Text>
             </View>
           </View>
 
-          <View style={{ width: 40 }} />
+          {/* Stepper bar */}
+          <View style={styles.progressRow}>
+            {[1, 2, 3, 4].map((s) => (
+              <View
+                key={s}
+                style={[
+                  styles.progressSegment,
+                  s <= step ? styles.progressSegmentActive : styles.progressSegmentInactive,
+                ]}
+              />
+            ))}
+          </View>
+          <View style={styles.stepCounterRow}>
+            <Text style={styles.stepCounterText}>
+              Step {step} of 4 •{' '}
+              {step === 1
+                ? 'Your Work'
+                : step === 2
+                ? 'Your Business'
+                : step === 3
+                ? 'Your Documents'
+                : 'Ready to Create'}
+            </Text>
+          </View>
         </View>
 
-        {/* Scrollable Form Body */}
+        {/* ── Scrollable Body Content ── */}
         <ScrollView
-          style={styles.scrollArea}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+          style={styles.scrollContent}
+          contentContainerStyle={[styles.scrollInner, { paddingBottom: insets.bottom + 110 }]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* STEP 1: WORKSPACE TYPE */}
-          {step === 1 && (
-            <View style={styles.stepSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                  What best describes your business?
-                </Text>
-                <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                  Billframe customizes document templates, quick actions, and defaults to your commercial workflow.
-                </Text>
-              </View>
+          {validationError ? (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorText}>⚠ {validationError}</Text>
+            </View>
+          ) : null}
 
-              <View style={styles.cardsList}>
-                {BUSINESS_TYPE_OPTIONS.map((item) => {
-                  const isSelected = businessType === item.id;
+          {/* ══════════════════════════════════════════════════════
+              STEP 1: YOUR WORK (INTENT SELECTION)
+             ══════════════════════════════════════════════════════ */}
+          {step === 1 && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepHeading}>Welcome to Billframe</Text>
+              <Text style={styles.stepSubtitle}>
+                What would you like to create first? You can access any document type at any time.
+              </Text>
+
+              <View style={styles.optionsList}>
+                {INTENT_OPTIONS.map((opt) => {
+                  const isSelected = primaryIntent === opt.id;
                   return (
                     <Pressable
-                      key={item.id}
-                      style={({ pressed }) => [
-                        styles.personaCard,
-                        {
-                          backgroundColor: isSelected ? theme.surfaceSecondary : theme.surface,
-                          borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
-                          borderWidth: isSelected ? 2 : 1,
-                          opacity: pressed ? 0.9 : 1,
-                        },
+                      key={opt.id}
+                      style={[
+                        styles.intentCard,
+                        isSelected && styles.intentCardSelected,
                       ]}
-                      onPress={() => setBusinessType(item.id)}
+                      onPress={() => setPrimaryIntent(opt.id)}
                       accessibilityRole="radio"
                       accessibilityState={{ selected: isSelected }}
-                      accessibilityLabel={item.title}
                     >
-                      <View style={[styles.personaIconBox, { backgroundColor: theme.surface }]}>
-                        {renderTypeIcon(item.iconName)}
+                      <View style={styles.intentTopRow}>
+                        <View style={[styles.intentIconBox, isSelected && styles.intentIconBoxSelected]}>
+                          {renderIntentIcon(opt.iconName)}
+                        </View>
+                        <View style={styles.intentTextWrap}>
+                          <Text style={[styles.intentTitle, isSelected && styles.intentTitleSelected]}>
+                            {opt.title}
+                          </Text>
+                          <Text style={styles.intentSubtitle}>{opt.subtitle}</Text>
+                        </View>
+                        <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+                          {isSelected && <View style={styles.radioInnerDot} />}
+                        </View>
                       </View>
-                      <View style={styles.personaTextWrap}>
-                        <Text style={[styles.personaTitle, { color: theme.textPrimary }]}>
-                          {item.title}
-                        </Text>
-                        <Text style={[styles.personaSubtitle, { color: theme.textSecondary }]}>
-                          {item.subtitle}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.radioCircle,
-                          {
-                            borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
-                            backgroundColor: isSelected ? theme.brandAnchor : 'transparent',
-                          },
-                        ]}
-                      >
-                        {isSelected && <Check color={theme.surface} size={14} strokeWidth={3} />}
-                      </View>
+                      <Text style={styles.intentDescription}>{opt.description}</Text>
                     </Pressable>
                   );
                 })}
               </View>
-
-              {/* Sovereign Guarantee Callout */}
-              <View style={[styles.guaranteeBox, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-                <Shield color={theme.brandAnchor} size={20} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.guaranteeTitle, { color: theme.textPrimary }]}>
-                    Local-First Sovereign Privacy
-                  </Text>
-                  <Text style={[styles.guaranteeBody, { color: theme.textSecondary }]}>
-                    Your customers, invoices, and finances are stored strictly on this device. Zero mandatory cloud accounts.
-                  </Text>
-                </View>
-              </View>
             </View>
           )}
 
-          {/* STEP 2: LOCATION & JURISDICTION */}
+          {/* ══════════════════════════════════════════════════════
+              STEP 2: YOUR BUSINESS (ORGANIZATION IDENTITY)
+             ══════════════════════════════════════════════════════ */}
           {step === 2 && (
-            <View style={styles.stepSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                  Where is your business located?
-                </Text>
-                <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                  Configures your default currency, tax system, phone calling code, and legal document formats.
-                </Text>
-              </View>
-
-              {/* Selected Country Selector Card */}
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>Country *</Text>
-              <Pressable
-                style={[
-                  styles.selectorCard,
-                  { backgroundColor: theme.surface, borderColor: theme.borderSubtle },
-                ]}
-                onPress={() => setShowCountryModal(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Choose Country"
-              >
-                <CountryFlag iso2={selectedCountry.iso2} countryName={selectedCountry.name} size="lg" />
-                <View style={styles.selectorCardInfo}>
-                  <Text style={[styles.selectorCardTitle, { color: theme.textPrimary }]}>
-                    {selectedCountry.name} ({selectedCountry.iso2})
-                  </Text>
-                  <Text style={[styles.selectorCardMeta, { color: theme.textSecondary }]}>
-                    Currency: {selectedCountry.currencyCode} ({selectedCountry.currencySymbol}) • Calling: {selectedCountry.callingCode}
-                  </Text>
-                </View>
-                <ChevronDown color={theme.textMuted} size={20} />
-              </Pressable>
-
-              {/* Subdivision Picker (Searchable Bottom Sheet / Input — NO giant wall of chips) */}
-              <View style={{ marginTop: spacing.lg }}>
-                <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
-                  {selectedCountry.subdivisionType} ({selectedCountry.name})
-                </Text>
-
-                {availableSubdivisions.length > 0 ? (
-                  <Pressable
-                    style={[
-                      styles.selectorCard,
-                      { backgroundColor: theme.surface, borderColor: theme.borderSubtle },
-                    ]}
-                    onPress={() => setShowSubdivisionModal(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Choose ${selectedCountry.subdivisionType}`}
-                  >
-                    <View style={styles.selectorCardInfo}>
-                      <Text style={[styles.selectorCardTitle, { color: theme.textPrimary }]}>
-                        {selectedSubdivision ? selectedSubdivision.name : `Select ${selectedCountry.subdivisionType}`}
-                      </Text>
-                      {selectedSubdivision && (
-                        <Text style={[styles.selectorCardMeta, { color: theme.textSecondary }]}>
-                          Code: {selectedSubdivision.code}
-                        </Text>
-                      )}
-                    </View>
-                    <ChevronDown color={theme.textMuted} size={20} />
-                  </Pressable>
-                ) : (
-                  <TextInput
-                    style={[
-                      styles.textInput,
-                      {
-                        backgroundColor: theme.surface,
-                        borderColor: theme.borderSubtle,
-                        color: theme.textPrimary,
-                      },
-                    ]}
-                    placeholder={`Enter your ${selectedCountry.subdivisionType.toLowerCase()}`}
-                    placeholderTextColor={theme.textMuted}
-                    value={customSubdivision}
-                    onChangeText={setCustomSubdivision}
-                  />
-                )}
-              </View>
-
-              {/* Currency & Tax Summary Badge */}
-              <View style={[styles.currencySummaryBadge, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                <View style={styles.summaryBadgeItem}>
-                  <Text style={[styles.summaryBadgeLabel, { color: theme.textSecondary }]}>Default Currency</Text>
-                  <Text style={[styles.summaryBadgeValue, { color: theme.textPrimary }]}>
-                    {selectedCountry.currencyCode} ({selectedCountry.currencySymbol})
-                  </Text>
-                </View>
-                <View style={[styles.summaryBadgeDivider, { backgroundColor: theme.borderSubtle }]} />
-                <View style={styles.summaryBadgeItem}>
-                  <Text style={[styles.summaryBadgeLabel, { color: theme.textSecondary }]}>Tax Framework</Text>
-                  <Text style={[styles.summaryBadgeValue, { color: theme.textPrimary }]}>
-                    {selectedCountry.taxSystemName || 'Standard'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* STEP 3: BUSINESS IDENTITY */}
-          {step === 3 && (
-            <View style={styles.stepSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                  Business Details
-                </Text>
-                <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                  This information will be printed as your seller identity on invoices, estimates, and receipts.
-                </Text>
-              </View>
-
-              {validationError ? (
-                <View style={[styles.errorBox, { backgroundColor: theme.surfaceSecondary, borderColor: theme.statusDanger }]}>
-                  <Text style={[styles.errorText, { color: theme.statusDanger }]}>
-                    {validationError}
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* Business Name */}
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
-                Business / Trade Name *
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepHeading}>Organization Identity</Text>
+              <Text style={styles.stepSubtitle}>
+                Set up once. Automatically populates headers, footers & signatures across all documents.
               </Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.borderSubtle,
-                    color: theme.textPrimary,
-                  },
-                ]}
-                placeholder="e.g. Apex Electrical Solutions"
-                placeholderTextColor={theme.textMuted}
-                value={businessName}
-                onChangeText={(t) => {
-                  setValidationError('');
-                  setBusinessName(t);
-                }}
-              />
 
-              {/* Legal Entity Name */}
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary, marginTop: spacing.md }]}>
-                Legal Entity Name (Optional)
-              </Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.borderSubtle,
-                    color: theme.textPrimary,
-                  },
-                ]}
-                placeholder="e.g. Apex Solutions Pvt. Ltd."
-                placeholderTextColor={theme.textMuted}
-                value={legalName}
-                onChangeText={setLegalName}
-              />
-
-              {/* Business Phone with Calling Code Badge */}
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary, marginTop: spacing.md }]}>
-                Business Phone
-              </Text>
-              <View style={styles.phoneInputRow}>
-                <View style={[styles.callingCodeBadge, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                  <CountryFlag iso2={selectedCountry.iso2} size="sm" />
-                  <Text style={[styles.callingCodeText, { color: theme.textPrimary }]}>
-                    {selectedCountry.callingCode}
-                  </Text>
-                </View>
+              {/* Business Name Field */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>
+                  ORGANIZATION / BUSINESS NAME <Text style={styles.reqStar}>*</Text>
+                </Text>
                 <TextInput
-                  style={[
-                    styles.phoneInput,
-                    {
-                      backgroundColor: theme.surface,
-                      borderColor: theme.borderSubtle,
-                      color: theme.textPrimary,
-                    },
-                  ]}
-                  placeholder="e.g. 98765 43210"
-                  placeholderTextColor={theme.textMuted}
-                  value={phoneRaw}
-                  onChangeText={setPhoneRaw}
-                  keyboardType="phone-pad"
+                  style={styles.textInput}
+                  value={businessName}
+                  onChangeText={(val) => {
+                    setBusinessName(val);
+                    if (validationError) setValidationError('');
+                  }}
+                  placeholder="e.g. Apex Engineering or Zenith Technologies"
+                  placeholderTextColor="#64748B"
+                  autoCapitalize="words"
+                  autoCorrect={false}
                 />
               </View>
-              {phoneValidation && phoneValidation.isValid && (
-                <Text style={[styles.helperSuccess, { color: theme.statusSuccess }]}>
-                  Standard format: {phoneValidation.nationalFormatted} ({phoneValidation.e164})
-                </Text>
-              )}
 
-              {/* Business Email */}
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary, marginTop: spacing.md }]}>
-                Business Email (Optional)
-              </Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.borderSubtle,
-                    color: theme.textPrimary,
-                  },
-                ]}
-                placeholder="billing@apexsolutions.com"
-                placeholderTextColor={theme.textMuted}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+              {/* Business Type Selector */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>BUSINESS TYPE / COMMERCIAL MODEL</Text>
+                <View style={styles.typeGrid}>
+                  {BUSINESS_TYPE_OPTIONS.map((bt) => {
+                    const isSelected = businessType === bt.id;
+                    return (
+                      <Pressable
+                        key={bt.id}
+                        style={[
+                          styles.typeCard,
+                          isSelected && styles.typeCardSelected,
+                        ]}
+                        onPress={() => setBusinessType(bt.id)}
+                      >
+                        <Text style={[styles.typeTitle, isSelected && styles.typeTitleSelected]}>
+                          {bt.title}
+                        </Text>
+                        <Text style={styles.typeSubtitle} numberOfLines={2}>
+                          {bt.subtitle}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
 
-              {/* Tax Registration Toggle & Tax ID */}
-              <View style={[styles.taxRegistrationCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle, marginTop: spacing.lg }]}>
+              {/* Country & Currency Selector */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>COUNTRY & PRIMARY CURRENCY</Text>
                 <Pressable
-                  style={styles.toggleRow}
-                  onPress={() => setIsTaxRegistered(!isTaxRegistered)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: isTaxRegistered }}
+                  style={styles.pickerButton}
+                  onPress={() => setShowCountryModal(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select Country and Currency"
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.toggleTitle, { color: theme.textPrimary }]}>
-                      Registered for {selectedCountry.taxSystemName || 'Tax'}?
-                    </Text>
-                    <Text style={[styles.toggleSubtitle, { color: theme.textSecondary }]}>
-                      Prints your official {selectedCountry.taxSystemName || 'Tax'} registration ID on documents
+                  <View style={styles.pickerContentRow}>
+                    <CountryFlag iso2={selectedCountry.iso2} size="md" />
+                    <Text style={styles.pickerMainText}>
+                      {selectedCountry.name} ({selectedCountry.currencyCode}, {selectedCountry.currencySymbol})
                     </Text>
                   </View>
-                  <View
-                    style={[
-                      styles.checkboxBox,
-                      {
-                        backgroundColor: isTaxRegistered ? theme.brandAnchor : 'transparent',
-                        borderColor: isTaxRegistered ? theme.brandAnchor : theme.borderSubtle,
-                      },
-                    ]}
-                  >
-                    {isTaxRegistered && <Check color={theme.surface} size={16} strokeWidth={3} />}
-                  </View>
+                  <ChevronDown size={18} color="#94A3B8" />
                 </Pressable>
+              </View>
 
-                {isTaxRegistered && (
-                  <View style={{ marginTop: spacing.md }}>
-                    <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
-                      {selectedCountry.iso2 === 'IN'
-                        ? 'GSTIN (GST Identification Number)'
-                        : selectedCountry.iso2 === 'US'
-                        ? 'EIN / Sales Tax Permit Number'
-                        : `${selectedCountry.taxSystemName || 'Tax'} ID`}
+              {/* Subdivision / State / Province */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>STATE / PROVINCE / SUBDIVISION</Text>
+                <Pressable
+                  style={styles.pickerButton}
+                  onPress={() => setShowSubdivisionModal(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select State or Province"
+                >
+                  <View style={styles.pickerContentRow}>
+                    <Building2 size={16} color="#94A3B8" />
+                    <Text style={styles.pickerMainText}>
+                      {selectedSubdivision
+                        ? `${selectedSubdivision.name} (${selectedSubdivision.code})`
+                        : customSubdivision.trim() || 'Select State or Province (Optional)'}
                     </Text>
+                  </View>
+                  <ChevronDown size={18} color="#94A3B8" />
+                </Pressable>
+              </View>
+
+              {/* Optional Organization Logo */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>ORGANIZATION LOGO (OPTIONAL)</Text>
+                <LogoUploader
+                  logoUri={logoUri}
+                  onLogoChange={(newUri) => setLogoUri(newUri)}
+                  autoSaveProfile={false}
+                  label="Organization Brand Mark"
+                  description="Displays in the executive monochrome header frame. Optional — you can upload or change anytime."
+                />
+              </View>
+
+              {/* Optional Contact Toggle */}
+              <Pressable
+                style={styles.accordionToggle}
+                onPress={() => setShowExtraContact(!showExtraContact)}
+              >
+                <Text style={styles.accordionToggleText}>
+                  {showExtraContact ? '▲ Hide Additional Address & Contact Details' : '▼ Add Address, City, Phone & Tax ID (Optional)'}
+                </Text>
+              </Pressable>
+
+              {showExtraContact && (
+                <View style={styles.extraContactCard}>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>CITY / TOWN</Text>
                     <TextInput
-                      style={[
-                        styles.textInput,
-                        {
-                          backgroundColor: theme.surfaceSecondary,
-                          borderColor: theme.borderSubtle,
-                          color: theme.textPrimary,
-                        },
-                      ]}
-                      placeholder={
-                        selectedCountry.iso2 === 'IN'
-                          ? 'e.g. 27AAAAA0000A1Z5'
-                          : 'e.g. 12-3456789'
-                      }
-                      placeholderTextColor={theme.textMuted}
+                      style={styles.textInput}
+                      value={city}
+                      onChangeText={setCity}
+                      placeholder="e.g. Bengaluru, Mumbai, London"
+                      placeholderTextColor="#64748B"
+                    />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>STREET ADDRESS</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={addressLine}
+                      onChangeText={setAddressLine}
+                      placeholder="e.g. 42 Tech Park, Outer Ring Road"
+                      placeholderTextColor="#64748B"
+                    />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>POSTAL / ZIP CODE</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={postalCode}
+                      onChangeText={setPostalCode}
+                      placeholder="e.g. 560103"
+                      placeholderTextColor="#64748B"
+                    />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>OFFICIAL PHONE</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={phoneRaw}
+                      onChangeText={setPhoneRaw}
+                      placeholder="e.g. +91 98765 43210"
+                      placeholderTextColor="#64748B"
+                      keyboardType="phone-pad"
+                    />
+                    {phoneValidation && (
+                      <Text style={[styles.phoneStatusText, phoneValidation.isValid ? styles.phoneValid : styles.phoneInvalid]}>
+                        {phoneValidation.isValid ? `✓ Valid (${phoneValidation.nationalFormatted})` : 'Format hint: include country code or full mobile digits'}
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>OFFICIAL EMAIL</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder="e.g. contact@apexengineering.com"
+                      placeholderTextColor="#64748B"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>TAX ID / GSTIN / VAT NUMBER</Text>
+                    <TextInput
+                      style={styles.textInput}
                       value={taxId}
                       onChangeText={setTaxId}
+                      placeholder="e.g. 29ABCDE1234F1Z5 or US EIN"
+                      placeholderTextColor="#64748B"
                       autoCapitalize="characters"
                     />
                   </View>
-                )}
-              </View>
+                </View>
+              )}
             </View>
           )}
 
-          {/* STEP 4: WORKSPACE PREFERENCES & LAUNCH */}
-          {step === 4 && (
-            <View style={styles.stepSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                  Workspace Preferences
-                </Text>
-                <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                  Set your default payment expectations and optional business capabilities.
+          {/* ══════════════════════════════════════════════════════
+              STEP 3: YOUR DOCUMENTS (CURATED PACKS & FAVORITES)
+             ══════════════════════════════════════════════════════ */}
+          {step === 3 && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepHeading}>Personalize Documents</Text>
+              <Text style={styles.stepSubtitle}>
+                Select the documents you use most frequently. Billframe keeps them pinned to your quick actions dock.
+              </Text>
+
+              {/* Selection summary pill */}
+              <View style={styles.selectionCountPill}>
+                <Check size={14} color="#FFFFFF" />
+                <Text style={styles.selectionCountText}>
+                  {selectedDocIds.length} Document{selectedDocIds.length === 1 ? '' : 's'} Selected for Rapid Creation
                 </Text>
               </View>
 
-              {/* Default Payment Terms */}
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
-                Default Payment Terms
-              </Text>
-              <View style={styles.termsList}>
-                {PAYMENT_TERMS_OPTIONS.map((item) => {
-                  const isSelected = paymentTerms === item.id;
+              <View style={styles.docsList}>
+                {recommendations.documents.map((doc) => {
+                  const isChecked = selectedDocIds.includes(doc.id);
                   return (
                     <Pressable
-                      key={item.id}
+                      key={doc.id}
                       style={[
-                        styles.termsCard,
-                        {
-                          backgroundColor: isSelected ? theme.surfaceSecondary : theme.surface,
-                          borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
-                          borderWidth: isSelected ? 2 : 1,
-                        },
+                        styles.docCard,
+                        isChecked && styles.docCardSelected,
                       ]}
-                      onPress={() => setPaymentTerms(item.id)}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => toggleDocumentFavorite(doc.id)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: isChecked }}
                     >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.termsLabel, { color: theme.textPrimary }]}>{item.label}</Text>
-                        <Text style={[styles.termsDesc, { color: theme.textSecondary }]}>{item.desc}</Text>
+                      <View style={styles.docHeaderRow}>
+                        <View style={styles.docTitleBlock}>
+                          <Text style={[styles.docTitleText, isChecked && styles.docTitleTextSelected]}>
+                            {doc.title}
+                          </Text>
+                          <View style={styles.badgeRow}>
+                            <View style={styles.categoryPill}>
+                              <Text style={styles.categoryPillText}>{doc.category}</Text>
+                            </View>
+                            <View style={styles.readyPill}>
+                              <Text style={styles.readyPillText}>{doc.badge}</Text>
+                            </View>
+                          </View>
+                        </View>
+                        <View style={[styles.checkboxSquare, isChecked && styles.checkboxSquareSelected]}>
+                          {isChecked && <Check size={14} color="#0D0E10" strokeWidth={3} />}
+                        </View>
                       </View>
-                      <View
-                        style={[
-                          styles.radioCircle,
-                          {
-                            borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
-                            backgroundColor: isSelected ? theme.brandAnchor : 'transparent',
-                          },
-                        ]}
-                      >
-                        {isSelected && <Check color={theme.surface} size={14} strokeWidth={3} />}
-                      </View>
+                      <Text style={styles.docDescText}>{doc.description}</Text>
                     </Pressable>
                   );
                 })}
               </View>
+            </View>
+          )}
 
-              {/* Optional Capabilities */}
-              <View style={{ marginTop: spacing.xl }}>
-                <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
-                  Operational Modules
-                </Text>
+          {/* ══════════════════════════════════════════════════════
+              STEP 4: READY TO CREATE (EXECUTIVE MONOCHROME PREVIEW)
+             ══════════════════════════════════════════════════════ */}
+          {step === 4 && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepHeading}>Your Workspace is Ready</Text>
+              <Text style={styles.stepSubtitle}>
+                Your organization identity is embedded into every template. Offline document creation is active.
+              </Text>
 
-                {/* Track Inventory */}
-                <Pressable
-                  style={[styles.capabilityRow, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}
-                  onPress={() => setTrackInventory(!trackInventory)}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.capabilityTitle, { color: theme.textPrimary }]}>Track Inventory & Catalog</Text>
-                    <Text style={[styles.capabilityDesc, { color: theme.textSecondary }]}>Save reusable products, items, and unit prices</Text>
+              {/* Organization Summary Card */}
+              <View style={styles.summaryCard}>
+                <View style={styles.summaryTopRow}>
+                  <View style={styles.summaryLogoBox}>
+                    {logoUri ? (
+                      <Image source={{ uri: logoUri }} style={styles.summaryLogoImage} resizeMode="contain" />
+                    ) : (
+                      <View style={styles.summaryMonogramBox}>
+                        <Text style={styles.summaryMonogramText}>
+                          {(businessName.trim() || 'BF').slice(0, 2).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                  <View
-                    style={[
-                      styles.checkboxBox,
-                      {
-                        backgroundColor: trackInventory ? theme.brandAnchor : 'transparent',
-                        borderColor: trackInventory ? theme.brandAnchor : theme.borderSubtle,
-                      },
-                    ]}
-                  >
-                    {trackInventory && <Check color={theme.surface} size={16} strokeWidth={3} />}
+                  <View style={styles.summaryDetailsWrap}>
+                    <Text style={styles.summaryBusinessName} numberOfLines={1}>
+                      {businessName.trim() || 'My Organization'}
+                    </Text>
+                    <Text style={styles.summaryLocationText}>
+                      {[
+                        city.trim(),
+                        selectedSubdivision?.name || customSubdivision.trim(),
+                        selectedCountry.name,
+                      ]
+                        .filter(Boolean)
+                        .join(' • ')}
+                    </Text>
+                    <View style={styles.summaryMetaRow}>
+                      <View style={styles.summaryPill}>
+                        <Text style={styles.summaryPillText}>
+                          Currency: {selectedCountry.currencyCode} ({selectedCountry.currencySymbol})
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                </Pressable>
+                </View>
 
-                {/* Direct UPI / Instant Pay */}
-                {selectedCountry.iso2 === 'IN' && (
-                  <Pressable
-                    style={[styles.capabilityRow, { backgroundColor: theme.surface, borderColor: theme.borderSubtle, marginTop: spacing.sm }]}
-                    onPress={() => setDirectUpiEnabled(!directUpiEnabled)}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.capabilityTitle, { color: theme.textPrimary }]}>Direct UPI & Instant QR</Text>
-                      <Text style={[styles.capabilityDesc, { color: theme.textSecondary }]}>Render offline zero-fee UPI QR codes directly on invoices</Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.checkboxBox,
-                        {
-                          backgroundColor: directUpiEnabled ? theme.brandAnchor : 'transparent',
-                          borderColor: directUpiEnabled ? theme.brandAnchor : theme.borderSubtle,
-                        },
-                      ]}
-                    >
-                      {directUpiEnabled && <Check color={theme.surface} size={16} strokeWidth={3} />}
-                    </View>
-                  </Pressable>
-                )}
+                {/* Tags row */}
+                <View style={styles.summaryTagsRow}>
+                  <View style={styles.summaryTagItem}>
+                    <Text style={styles.summaryTagText}>
+                      Workflow: {INTENT_OPTIONS.find((i) => i.id === primaryIntent)?.title || 'Universal Documents'}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryTagItem}>
+                    <Text style={styles.summaryTagText}>
+                      {selectedDocIds.length} Pinned Templates
+                    </Text>
+                  </View>
+                </View>
               </View>
 
-              {/* Setup Summary Confirmation */}
-              <View style={[styles.summaryCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle, marginTop: spacing.xl }]}>
-                <Text style={[styles.summaryTitle, { color: theme.textPrimary }]}>Workspace Ready</Text>
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryKey, { color: theme.textSecondary }]}>Business</Text>
-                  <Text style={[styles.summaryVal, { color: theme.textPrimary }]}>{businessName || 'My Business'}</Text>
+              {/* ── Miniature A4 Document Preview Card (Executive Monochrome) ── */}
+              <View style={styles.previewSectionHeader}>
+                <Text style={styles.previewSectionTitle}>DOCUMENT SYSTEM LIVE PREVIEW</Text>
+                <Text style={styles.previewSectionBadge}>A4 Executive Monochrome</Text>
+              </View>
+
+              <View style={styles.sheetPreviewCard}>
+                {/* Header Frame */}
+                <View style={styles.sheetHeader}>
+                  <View style={styles.sheetLogoFrame}>
+                    {logoUri ? (
+                      <Image source={{ uri: logoUri }} style={styles.sheetLogoImage} resizeMode="contain" />
+                    ) : (
+                      <View style={styles.sheetMonogramInner}>
+                        <Text style={styles.sheetMonogramStar}>✦</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.sheetOrgTextWrap}>
+                    <Text style={styles.sheetOrgName}>
+                      {businessName.trim() || 'ACME CORPORATION'}
+                    </Text>
+                    <Text style={styles.sheetOrgMeta}>
+                      {[city.trim() || 'Metropolitan Center', selectedCountry.name].filter(Boolean).join(', ')}
+                    </Text>
+                    <Text style={styles.sheetDocMeta}>
+                      REF: {topHeroDocument.code.toUpperCase()}-2026-001 • DATE: 10 OCT 2026
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryKey, { color: theme.textSecondary }]}>Region</Text>
-                  <Text style={[styles.summaryVal, { color: theme.textPrimary }]}>
-                    {selectedCountry.name} ({selectedCountry.currencyCode} • {selectedCountry.currencySymbol})
+
+                {/* Solid Divider Line */}
+                <View style={styles.sheetDivider} />
+
+                {/* Hero Document Title */}
+                <View style={styles.sheetTitleBanner}>
+                  <Text style={styles.sheetDocTitleText}>
+                    {topHeroDocument.title.toUpperCase()}
                   </Text>
                 </View>
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryKey, { color: theme.textSecondary }]}>Terms</Text>
-                  <Text style={[styles.summaryVal, { color: theme.textPrimary }]}>
-                    {PAYMENT_TERMS_OPTIONS.find((t) => t.id === paymentTerms)?.label}
+
+                {/* Structured Document Body Sample */}
+                <View style={styles.sheetBody}>
+                  {topHeroDocument.id === 'job_offer_letter' ? (
+                    <View style={styles.sheetDocContent}>
+                      <Text style={styles.sheetParagraph}>
+                        Dear Aarav Sharma, we are pleased to offer you the position of Senior Engineer at{' '}
+                        <Text style={styles.sheetBold}>{businessName.trim() || 'Acme Corporation'}</Text>.
+                      </Text>
+                      <View style={styles.sheetMiniTable}>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Annual CTC:</Text>
+                          <Text style={styles.sheetTableCell}>
+                            {selectedCountry.currencySymbol} 1,200,000 / year
+                          </Text>
+                        </View>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Joining Date:</Text>
+                          <Text style={styles.sheetTableCell}>01 November 2026</Text>
+                        </View>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Base Location:</Text>
+                          <Text style={styles.sheetTableCell}>{city.trim() || selectedCountry.name}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ) : topHeroDocument.id === 'work_order' ? (
+                    <View style={styles.sheetDocContent}>
+                      <Text style={styles.sheetParagraph}>
+                        Authorization for on-site services and technical execution under work order terms:
+                      </Text>
+                      <View style={styles.sheetMiniTable}>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Service Task:</Text>
+                          <Text style={styles.sheetTableCell}>Commercial Installation & Safety Inspection</Text>
+                        </View>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Estimated Hours:</Text>
+                          <Text style={styles.sheetTableCell}>16 Labor Hours • Priority A</Text>
+                        </View>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Assigned Lead:</Text>
+                          <Text style={styles.sheetTableCell}>Field Operations Unit</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ) : topHeroDocument.id === 'student_fee_receipt' ? (
+                    <View style={styles.sheetDocContent}>
+                      <Text style={styles.sheetParagraph}>
+                        Official receipt of academic tuition fees for student semester enrollment:
+                      </Text>
+                      <View style={styles.sheetMiniTable}>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Student Name:</Text>
+                          <Text style={styles.sheetTableCell}>Aditi Sharma (Roll # 2026-ENG-42)</Text>
+                        </View>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Tuition Paid:</Text>
+                          <Text style={styles.sheetTableCell}>{selectedCountry.currencySymbol} 45,000 (Clearance: Paid)</Text>
+                        </View>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Term / Year:</Text>
+                          <Text style={styles.sheetTableCell}>Academic Term 2026–2027</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.sheetDocContent}>
+                      <Text style={styles.sheetParagraph}>
+                        Commercial tax invoice rendered for customer services and equipment supplies:
+                      </Text>
+                      <View style={styles.sheetMiniTable}>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Item / Scope</Text>
+                          <Text style={styles.sheetTableCellBold}>Total ({selectedCountry.currencyCode})</Text>
+                        </View>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCell}>1. Professional Advisory & Services</Text>
+                          <Text style={styles.sheetTableCell}>{selectedCountry.currencySymbol} 24,000</Text>
+                        </View>
+                        <View style={styles.sheetTableRow}>
+                          <Text style={styles.sheetTableCellBold}>Net Total Due:</Text>
+                          <Text style={styles.sheetTableCellBold}>{selectedCountry.currencySymbol} 24,000</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Signatory Footer */}
+                <View style={styles.sheetFooter}>
+                  <View style={styles.sheetSignatoryLine} />
+                  <Text style={styles.sheetSignatoryText}>
+                    Authorized Signatory • {businessName.trim() || 'My Organization'}
+                  </Text>
+                  <Text style={styles.sheetWatermark}>
+                    Generated 100% Offline via Billframe Intelligence Engine
                   </Text>
                 </View>
               </View>
@@ -888,58 +1095,107 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
           )}
         </ScrollView>
 
-        {/* PINNED STICKY BOTTOM ACTION DOCK (NEVER OVERLAYS LIST CONTENT) */}
-        <View style={[styles.bottomActionDock, { backgroundColor: theme.surface, borderTopColor: theme.borderSubtle }]}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryCtaBtn,
-              {
-                backgroundColor: theme.brandAnchor,
-                opacity: pressed || saving ? 0.85 : 1,
-              },
-            ]}
-            onPress={handleNext}
-            disabled={saving}
-            accessibilityRole="button"
-            accessibilityLabel={step === 4 ? 'Launch Billframe Workspace' : 'Continue'}
-          >
-            <Text style={[styles.primaryCtaBtnText, { color: theme.surface }]}>
-              {saving ? 'Configuring Workspace...' : step === 4 ? 'Launch Billframe Workspace' : 'Continue'}
-            </Text>
-            {step < 4 && <ArrowRight color={theme.surface} size={18} strokeWidth={2.5} />}
-          </Pressable>
+        {/* ══════════════════════════════════════════════════════
+            PINNED BOTTOM ACTION DOCK
+           ══════════════════════════════════════════════════════ */}
+        <View style={[styles.bottomDock, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+          {step > 1 && step < 4 && (
+            <Pressable
+              style={styles.backButton}
+              onPress={handleBack}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel="Go back to previous step"
+            >
+              <ArrowLeft size={16} color="#FFFFFF" />
+              <Text style={styles.backButtonText}>Back</Text>
+            </Pressable>
+          )}
+
+          {step < 4 ? (
+            <Pressable
+              style={[styles.primaryButton, step === 1 && { flex: 1 }]}
+              onPress={handleNext}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel="Continue to next step"
+            >
+              <Text style={styles.primaryButtonText}>Continue</Text>
+              <ArrowRight size={16} color="#0D0E10" strokeWidth={2.5} />
+            </Pressable>
+          ) : (
+            <View style={styles.step4ActionGroup}>
+              {/* Primary CTA: Launch directly into first document */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.createDocHeroBtn,
+                  pressed && { opacity: 0.85 },
+                  saving && { opacity: 0.6 },
+                ]}
+                onPress={() => handleFinish(topHeroDocument.editorRoute)}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityLabel={`Create my first document: ${topHeroDocument.title}`}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#0D0E10" />
+                ) : (
+                  <>
+                    <Text style={styles.createDocHeroBtnText}>
+                      Create my first document ({topHeroDocument.title})
+                    </Text>
+                    <ArrowRight size={16} color="#0D0E10" strokeWidth={2.5} />
+                  </>
+                )}
+              </Pressable>
+
+              {/* Secondary CTA: Explore dashboard */}
+              <Pressable
+                style={styles.exploreWorkspaceBtn}
+                onPress={() => handleFinish()}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityLabel="Explore my workspace"
+              >
+                <Text style={styles.exploreWorkspaceBtnText}>Explore my workspace</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
 
-        {/* COUNTRY SEARCH BOTTOM SHEET MODAL */}
+        {/* ══════════════════════════════════════════════════════
+            COUNTRY PICKER MODAL
+           ══════════════════════════════════════════════════════ */}
         <Modal
           visible={showCountryModal}
           animationType="slide"
-          transparent
+          transparent={true}
           onRequestClose={() => setShowCountryModal(false)}
         >
           <View style={styles.modalBackdrop}>
-            <View style={[styles.sheetModalCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-              <View style={styles.sheetHandle}>
-                <View style={[styles.handleBar, { backgroundColor: theme.borderSubtle }]} />
-              </View>
-
-              <View style={[styles.sheetHeader, { borderBottomColor: theme.borderSubtle }]}>
-                <Text style={[styles.sheetTitle, { color: theme.textPrimary }]}>Select Country</Text>
-                <Pressable onPress={() => setShowCountryModal(false)} hitSlop={12}>
-                  <X color={theme.textPrimary} size={22} />
+            <SafeAreaView style={styles.modalSheet} edges={['bottom']}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Country & Currency</Text>
+                <Pressable
+                  style={styles.modalCloseBtn}
+                  onPress={() => setShowCountryModal(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close Country Modal"
+                >
+                  <X size={20} color="#FFFFFF" />
                 </Pressable>
               </View>
 
-              {/* Search Box */}
-              <View style={[styles.modalSearchBox, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                <Search color={theme.textMuted} size={18} />
+              <View style={styles.modalSearchRow}>
+                <Search size={16} color="#94A3B8" />
                 <TextInput
-                  style={[styles.modalSearchInput, { color: theme.textPrimary }]}
-                  placeholder="Search country or currency..."
-                  placeholderTextColor={theme.textMuted}
+                  style={styles.modalSearchInput}
                   value={countrySearch}
                   onChangeText={setCountrySearch}
-                  autoFocus
+                  placeholder="Search by country, currency or code..."
+                  placeholderTextColor="#64748B"
+                  autoFocus={true}
+                  clearButtonMode="while-editing"
                 />
               </View>
 
@@ -948,69 +1204,65 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
                 keyExtractor={(item) => item.iso2}
                 keyboardShouldPersistTaps="handled"
                 renderItem={({ item }) => {
-                  const isSelected = item.iso2 === selectedCountry.iso2;
+                  const isSelected = selectedCountry.iso2 === item.iso2;
                   return (
                     <Pressable
-                      style={({ pressed }) => [
-                        styles.countryItemRow,
-                        {
-                          borderBottomColor: theme.borderSubtle,
-                          backgroundColor: isSelected ? theme.surfaceSecondary : 'transparent',
-                          opacity: pressed ? 0.8 : 1,
-                        },
-                      ]}
+                      style={[styles.modalItemRow, isSelected && styles.modalItemRowSelected]}
                       onPress={() => handleSelectCountry(item)}
                     >
-                      <CountryFlag iso2={item.iso2} countryName={item.name} size="md" />
-                      <View style={{ flex: 1, marginLeft: spacing.md }}>
-                        <Text style={[styles.countryItemName, { color: theme.textPrimary }]}>
+                      <CountryFlag iso2={item.iso2} size="md" />
+                      <View style={styles.modalItemTextWrap}>
+                        <Text style={[styles.modalItemTitle, isSelected && styles.modalItemTitleSelected]}>
                           {item.name}
                         </Text>
-                        <Text style={[styles.countryItemMeta, { color: theme.textSecondary }]}>
-                          {item.currencyCode} ({item.currencySymbol}) • Calling: {item.callingCode}
+                        <Text style={styles.modalItemSub}>
+                          {item.currencyCode} ({item.currencySymbol}) • Dial {item.callingCode}
                         </Text>
                       </View>
-                      {isSelected && <Check color={theme.brandAnchor} size={20} strokeWidth={2.5} />}
+                      {isSelected && <Check size={18} color="#FFFFFF" />}
                     </Pressable>
                   );
                 }}
               />
-            </View>
+            </SafeAreaView>
           </View>
         </Modal>
 
-        {/* SUBDIVISION SEARCH BOTTOM SHEET MODAL (NO WALL OF CHIPS) */}
+        {/* ══════════════════════════════════════════════════════
+            SUBDIVISION PICKER MODAL
+           ══════════════════════════════════════════════════════ */}
         <Modal
           visible={showSubdivisionModal}
           animationType="slide"
-          transparent
+          transparent={true}
           onRequestClose={() => setShowSubdivisionModal(false)}
         >
           <View style={styles.modalBackdrop}>
-            <View style={[styles.sheetModalCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-              <View style={styles.sheetHandle}>
-                <View style={[styles.handleBar, { backgroundColor: theme.borderSubtle }]} />
-              </View>
-
-              <View style={[styles.sheetHeader, { borderBottomColor: theme.borderSubtle }]}>
-                <Text style={[styles.sheetTitle, { color: theme.textPrimary }]}>
-                  Select {selectedCountry.subdivisionType}
+            <SafeAreaView style={styles.modalSheet} edges={['bottom']}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  Select State / Province ({selectedCountry.name})
                 </Text>
-                <Pressable onPress={() => setShowSubdivisionModal(false)} hitSlop={12}>
-                  <X color={theme.textPrimary} size={22} />
+                <Pressable
+                  style={styles.modalCloseBtn}
+                  onPress={() => setShowSubdivisionModal(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close State Modal"
+                >
+                  <X size={20} color="#FFFFFF" />
                 </Pressable>
               </View>
 
-              {/* Search Box */}
-              <View style={[styles.modalSearchBox, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                <Search color={theme.textMuted} size={18} />
+              <View style={styles.modalSearchRow}>
+                <Search size={16} color="#94A3B8" />
                 <TextInput
-                  style={[styles.modalSearchInput, { color: theme.textPrimary }]}
-                  placeholder={`Search ${selectedCountry.subdivisionType}...`}
-                  placeholderTextColor={theme.textMuted}
+                  style={styles.modalSearchInput}
                   value={subdivisionSearch}
                   onChangeText={setSubdivisionSearch}
-                  autoFocus
+                  placeholder="Search states, provinces, territories..."
+                  placeholderTextColor="#64748B"
+                  autoFocus={true}
+                  clearButtonMode="while-editing"
                 />
               </View>
 
@@ -1018,34 +1270,49 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
                 data={filteredSubdivisions}
                 keyExtractor={(item) => item.code}
                 keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={
+                  <View style={styles.emptySubdivisionWrap}>
+                    <Text style={styles.emptySubdivisionText}>
+                      No standard subdivisions listed for this region. You may type a custom state name:
+                    </Text>
+                    <TextInput
+                      style={[styles.textInput, { marginTop: 12 }]}
+                      value={customSubdivision}
+                      onChangeText={setCustomSubdivision}
+                      placeholder="Enter State or Province name"
+                      placeholderTextColor="#64748B"
+                    />
+                    <Pressable
+                      style={[styles.primaryButton, { marginTop: 12 }]}
+                      onPress={() => {
+                        setSelectedSubdivision(null);
+                        setShowSubdivisionModal(false);
+                      }}
+                    >
+                      <Text style={styles.primaryButtonText}>Use Custom State</Text>
+                    </Pressable>
+                  </View>
+                }
                 renderItem={({ item }) => {
-                  const isSelected = item.code === selectedSubdivision?.code;
+                  const isSelected = selectedSubdivision?.code === item.code;
                   return (
                     <Pressable
-                      style={({ pressed }) => [
-                        styles.countryItemRow,
-                        {
-                          borderBottomColor: theme.borderSubtle,
-                          backgroundColor: isSelected ? theme.surfaceSecondary : 'transparent',
-                          opacity: pressed ? 0.8 : 1,
-                        },
-                      ]}
+                      style={[styles.modalItemRow, isSelected && styles.modalItemRowSelected]}
                       onPress={() => handleSelectSubdivision(item)}
                     >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.countryItemName, { color: theme.textPrimary }]}>
+                      <Building2 size={18} color="#94A3B8" />
+                      <View style={styles.modalItemTextWrap}>
+                        <Text style={[styles.modalItemTitle, isSelected && styles.modalItemTitleSelected]}>
                           {item.name}
                         </Text>
-                        <Text style={[styles.countryItemMeta, { color: theme.textSecondary }]}>
-                          {item.type} • {item.code}
-                        </Text>
+                        <Text style={styles.modalItemSub}>Code: {item.code}</Text>
                       </View>
-                      {isSelected && <Check color={theme.brandAnchor} size={20} strokeWidth={2.5} />}
+                      {isSelected && <Check size={18} color="#FFFFFF" />}
                     </Pressable>
                   );
                 }}
               />
-            </View>
+            </SafeAreaView>
           </View>
         </Modal>
       </KeyboardAvoidingView>
@@ -1057,392 +1324,838 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  keyboardContainer: {
+  keyboardAvoid: {
     flex: 1,
   },
-  topHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  stepIndicatorWrap: {
+  loadingText: {
+    marginTop: 12,
+    color: '#94A3B8',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // ── Header Bar ──
+  headerBar: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#202227',
+  },
+  brandRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: 140,
+    marginBottom: spacing.sm,
   },
-  stepIndicatorText: {
-    fontSize: typography.caption.fontSize,
-    fontWeight: '700',
+  brandMark: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  brandMarkText: {
+    color: '#0D0E10',
+    fontSize: 11,
+    fontWeight: '900',
     letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: 4,
   },
-  progressBarTrack: {
-    width: '100%',
+  brandTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  versionBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: '#202227',
+    borderWidth: 1,
+    borderColor: '#303238',
+  },
+  versionBadgeText: {
+    color: '#9E9EA4',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     height: 4,
-    borderRadius: radii.full,
-    overflow: 'hidden',
+    borderRadius: 2,
+    gap: 6,
+    marginVertical: 4,
   },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: radii.full,
+  progressSegment: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
   },
-  scrollArea: {
+  progressSegmentActive: {
+    backgroundColor: '#FFFFFF',
+  },
+  progressSegmentInactive: {
+    backgroundColor: '#26282E',
+  },
+  stepCounterRow: {
+    marginTop: 4,
+  },
+  stepCounterText: {
+    color: '#9E9EA4',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+
+  // ── Scroll Content ──
+  scrollContent: {
     flex: 1,
   },
-  scrollContent: {
+  scrollInner: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: 130, // Generous padding ensuring content is NEVER occluded by the sticky dock
     maxWidth: MAX_CONTENT_WIDTH,
     alignSelf: 'center',
     width: '100%',
   },
-  stepSection: {
-    width: '100%',
-  },
-  sectionHeader: {
-    marginBottom: spacing.xl,
-  },
-  sectionTitle: {
-    fontSize: typography.screenTitle.fontSize,
-    fontWeight: typography.screenTitle.fontWeight,
-    lineHeight: 30,
-  },
-  sectionSubtitle: {
-    fontSize: typography.body.fontSize,
-    lineHeight: 22,
-    marginTop: spacing.xs,
-  },
-  cardsList: {
-    gap: spacing.sm,
-  },
-  personaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    minHeight: MIN_TOUCH_TARGET,
-  },
-  personaIconBox: {
-    width: 44,
-    height: 44,
+
+  errorBanner: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
     borderRadius: radii.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  personaTextWrap: {
-    flex: 1,
-  },
-  personaTitle: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '600',
-  },
-  personaSubtitle: {
-    fontSize: typography.caption.fontSize,
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  radioCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: spacing.sm,
-  },
-  guaranteeBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    gap: spacing.md,
-    marginTop: spacing.xl,
-  },
-  guaranteeTitle: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '600',
-  },
-  guaranteeBody: {
-    fontSize: typography.caption.fontSize,
-    lineHeight: 18,
-    marginTop: 2,
-  },
-  fieldLabel: {
-    fontSize: typography.caption.fontSize,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-    letterSpacing: 0.3,
-  },
-  selectorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    minHeight: MIN_TOUCH_TARGET,
-  },
-  selectorCardInfo: {
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  selectorCardTitle: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '600',
-  },
-  selectorCardMeta: {
-    fontSize: typography.caption.fontSize,
-    marginTop: 2,
-  },
-  textInput: {
-    height: MIN_TOUCH_TARGET,
-    borderWidth: 1,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    fontSize: typography.body.fontSize,
-  },
-  currencySummaryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    marginTop: spacing.xl,
-  },
-  summaryBadgeItem: {
-    flex: 1,
-  },
-  summaryBadgeLabel: {
-    fontSize: typography.caption.fontSize,
-  },
-  summaryBadgeValue: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  summaryBadgeDivider: {
-    width: 1,
-    height: 32,
-    marginHorizontal: spacing.md,
-  },
-  errorBox: {
-    padding: spacing.md,
-    borderRadius: radii.sm,
-    borderWidth: 1,
+    padding: spacing.sm,
     marginBottom: spacing.md,
   },
   errorText: {
-    fontSize: typography.caption.fontSize,
+    color: '#EF4444',
+    fontSize: 13,
     fontWeight: '600',
   },
-  phoneInputRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+
+  stepContainer: {
+    marginBottom: spacing.xl,
   },
-  callingCodeBadge: {
+  stepHeading: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  stepSubtitle: {
+    color: '#9E9EA4',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+
+  // ── Step 1: Intents ──
+  optionsList: {
+    gap: spacing.md,
+  },
+  intentCard: {
+    backgroundColor: '#16171B',
+    borderColor: '#26282E',
+    borderWidth: 1.5,
+    borderRadius: radii.md,
+    padding: spacing.md,
+  },
+  intentCardSelected: {
+    borderColor: '#FFFFFF',
+    backgroundColor: '#1E2026',
+  },
+  intentTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
+    marginBottom: 6,
+  },
+  intentIconBox: {
+    width: 36,
+    height: 36,
     borderRadius: radii.sm,
-    height: MIN_TOUCH_TARGET,
+    backgroundColor: '#26282E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  callingCodeText: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '600',
+  intentIconBoxSelected: {
+    backgroundColor: '#303238',
   },
-  phoneInput: {
+  intentTextWrap: {
     flex: 1,
-    height: MIN_TOUCH_TARGET,
-    borderWidth: 1,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    fontSize: typography.body.fontSize,
   },
-  helperSuccess: {
-    fontSize: typography.caption.fontSize,
+  intentTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  intentTitleSelected: {
+    color: '#FFFFFF',
+  },
+  intentSubtitle: {
+    color: '#9E9EA4',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#4A4D55',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  radioCircleSelected: {
+    borderColor: '#FFFFFF',
+  },
+  radioInnerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFFFFF',
+  },
+  intentDescription: {
+    color: '#71747F',
+    fontSize: 12,
+    lineHeight: 16,
     marginTop: 4,
   },
-  taxRegistrationCard: {
-    padding: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
+
+  // ── Step 2: Form Fields ──
+  fieldGroup: {
+    marginBottom: spacing.md,
   },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  toggleTitle: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '600',
-  },
-  toggleSubtitle: {
-    fontSize: typography.caption.fontSize,
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  checkboxBox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: spacing.sm,
-  },
-  termsList: {
-    gap: spacing.xs,
-  },
-  termsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    minHeight: MIN_TOUCH_TARGET,
-  },
-  termsLabel: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '600',
-  },
-  termsDesc: {
-    fontSize: typography.caption.fontSize,
-    marginTop: 2,
-  },
-  capabilityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    minHeight: MIN_TOUCH_TARGET,
-  },
-  capabilityTitle: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '600',
-  },
-  capabilityDesc: {
-    fontSize: typography.caption.fontSize,
-    marginTop: 2,
-  },
-  summaryCard: {
-    padding: spacing.lg,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-  },
-  summaryTitle: {
-    fontSize: typography.bodyMedium.fontSize,
+  fieldLabel: {
+    color: '#9E9EA4',
+    fontSize: 11,
     fontWeight: '700',
-    marginBottom: spacing.xs,
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  reqStar: {
+    color: '#EF4444',
   },
-  summaryKey: {
-    fontSize: typography.caption.fontSize,
-  },
-  summaryVal: {
-    fontSize: typography.caption.fontSize,
-    fontWeight: '600',
-  },
-  bottomActionDock: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-  },
-  primaryCtaBtn: {
-    height: 52,
+  textInput: {
+    backgroundColor: '#16171B',
+    borderColor: '#26282E',
+    borderWidth: 1,
     borderRadius: radii.sm,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.sm,
+    color: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
   },
-  primaryCtaBtnText: {
-    fontSize: typography.bodyMedium.fontSize,
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  typeCard: {
+    width: '48.5%',
+    backgroundColor: '#16171B',
+    borderColor: '#26282E',
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: 10,
+  },
+  typeCardSelected: {
+    borderColor: '#FFFFFF',
+    backgroundColor: '#202228',
+  },
+  typeTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
+  typeTitleSelected: {
+    color: '#FFFFFF',
   },
-  sheetModalCard: {
-    maxHeight: '85%',
-    borderTopLeftRadius: radii.xl,
-    borderTopRightRadius: radii.xl,
-    borderTopWidth: 1,
-    paddingBottom: spacing.xxl,
+  typeSubtitle: {
+    color: '#71747F',
+    fontSize: 11,
+    marginTop: 3,
+    lineHeight: 14,
   },
-  sheetHandle: {
+  pickerButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    justifyContent: 'space-between',
+    backgroundColor: '#16171B',
+    borderColor: '#26282E',
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  handleBar: {
-    width: 38,
-    height: 4,
-    borderRadius: radii.full,
+  pickerContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  pickerMainText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 10,
+  },
+  accordionToggle: {
+    paddingVertical: spacing.sm,
+    marginVertical: spacing.xs,
+  },
+  accordionToggleText: {
+    color: '#9E9EA4',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  extraContactCard: {
+    backgroundColor: '#131418',
+    borderColor: '#202227',
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  phoneStatusText: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  phoneValid: {
+    color: '#10B981',
+  },
+  phoneInvalid: {
+    color: '#94A3B8',
+  },
+
+  // ── Step 3: Documents ──
+  selectionCountPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E2026',
+    borderWidth: 1,
+    borderColor: '#303238',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    alignSelf: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  selectionCountText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  docsList: {
+    gap: spacing.sm,
+  },
+  docCard: {
+    backgroundColor: '#16171B',
+    borderColor: '#26282E',
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+  },
+  docCardSelected: {
+    borderColor: '#FFFFFF',
+    backgroundColor: '#1D1F25',
+  },
+  docHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  docTitleBlock: {
+    flex: 1,
+    marginRight: 12,
+  },
+  docTitleText: {
+    color: '#E2E8F0',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  docTitleTextSelected: {
+    color: '#FFFFFF',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  categoryPill: {
+    backgroundColor: '#26282E',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  categoryPillText: {
+    color: '#9E9EA4',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  readyPill: {
+    backgroundColor: '#1E293B',
+    borderWidth: 0.5,
+    borderColor: '#334155',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  readyPillText: {
+    color: '#CBD5E1',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  checkboxSquare: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#4A4D55',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxSquareSelected: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+  },
+  docDescText: {
+    color: '#71747F',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+
+  // ── Step 4: Summary & Document Preview ──
+  summaryCard: {
+    backgroundColor: '#16171B',
+    borderColor: '#26282E',
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  summaryTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryLogoBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  summaryLogoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  summaryMonogramBox: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  summaryMonogramText: {
+    color: '#0D0E10',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  summaryDetailsWrap: {
+    flex: 1,
+  },
+  summaryBusinessName: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  summaryLocationText: {
+    color: '#9E9EA4',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  summaryMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  summaryPill: {
+    backgroundColor: '#26282E',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+  },
+  summaryPillText: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  summaryTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#26282E',
+  },
+  summaryTagItem: {
+    backgroundColor: '#202227',
+    borderWidth: 1,
+    borderColor: '#303238',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  summaryTagText: {
+    color: '#9E9EA4',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // ── Miniature A4 Sheet Preview ──
+  previewSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  previewSectionTitle: {
+    color: '#9E9EA4',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  previewSectionBadge: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sheetPreviewCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#000000',
+    borderWidth: 2,
+    borderRadius: 6,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
   },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  sheetLogoFrame: {
+    width: 44,
+    height: 44,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    overflow: 'hidden',
+  },
+  sheetLogoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  sheetMonogramInner: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sheetMonogramStar: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  sheetOrgTextWrap: {
+    flex: 1,
+  },
+  sheetOrgName: {
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  sheetOrgMeta: {
+    color: '#334155',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  sheetDocMeta: {
+    color: '#64748B',
+    fontSize: 9,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  sheetDivider: {
+    height: 2,
+    backgroundColor: '#000000',
+    marginBottom: 10,
+  },
+  sheetTitleBanner: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sheetDocTitleText: {
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  sheetBody: {
+    marginBottom: 12,
+  },
+  sheetDocContent: {
+    gap: 8,
+  },
+  sheetParagraph: {
+    color: '#1E293B',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  sheetBold: {
+    fontWeight: '800',
+    color: '#000000',
+  },
+  sheetMiniTable: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 4,
+    padding: 6,
+    gap: 4,
+  },
+  sheetTableRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  sheetTableCellBold: {
+    color: '#0F172A',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  sheetTableCell: {
+    color: '#334155',
+    fontSize: 10,
+  },
+  sheetFooter: {
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  sheetSignatoryLine: {
+    width: 120,
+    height: 1,
+    backgroundColor: '#000000',
+    marginBottom: 4,
+  },
+  sheetSignatoryText: {
+    color: '#000000',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  sheetWatermark: {
+    color: '#94A3B8',
+    fontSize: 8,
+    marginTop: 4,
+  },
+
+  // ── Bottom Dock ──
+  bottomDock: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(13, 14, 16, 0.96)',
+    borderTopWidth: 1,
+    borderTopColor: '#202227',
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-  },
-  sheetTitle: {
-    fontSize: typography.sectionTitle.fontSize,
-    fontWeight: typography.sectionTitle.fontWeight,
-  },
-  modalSearchBox: {
+    paddingTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    height: MIN_TOUCH_TARGET,
-    borderRadius: radii.sm,
+    gap: 12,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E2026',
     borderWidth: 1,
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.md,
+    borderColor: '#303238',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: radii.sm,
+    minHeight: MIN_TOUCH_TARGET,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  primaryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: radii.sm,
+    minHeight: MIN_TOUCH_TARGET,
+  },
+  primaryButtonText: {
+    color: '#0D0E10',
+    fontSize: 14,
+    fontWeight: '800',
+    marginRight: 6,
+  },
+
+  // Step 4 Actions
+  step4ActionGroup: {
+    flex: 1,
+    gap: 8,
+  },
+  createDocHeroBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: radii.sm,
+    minHeight: 46,
+  },
+  createDocHeroBtnText: {
+    color: '#0D0E10',
+    fontSize: 14,
+    fontWeight: '800',
+    marginRight: 8,
+  },
+  exploreWorkspaceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E2026',
+    borderWidth: 1,
+    borderColor: '#303238',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radii.sm,
+    minHeight: 40,
+  },
+  exploreWorkspaceBtnText: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // ── Modals ──
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#16171B',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    height: '80%',
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282E',
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalCloseBtn: {
+    padding: 6,
+  },
+  modalSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0D0E10',
+    borderColor: '#26282E',
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginVertical: 12,
   },
   modalSearchInput: {
     flex: 1,
-    fontSize: typography.input.fontSize,
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginLeft: 8,
   },
-  countryItemRow: {
+  modalItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
-    minHeight: MIN_TOUCH_TARGET,
+    borderBottomColor: '#202227',
   },
-  countryItemName: {
-    fontSize: typography.bodyMedium.fontSize,
+  modalItemRowSelected: {
+    backgroundColor: '#202228',
+  },
+  modalItemTextWrap: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  modalItemTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '600',
   },
-  countryItemMeta: {
-    fontSize: typography.caption.fontSize,
+  modalItemTitleSelected: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  modalItemSub: {
+    color: '#94A3B8',
+    fontSize: 12,
     marginTop: 2,
+  },
+  emptySubdivisionWrap: {
+    padding: spacing.md,
+  },
+  emptySubdivisionText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
