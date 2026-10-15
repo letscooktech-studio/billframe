@@ -1,11 +1,12 @@
 /**
- * DOCUMENT TEMPLATE SELECTION SCREEN
- * Allows selecting the perfect verified document layout before creating/drafting:
+ * DOCUMENT TEMPLATE SELECTION SCREEN — BILLFRAME LUXURY ARCHITECTURE
  * 
- * 1. Document Types: Tax Invoice, Estimate, Delivery Challan, Credit Note, Purchase Order, Work Order, Payment Receipt.
- * 2. Down side: Proper Templates selector with visual cards and target organization descriptors.
- * 3. Live Interactive Document Preview Area showing the exact typography, letterhead, and table layout.
- * 4. Action Button: "Create with this Template" -> routes directly to the actual document build/draft screen (/document/edit).
+ * Strict invariants:
+ * - Monochrome & frozen neutral luxury palette (no multi-colored rainbow badges).
+ * - Ultra-spacious, architectural layout canvas with generous breathing room.
+ * - Minimal, confident metadata (no overwhelming walls of text or paragraphs).
+ * - Live layout preview reflecting the exact structural differences of each template.
+ * - Direct routing to document edit/build screen on selection.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -31,34 +32,27 @@ import {
   ShoppingBag,
   ClipboardList,
   Receipt,
-  Sparkles,
   ShieldCheck,
   Building2,
-  Sliders,
-  Layers,
+  ChevronRight,
 } from 'lucide-react-native';
-import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { spacing, radii, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { useTheme } from '../../design/ThemeContext';
 import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
 import { BusinessProfile } from '../../domain/profile/types';
-import { GST_LAYOUT_DEFINITIONS, GstLayoutMeta } from '../../services/pdf/templates/gst';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export interface DocumentTemplateItem {
   id: string;
   code: string;
-  badge: string;
   name: string;
-  targetOrganizations: string;
-  keyFeatures: string;
-  category: string;
-  accentColor: string;
+  tagline: string;
+  category: 'executive' | 'ledger' | 'minimal' | 'corporate' | 'supply_chain';
 }
 
 export interface DocumentTypeConfig {
   id: string;
   title: string;
+  shortName: string;
   subtitle: string;
   icon: React.ComponentType<{ size: number; color: string; strokeWidth?: number }>;
   defaultTemplateId: string;
@@ -69,300 +63,257 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
   invoice: {
     id: 'invoice',
     title: 'GST Tax Invoice',
-    subtitle: 'Standard commercial invoice with GST, tax calculation and payment terms',
+    shortName: 'Tax Invoice',
+    subtitle: 'Commercial tax invoice with GST & Rule 46 compliance',
     icon: FileText,
     defaultTemplateId: 'gst_executive',
     templates: [
       {
         id: 'gst_executive',
         code: 'GST-01',
-        badge: 'GST-01',
         name: 'Executive Letterhead',
-        targetOrganizations: 'IT agencies, design studios, marketing firms, consultancies & engineering services.',
-        keyFeatures: 'Dominant organization header, vertical divider, 3-column party info, generous executive whitespace.',
+        tagline: 'Classic brand letterhead with generous executive margins',
         category: 'executive',
-        accentColor: '#3B82F6',
       },
       {
         id: 'gst_ledger',
         code: 'GST-02',
-        badge: 'GST-02',
         name: 'Structured Ledger',
-        targetOrganizations: 'Wholesalers, distributors, trading firms, parts suppliers & industrial vendors.',
-        keyFeatures: '6-compartment metadata band, boxed party panels, 11-column high-density item grid, structured tax breakup.',
+        tagline: 'Itemized grid with 4-compartment metadata band',
         category: 'ledger',
-        accentColor: '#10B981',
       },
       {
         id: 'gst_minimal',
         code: 'GST-03',
-        badge: 'GST-03',
         name: 'Minimal Professional',
-        targetOrganizations: 'Independent consultants, freelance specialists, architects & boutique advisory studios.',
-        keyFeatures: 'Borderless hairline typography, prominent invoice number, clean stacked summary, zero visual noise.',
+        tagline: 'Clean borderless typography with bold summary',
         category: 'minimal',
-        accentColor: '#1EC1CB',
       },
       {
         id: 'gst_corporate',
         code: 'GST-04',
-        badge: 'GST-04',
         name: 'Corporate B2B',
-        targetOrganizations: 'Enterprise vendors, Tier-1 suppliers, government contractors & manufacturing corporations.',
-        keyFeatures: 'Dual buyer/consignee panels, E-invoice status flag, inverted solid black Grand Total bar.',
+        tagline: 'Dual buyer/consignee panels & enterprise tax breakdown',
         category: 'corporate',
-        accentColor: '#8B5CF6',
       },
       {
         id: 'gst_supply_chain',
         code: 'GST-05',
-        badge: 'GST-05',
         name: 'Trade Supply Chain',
-        targetOrganizations: 'Freight forwarders, logistics fleets, FMCG distributors & multi-depot shipping networks.',
-        keyFeatures: 'HSN in column 2, 4-column metadata transport strip, multi-page ledger support with running footer.',
+        tagline: 'Logistics transport strip & multi-depot shipping tally',
         category: 'supply_chain',
-        accentColor: '#F59E0B',
       },
     ],
   },
   estimate: {
     id: 'estimate',
     title: 'Estimate / Quotation',
-    subtitle: 'Project proposals, cost breakdowns, and formal commercial quotations',
+    shortName: 'Estimate',
+    subtitle: 'Cost proposals, quotations and milestone estimates',
     icon: Briefcase,
     defaultTemplateId: 'est_executive',
     templates: [
       {
         id: 'est_executive',
         code: 'EST-01',
-        badge: 'EST-01',
         name: 'Executive Proposal',
-        targetOrganizations: 'Creative studios, software agencies, commercial contractors & consultants.',
-        keyFeatures: 'Scope of work narrative, milestone price table, validity timeline & acceptance signoff.',
+        tagline: 'Scope narrative with milestone pricing schedule',
         category: 'executive',
-        accentColor: '#3B82F6',
       },
       {
         id: 'est_itemized',
         code: 'EST-02',
-        badge: 'EST-02',
         name: 'Itemized Quotation',
-        targetOrganizations: 'Fabricators, construction suppliers, hardware merchants & equipment repair.',
-        keyFeatures: 'Detailed unit rates, optional quantities, revision numbering & delivery assumptions.',
+        tagline: 'Detailed unit rates with revision versioning',
         category: 'ledger',
-        accentColor: '#10B981',
       },
       {
         id: 'est_proforma',
         code: 'EST-03',
-        badge: 'EST-03',
         name: 'Commercial Proforma',
-        targetOrganizations: 'Exporters, cross-border suppliers, wholesale traders & advance commercial supply.',
-        keyFeatures: 'International bank wire coordinates, proforma invoice number, advance payment clauses.',
+        tagline: 'Advance wire instructions & proforma trade numbering',
         category: 'corporate',
-        accentColor: '#8B5CF6',
       },
     ],
   },
   challan: {
     id: 'challan',
     title: 'Delivery Challan',
-    subtitle: 'Goods dispatch, vehicle transfer note & transit documentation',
+    shortName: 'Challan',
+    subtitle: 'Goods dispatch, vehicle transfer note & transit record',
     icon: Truck,
     defaultTemplateId: 'challan_standard',
     templates: [
       {
         id: 'challan_standard',
         code: 'DC-01',
-        badge: 'DC-01',
-        name: 'Standard Goods Dispatch',
-        targetOrganizations: 'FMCG distributors, retail manufacturers, parts warehouses & delivery fleets.',
-        keyFeatures: 'Vehicle registration, transporter ID, package/box tally, receiver acknowledgement seal.',
+        name: 'Goods Dispatch Note',
+        tagline: 'Transporter ID, vehicle number & receiver seal',
         category: 'supply_chain',
-        accentColor: '#F59E0B',
       },
       {
         id: 'challan_transfer',
         code: 'DC-02',
-        badge: 'DC-02',
-        name: 'Depot Consignment Transfer',
-        targetOrganizations: 'Multi-branch logistics, inter-warehouse stock transfer & internal transport.',
-        keyFeatures: 'Source & destination warehouse codes, gate pass authorization, security signature block.',
+        name: 'Consignment Transfer',
+        tagline: 'Inter-warehouse movement & gate pass record',
         category: 'corporate',
-        accentColor: '#10B981',
       },
     ],
   },
   credit_note: {
     id: 'credit_note',
     title: 'Credit Note / Debit Note',
-    subtitle: 'Sales returns, tax adjustments, price variations & customer refunds',
+    shortName: 'Credit Note',
+    subtitle: 'Sales returns, tax adjustments & customer refunds',
     icon: RotateCcw,
     defaultTemplateId: 'credit_tax',
     templates: [
       {
         id: 'credit_tax',
         code: 'CN-01',
-        badge: 'CN-01',
         name: 'Tax Credit Note',
-        targetOrganizations: 'GST-registered entities processing returns, post-sale discounts or excess billing.',
-        keyFeatures: 'Original invoice cross-reference, Rule 53 GST compliance, net tax credit adjustment.',
+        tagline: 'Rule 53 GST invoice reversal & net tax credit adjustment',
         category: 'ledger',
-        accentColor: '#F43F5E',
       },
       {
         id: 'debit_memo',
         code: 'DN-01',
-        badge: 'DN-01',
         name: 'Commercial Debit Memo',
-        targetOrganizations: 'Suppliers claiming rate revisions, short payments, or debit balance adjustments.',
-        keyFeatures: 'Debit claim justification, underlying PO reference, revised payable balance breakdown.',
+        tagline: 'Rate revision claim & revised payable breakdown',
         category: 'corporate',
-        accentColor: '#8B5CF6',
       },
     ],
   },
   purchase_order: {
     id: 'purchase_order',
     title: 'Purchase Order',
-    subtitle: 'Official procurement orders sent to vendors, contractors & suppliers',
+    shortName: 'Purchase Order',
+    subtitle: 'Official procurement orders sent to vendors & suppliers',
     icon: ShoppingBag,
     defaultTemplateId: 'po_corporate',
     templates: [
       {
         id: 'po_corporate',
         code: 'PO-01',
-        badge: 'PO-01',
         name: 'Corporate Purchase Order',
-        targetOrganizations: 'Procurement teams, corporate buyers, factories & manufacturing contractors.',
-        keyFeatures: 'Vendor billing/shipping address, shipping instructions, delivery deadline, buyer seal.',
+        tagline: 'Vendor shipping instructions & procurement authorization',
         category: 'corporate',
-        accentColor: '#3B82F6',
       },
       {
         id: 'po_supply',
         code: 'PO-02',
-        badge: 'PO-02',
         name: 'Industrial Supply Order',
-        targetOrganizations: 'Engineering works, raw material buyers, OEM assemblers & site contractors.',
-        keyFeatures: 'Technical specification notes, inspection criteria, staggered delivery schedule.',
+        tagline: 'Technical bill of materials & delivery milestones',
         category: 'supply_chain',
-        accentColor: '#10B981',
       },
     ],
   },
   work_order: {
     id: 'work_order',
     title: 'Work Order & Contract',
-    subtitle: 'Scope of work, milestone deliverables, technical terms & legal signoff',
+    shortName: 'Work Order',
+    subtitle: 'Scope of work, milestone deliverables & legal signoff',
     icon: ClipboardList,
     defaultTemplateId: 'wo_service',
     templates: [
       {
         id: 'wo_service',
         code: 'WO-01',
-        badge: 'WO-01',
         name: 'Service Work Order',
-        targetOrganizations: 'Maintenance engineers, field service providers, contractors & technical agencies.',
-        keyFeatures: 'Job site address, scope deliverables, materials provided, customer completion signoff.',
+        tagline: 'Scope deliverables, materials & customer completion signoff',
         category: 'ledger',
-        accentColor: '#8B5CF6',
       },
       {
         id: 'wo_contract',
         code: 'WO-02',
-        badge: 'WO-02',
-        name: 'Professional Engagement Agreement',
-        targetOrganizations: 'Retained consultants, advisory specialists, creative partners & vendors.',
-        keyFeatures: 'Confidentiality terms, payment schedules, intellectual property clauses & signature blocks.',
+        name: 'Retainer Agreement',
+        tagline: 'Engagement terms, milestones & legal signature block',
         category: 'executive',
-        accentColor: '#1EC1CB',
       },
     ],
   },
   receipt: {
     id: 'receipt',
     title: 'Payment Receipt',
-    subtitle: 'Official payment acknowledgments, rent receipts & settlement vouchers',
+    shortName: 'Receipt',
+    subtitle: 'Payment acknowledgment & settlement vouchers',
     icon: Receipt,
     defaultTemplateId: 'receipt_payment',
     templates: [
       {
         id: 'receipt_payment',
         code: 'REC-01',
-        badge: 'REC-01',
-        name: 'Executive Payment Receipt',
-        targetOrganizations: 'Service providers, educational institutes, clinics & professional practices.',
-        keyFeatures: 'Transaction UTR/cheque reference, payment mode, invoice settlement & balance due tally.',
+        name: 'Payment Voucher',
+        tagline: 'Bank UTR reference & official settlement acknowledgment',
         category: 'minimal',
-        accentColor: '#10B981',
       },
       {
-        id: 'receipt_rent',
+        id: 'receipt_settlement',
         code: 'REC-02',
-        badge: 'REC-02',
-        name: 'House & Commercial Rent Receipt',
-        targetOrganizations: 'Property landlords, commercial leasing entities & salaried tenant reimbursement.',
-        keyFeatures: 'Property address, rental period month, landlord PAN disclosure, statutory revenue stamp.',
-        category: 'ledger',
-        accentColor: '#F59E0B',
+        name: 'Account Settlement',
+        tagline: 'Full balance clearance & statement reconciliation',
+        category: 'corporate',
       },
     ],
   },
 };
 
-export default function DocumentTemplatesScreen() {
+export default function DocumentTemplateSelectionScreen() {
   const router = useRouter();
+  const searchParams = useLocalSearchParams<{ type?: string; templateId?: string }>();
   const insets = useSafeAreaInsets();
-  const searchParams = useLocalSearchParams<{ type?: string }>();
   const { theme } = useTheme();
 
-  const docTypeKey = searchParams.type && DOCUMENT_TYPE_CONFIGS[searchParams.type]
-    ? searchParams.type
-    : 'invoice';
+  const [activeDocType, setActiveDocType] = useState<string>(() => {
+    const rawType = (searchParams.type || 'invoice').toLowerCase();
+    return DOCUMENT_TYPE_CONFIGS[rawType] ? rawType : 'invoice';
+  });
 
-  const [activeDocType, setActiveDocType] = useState<string>(docTypeKey);
-  const activeConfig = DOCUMENT_TYPE_CONFIGS[activeDocType] || DOCUMENT_TYPE_CONFIGS.invoice;
+  const activeConfig = useMemo(() => {
+    return DOCUMENT_TYPE_CONFIGS[activeDocType] || DOCUMENT_TYPE_CONFIGS.invoice;
+  }, [activeDocType]);
 
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
-    activeConfig.defaultTemplateId || activeConfig.templates[0].id
-  );
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => {
+    if (searchParams.templateId) {
+      const match = activeConfig.templates.find((t) => t.id === searchParams.templateId);
+      if (match) return match.id;
+    }
+    return activeConfig.defaultTemplateId;
+  });
 
+  const selectedTemplate = useMemo(() => {
+    return (
+      activeConfig.templates.find((t) => t.id === selectedTemplateId) ||
+      activeConfig.templates[0]
+    );
+  }, [activeConfig, selectedTemplateId]);
+
+  // Business profile for live preview
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
 
   useEffect(() => {
-    (async () => {
+    const loadProfile = async () => {
       try {
-        const prof = await BusinessProfileRepository.getActiveProfile();
-        if (prof) setBusinessProfile(prof);
-      } catch {}
-    })();
+        const profile = await BusinessProfileRepository.getActiveProfile();
+        if (profile) setBusinessProfile(profile);
+      } catch (err) {
+        // Fallback to demo org
+      }
+    };
+    loadProfile();
   }, []);
 
-  // Update selected template when switching document types
-  const handleSwitchDocType = (typeKey: string) => {
+  const handleSelectType = (typeKey: string) => {
     setActiveDocType(typeKey);
     const cfg = DOCUMENT_TYPE_CONFIGS[typeKey];
-    if (cfg && cfg.templates.length > 0) {
-      setSelectedTemplateId(cfg.templates[0].id);
+    if (cfg) {
+      setSelectedTemplateId(cfg.defaultTemplateId);
     }
   };
 
-  const selectedTemplate = useMemo(() => {
-    return activeConfig.templates.find((t) => t.id === selectedTemplateId) || activeConfig.templates[0];
-  }, [activeConfig, selectedTemplateId]);
-
   const handleCreateDocument = () => {
-    if (activeDocType === 'invoice') {
-      router.push({
-        pathname: '/document/edit',
-        params: { type: 'invoice', templateId: selectedTemplate.id },
-      });
-    } else if (activeDocType === 'estimate') {
-      router.push({
-        pathname: '/document/edit',
-        params: { type: 'estimate', templateId: selectedTemplate.id },
-      });
+    if (activeDocType === 'quick-bill') {
+      router.push('/quick-bill');
     } else if (activeDocType === 'work_order') {
       router.push({
         pathname: '/templates/studio',
@@ -378,7 +329,7 @@ export default function DocumentTemplatesScreen() {
 
   const orgName = businessProfile?.name || 'Apex Studio Pvt Ltd';
   const orgGstin = businessProfile?.tax_id || '27AABCU9603R1ZM';
-  const orgAddress = businessProfile?.address_line1 || '101, Maker Chambers V, Nariman Point, Mumbai 400021';
+  const orgAddress = businessProfile?.address_line1 || '101, Maker Chambers V, Nariman Point, Mumbai';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
@@ -405,31 +356,30 @@ export default function DocumentTemplatesScreen() {
             {activeConfig.title}
           </Text>
           <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
-            Choose layout · {activeConfig.templates.length} verified templates
+            {activeConfig.subtitle}
           </Text>
         </View>
       </View>
 
-      {/* ── Document Type Pills Carousel ── */}
-      <View style={[styles.typePillsWrap, { borderBottomColor: theme.borderSubtle }]}>
+      {/* ── Document Types Horizontal Carousel ── */}
+      <View style={[styles.carouselContainer, { borderBottomColor: theme.borderSubtle }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.typePillsContent}
+          contentContainerStyle={styles.carouselContent}
         >
           {Object.values(DOCUMENT_TYPE_CONFIGS).map((cfg) => {
             const isSelected = cfg.id === activeDocType;
             return (
               <Pressable
                 key={cfg.id}
-                onPress={() => handleSwitchDocType(cfg.id)}
                 style={[
                   styles.typePill,
-                  {
-                    backgroundColor: isSelected ? theme.surfaceSecondary : theme.surface,
-                    borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
-                  },
+                  isSelected
+                    ? styles.typePillSelected
+                    : [styles.typePillUnselected, { borderColor: theme.borderSubtle }],
                 ]}
+                onPress={() => handleSelectType(cfg.id)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: isSelected }}
               >
@@ -437,12 +387,12 @@ export default function DocumentTemplatesScreen() {
                   style={[
                     styles.typePillText,
                     {
-                      color: isSelected ? theme.textPrimary : theme.textSecondary,
+                      color: isSelected ? '#000000' : theme.textSecondary,
                       fontWeight: isSelected ? '700' : '500',
                     },
                   ]}
                 >
-                  {cfg.title}
+                  {cfg.shortName}
                 </Text>
               </Pressable>
             );
@@ -450,215 +400,260 @@ export default function DocumentTemplatesScreen() {
         </ScrollView>
       </View>
 
-      {/* ── Main Scroll View: Live Preview + Downside Templates ── */}
+      {/* ── Main Scroll View: Spacious Live Preview + Clean Templates Downside ── */}
       <ScrollView
         style={styles.scrollArea}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 90 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Section: Document Live Preview Card ── */}
-        <View style={styles.previewContainer}>
-          <View style={styles.previewHeaderRow}>
-            <View style={styles.previewBadgeRow}>
-              <View style={[styles.badgePill, { backgroundColor: theme.surfaceSecondary }]}>
-                <ShieldCheck size={14} color={selectedTemplate.accentColor} strokeWidth={2} />
-                <Text style={[styles.badgePillText, { color: selectedTemplate.accentColor }]}>
-                  {selectedTemplate.badge}
-                </Text>
+        <View style={styles.contentConstrained}>
+          {/* ── Live Architectural Document Canvas ── */}
+          <View style={styles.previewSection}>
+            <View style={styles.previewTopBar}>
+              <View style={styles.previewBadge}>
+                <ShieldCheck size={13} color="#FFFFFF" strokeWidth={2} />
+                <Text style={styles.previewBadgeText}>{selectedTemplate.code}</Text>
               </View>
-              <Text style={[styles.previewCategoryTag, { color: theme.textSecondary }]}>
-                {selectedTemplate.category.toUpperCase()} LAYOUT
+              <Text style={[styles.previewCategoryLabel, { color: theme.textSecondary }]}>
+                {selectedTemplate.name.toUpperCase()}
+              </Text>
+              <View style={styles.previewSpacer} />
+              <Text style={[styles.previewStatusHint, { color: theme.textMuted }]}>
+                Live Preview
               </Text>
             </View>
-            <Text style={[styles.previewInfoHint, { color: theme.textMuted }]}>
-              Live Layout Mockup
-            </Text>
-          </View>
 
-          {/* Interactive A4 Styled Sheet */}
-          <View style={[styles.a4Sheet, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
-            {/* Header Style variants */}
-            {selectedTemplate.category === 'executive' ? (
-              <View style={styles.mockExecHeader}>
-                <View style={styles.mockExecLeft}>
-                  <Text style={styles.mockOrgName}>{orgName}</Text>
-                  <Text style={styles.mockOrgMeta}>GSTIN: {orgGstin}</Text>
-                  <Text style={styles.mockOrgMeta}>{orgAddress}</Text>
-                </View>
-                <View style={styles.mockExecDivider} />
-                <View style={styles.mockExecRight}>
-                  <Text style={styles.mockDocTitle}>{activeConfig.title.toUpperCase()}</Text>
-                  <Text style={styles.mockDocNumber}>DOC-2026-001</Text>
-                  <Text style={styles.mockDocMeta}>Date: 15 Oct 2026</Text>
-                  <Text style={styles.mockDocMeta}>Due: 14 Nov 2026</Text>
-                </View>
-              </View>
-            ) : selectedTemplate.category === 'ledger' ? (
-              <View style={styles.mockLedgerHeader}>
-                <View style={styles.mockLedgerTopRow}>
-                  <Text style={styles.mockOrgName}>{orgName}</Text>
-                  <Text style={styles.mockDocTitle}>{activeConfig.title.toUpperCase()}</Text>
-                </View>
-                <View style={styles.mockLedgerBand}>
-                  <View style={styles.mockBandCol}>
-                    <Text style={styles.mockBandLabel}>INVOICE NO.</Text>
-                    <Text style={styles.mockBandVal}>INV-2026-001</Text>
+            {/* Architectural Document Sheet */}
+            <View style={styles.documentCanvas}>
+              {/* Header Anatomy according to Layout Category */}
+              {selectedTemplate.category === 'executive' && (
+                <View style={styles.execHeader}>
+                  <View style={styles.execLeft}>
+                    <Text style={styles.docBrandName}>{orgName}</Text>
+                    <Text style={styles.docBrandMeta}>GSTIN: {orgGstin}</Text>
+                    <Text style={styles.docBrandMeta}>{orgAddress}</Text>
                   </View>
-                  <View style={styles.mockBandCol}>
-                    <Text style={styles.mockBandLabel}>DATE</Text>
-                    <Text style={styles.mockBandVal}>15-OCT-2026</Text>
-                  </View>
-                  <View style={styles.mockBandCol}>
-                    <Text style={styles.mockBandLabel}>STATE CODE</Text>
-                    <Text style={styles.mockBandVal}>27 (MAH)</Text>
+                  <View style={styles.execDivider} />
+                  <View style={styles.execRight}>
+                    <Text style={styles.docTitleMain}>{activeConfig.shortName.toUpperCase()}</Text>
+                    <Text style={styles.docNumberMain}>#DOC-2026-001</Text>
+                    <Text style={styles.docDateMeta}>Date: 15 Oct 2026</Text>
+                    <Text style={styles.docDateMeta}>Terms: Net 30 Days</Text>
                   </View>
                 </View>
-              </View>
-            ) : (
-              <View style={styles.mockStandardHeader}>
-                <View>
-                  <Text style={styles.mockDocTitle}>{activeConfig.title.toUpperCase()}</Text>
-                  <Text style={styles.mockDocNumber}>#DOC-2026-001</Text>
-                </View>
-                <View style={styles.mockStandardRight}>
-                  <Text style={styles.mockOrgName}>{orgName}</Text>
-                  <Text style={styles.mockOrgMeta}>{orgGstin}</Text>
-                </View>
-              </View>
-            )}
+              )}
 
-            {/* Bill To / Party Box */}
-            <View style={styles.mockPartyBox}>
-              <Text style={styles.mockPartyHeading}>BILLED TO:</Text>
-              <Text style={styles.mockClientName}>Reliance Retail Limited</Text>
-              <Text style={styles.mockClientMeta}>GSTIN: 27AABCR1234F1Z8 · Mumbai, Maharashtra</Text>
-            </View>
+              {selectedTemplate.category === 'ledger' && (
+                <View style={styles.ledgerHeader}>
+                  <View style={styles.ledgerTopRow}>
+                    <Text style={styles.docBrandName}>{orgName}</Text>
+                    <Text style={styles.docTitleMain}>{activeConfig.shortName.toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.ledgerBand}>
+                    <View style={styles.ledgerBandCol}>
+                      <Text style={styles.ledgerBandLabel}>DOC NUMBER</Text>
+                      <Text style={styles.ledgerBandVal}>INV-2026-001</Text>
+                    </View>
+                    <View style={styles.ledgerBandCol}>
+                      <Text style={styles.ledgerBandLabel}>DATE</Text>
+                      <Text style={styles.ledgerBandVal}>15-OCT-2026</Text>
+                    </View>
+                    <View style={styles.ledgerBandCol}>
+                      <Text style={styles.ledgerBandLabel}>STATE CODE</Text>
+                      <Text style={styles.ledgerBandVal}>27 (MAH)</Text>
+                    </View>
+                    <View style={[styles.ledgerBandCol, { borderRightWidth: 0 }]}>
+                      <Text style={styles.ledgerBandLabel}>PAYMENT</Text>
+                      <Text style={styles.ledgerBandVal}>DUE 14-NOV</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
 
-            {/* Table Mockup */}
-            <View style={styles.mockTable}>
-              <View style={styles.mockTableHeader}>
-                <Text style={[styles.mockTh, { flex: 2 }]}>DESCRIPTION</Text>
-                <Text style={[styles.mockTh, { width: 50, textAlign: 'center' }]}>HSN</Text>
-                <Text style={[styles.mockTh, { width: 40, textAlign: 'right' }]}>QTY</Text>
-                <Text style={[styles.mockTh, { width: 70, textAlign: 'right' }]}>RATE</Text>
-                <Text style={[styles.mockTh, { width: 75, textAlign: 'right' }]}>AMOUNT</Text>
+              {selectedTemplate.category === 'minimal' && (
+                <View style={styles.minimalHeader}>
+                  <View>
+                    <Text style={styles.docBrandName}>{orgName}</Text>
+                    <Text style={styles.docBrandMeta}>GSTIN: {orgGstin}</Text>
+                  </View>
+                  <View style={styles.minimalRight}>
+                    <Text style={styles.minimalNumber}>#001</Text>
+                    <Text style={styles.minimalDate}>15 Oct 2026</Text>
+                  </View>
+                </View>
+              )}
+
+              {selectedTemplate.category === 'corporate' && (
+                <View style={styles.corporateHeader}>
+                  <View style={styles.corpTopRow}>
+                    <Text style={styles.docBrandName}>{orgName}</Text>
+                    <View style={styles.corpBadgePill}>
+                      <Text style={styles.corpBadgeText}>ORIGINAL FOR RECIPIENT</Text>
+                    </View>
+                  </View>
+                  <View style={styles.corpDualPanels}>
+                    <View style={styles.corpPanel}>
+                      <Text style={styles.corpPanelTag}>BUYER / RECIPIENT</Text>
+                      <Text style={styles.corpPartyName}>Reliance Retail Limited</Text>
+                      <Text style={styles.corpPartyGstin}>GSTIN: 27AABCR1234F1Z8</Text>
+                    </View>
+                    <View style={[styles.corpPanel, { marginLeft: 10 }]}>
+                      <Text style={styles.corpPanelTag}>CONSIGNEE / SHIP TO</Text>
+                      <Text style={styles.corpPartyName}>Reliance Logistics Hub</Text>
+                      <Text style={styles.corpPartyGstin}>Bhiwandi Depot, MH</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {selectedTemplate.category === 'supply_chain' && (
+                <View style={styles.supplyHeader}>
+                  <View style={styles.supplyTopRow}>
+                    <Text style={styles.docBrandName}>{orgName}</Text>
+                    <Text style={styles.docTitleMain}>{activeConfig.shortName.toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.supplyTransportStrip}>
+                    <View style={styles.transportCol}>
+                      <Text style={styles.transportLabel}>VEHICLE NO.</Text>
+                      <Text style={styles.transportVal}>MH-04-AB-2041</Text>
+                    </View>
+                    <View style={styles.transportCol}>
+                      <Text style={styles.transportLabel}>TRANSPORTER</Text>
+                      <Text style={styles.transportVal}>BlueDart Express</Text>
+                    </View>
+                    <View style={[styles.transportCol, { borderRightWidth: 0 }]}>
+                      <Text style={styles.transportLabel}>LR / DOCKET</Text>
+                      <Text style={styles.transportVal}>BD-902184</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Billed To Box (Spacious & Clean) */}
+              {selectedTemplate.category !== 'corporate' && (
+                <View style={styles.partyBox}>
+                  <Text style={styles.partyBoxLabel}>BILLED TO:</Text>
+                  <Text style={styles.partyName}>Reliance Retail Limited</Text>
+                  <Text style={styles.partyMeta}>GSTIN: 27AABCR1234F1Z8 · Nariman Point, Mumbai, Maharashtra</Text>
+                </View>
+              )}
+
+              {/* Spacious Line Items Table */}
+              <View style={styles.tableBlock}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableTh, { flex: 3 }]}>DESCRIPTION</Text>
+                  <Text style={[styles.tableTh, { width: 50, textAlign: 'center' }]}>QTY</Text>
+                  <Text style={[styles.tableTh, { width: 80, textAlign: 'right' }]}>RATE</Text>
+                  <Text style={[styles.tableTh, { width: 90, textAlign: 'right' }]}>AMOUNT</Text>
+                </View>
+
+                <View style={styles.tableRow}>
+                  <Text style={[styles.tableTd, { flex: 3, fontWeight: '600' }]}>
+                    Enterprise Cloud Architecture
+                  </Text>
+                  <Text style={[styles.tableTd, { width: 50, textAlign: 'center' }]}>1</Text>
+                  <Text style={[styles.tableTd, { width: 80, textAlign: 'right' }]}>₹45,000</Text>
+                  <Text style={[styles.tableTd, { width: 90, textAlign: 'right', fontWeight: '700' }]}>
+                    ₹45,000
+                  </Text>
+                </View>
+
+                <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
+                  <Text style={[styles.tableTd, { flex: 3, fontWeight: '600' }]}>
+                    Security & Compliance Audit
+                  </Text>
+                  <Text style={[styles.tableTd, { width: 50, textAlign: 'center' }]}>1</Text>
+                  <Text style={[styles.tableTd, { width: 80, textAlign: 'right' }]}>₹15,000</Text>
+                  <Text style={[styles.tableTd, { width: 90, textAlign: 'right', fontWeight: '700' }]}>
+                    ₹15,000
+                  </Text>
+                </View>
               </View>
 
-              <View style={styles.mockTableRow}>
-                <Text style={[styles.mockTd, { flex: 2, fontWeight: '600' }]}>Cloud Platform Architecture</Text>
-                <Text style={[styles.mockTd, { width: 50, textAlign: 'center' }]}>998313</Text>
-                <Text style={[styles.mockTd, { width: 40, textAlign: 'right' }]}>1</Text>
-                <Text style={[styles.mockTd, { width: 70, textAlign: 'right' }]}>₹45,000</Text>
-                <Text style={[styles.mockTd, { width: 75, textAlign: 'right', fontWeight: '600' }]}>₹45,000</Text>
-              </View>
+              {/* Spacious Totals & Authorized Signoff */}
+              <View style={styles.bottomSummaryRow}>
+                <View style={styles.signatorySide}>
+                  <View style={styles.signLine} />
+                  <Text style={styles.signatoryLabel}>Authorized Signatory</Text>
+                  <Text style={styles.signatoryOrg}>{orgName}</Text>
+                </View>
 
-              <View style={styles.mockTableRow}>
-                <Text style={[styles.mockTd, { flex: 2, fontWeight: '600' }]}>Security & GST Audit</Text>
-                <Text style={[styles.mockTd, { width: 50, textAlign: 'center' }]}>998311</Text>
-                <Text style={[styles.mockTd, { width: 40, textAlign: 'right' }]}>1</Text>
-                <Text style={[styles.mockTd, { width: 70, textAlign: 'right' }]}>₹15,000</Text>
-                <Text style={[styles.mockTd, { width: 75, textAlign: 'right', fontWeight: '600' }]}>₹15,000</Text>
-              </View>
-            </View>
-
-            {/* Totals & Tax Breakup Mockup */}
-            <View style={styles.mockTotalsWrap}>
-              <View style={styles.mockTotalsCol}>
-                <View style={styles.mockTotalRow}>
-                  <Text style={styles.mockTotalLabel}>Taxable Value:</Text>
-                  <Text style={styles.mockTotalVal}>₹60,000.00</Text>
+                <View style={styles.totalsSide}>
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>Subtotal</Text>
+                    <Text style={styles.totalVal}>₹60,000.00</Text>
+                  </View>
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>GST (18%)</Text>
+                    <Text style={styles.totalVal}>₹10,800.00</Text>
+                  </View>
+                  <View style={styles.grandTotalBlock}>
+                    <Text style={styles.grandTotalLabel}>TOTAL AMOUNT</Text>
+                    <Text style={styles.grandTotalVal}>₹70,800.00</Text>
+                  </View>
                 </View>
-                <View style={styles.mockTotalRow}>
-                  <Text style={styles.mockTotalLabel}>CGST (9%):</Text>
-                  <Text style={styles.mockTotalVal}>₹5,400.00</Text>
-                </View>
-                <View style={styles.mockTotalRow}>
-                  <Text style={styles.mockTotalLabel}>SGST (9%):</Text>
-                  <Text style={styles.mockTotalVal}>₹5,400.00</Text>
-                </View>
-                <View style={[styles.mockTotalRow, styles.mockGrandTotalRow]}>
-                  <Text style={styles.mockGrandTotalLabel}>TOTAL AMOUNT:</Text>
-                  <Text style={styles.mockGrandTotalVal}>₹70,800.00</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Footer / Signature */}
-            <View style={styles.mockFooter}>
-              <Text style={styles.mockTerms}>Computer generated document. Valid without physical seal under IT Act 2000.</Text>
-              <View style={styles.mockSignBlock}>
-                <Text style={styles.mockSignOrg}>For {orgName}</Text>
-                <View style={styles.mockSignLine} />
-                <Text style={styles.mockSignLabel}>Authorized Signatory</Text>
               </View>
             </View>
           </View>
-        </View>
 
-        {/* ── Down Side: Proper Templates Selection Area ── */}
-        <View style={styles.selectorSection}>
-          <View style={styles.selectorSectionHeader}>
-            <Text style={[styles.selectorTitle, { color: theme.textPrimary }]}>
-              SELECT A TEMPLATE
-            </Text>
-            <Text style={[styles.selectorSubtitle, { color: theme.textSecondary }]}>
-              Tap any layout below to switch designs instantly
-            </Text>
-          </View>
+          {/* ── Down-Side Proper Templates Selector ── */}
+          <View style={styles.selectorSection}>
+            <View style={styles.selectorHeader}>
+              <Text style={[styles.selectorTitle, { color: theme.textMuted }]}>
+                AVAILABLE LAYOUTS · {activeConfig.templates.length} VERIFIED
+              </Text>
+            </View>
 
-          {/* Cards for each template in this document type */}
-          <View style={styles.templateCardsList}>
-            {activeConfig.templates.map((tmpl) => {
-              const isSelected = tmpl.id === selectedTemplateId;
-              return (
-                <Pressable
-                  key={tmpl.id}
-                  style={({ pressed }) => [
-                    styles.templateCard,
-                    {
-                      backgroundColor: theme.surface,
-                      borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
-                      opacity: pressed ? 0.9 : 1,
-                    },
-                    isSelected && styles.templateCardSelected,
-                  ]}
-                  onPress={() => setSelectedTemplateId(tmpl.id)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
-                >
-                  <View style={styles.templateCardTop}>
-                    <View style={styles.templateBadgeRow}>
-                      <View style={[styles.templateCodeBadge, { backgroundColor: theme.surfaceSecondary }]}>
-                        <Text style={[styles.templateCodeText, { color: tmpl.accentColor }]}>
-                          {tmpl.badge}
+            <View style={styles.templatesList}>
+              {activeConfig.templates.map((tmpl) => {
+                const isSelected = tmpl.id === selectedTemplateId;
+                return (
+                  <Pressable
+                    key={tmpl.id}
+                    style={({ pressed }) => [
+                      styles.templateCard,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: isSelected ? '#FFFFFF' : 'rgba(255, 255, 255, 0.08)',
+                        opacity: pressed ? 0.9 : 1,
+                      },
+                      isSelected && styles.templateCardSelected,
+                    ]}
+                    onPress={() => setSelectedTemplateId(tmpl.id)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
+                  >
+                    <View style={styles.cardMain}>
+                      <View style={styles.cardHeader}>
+                        <View style={styles.cardBadge}>
+                          <Text style={styles.cardBadgeText}>{tmpl.code}</Text>
+                        </View>
+                        <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
+                          {tmpl.name}
                         </Text>
                       </View>
-                      <Text style={[styles.templateNameText, { color: theme.textPrimary }]}>
-                        {tmpl.name}
+
+                      <Text style={[styles.cardTagline, { color: theme.textSecondary }]}>
+                        {tmpl.tagline}
                       </Text>
                     </View>
 
-                    {isSelected ? (
-                      <View style={[styles.checkCircle, { backgroundColor: theme.brandAnchor }]}>
-                        <Check size={14} color="#FFFFFF" strokeWidth={2.5} />
-                      </View>
-                    ) : (
-                      <View style={[styles.uncheckCircle, { borderColor: theme.borderDefault }]} />
-                    )}
-                  </View>
-
-                  <Text style={[styles.targetOrgText, { color: theme.textSecondary }]}>
-                    {tmpl.targetOrganizations}
-                  </Text>
-
-                  <View style={[styles.featuresRow, { borderTopColor: theme.borderSubtle }]}>
-                    <Text style={[styles.featuresText, { color: theme.textMuted }]} numberOfLines={2}>
-                      {tmpl.keyFeatures}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
+                    <View style={styles.radioArea}>
+                      {isSelected ? (
+                        <View style={styles.radioSelected}>
+                          <Check size={12} color="#000000" strokeWidth={3} />
+                        </View>
+                      ) : (
+                        <View style={styles.radioUnselected} />
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -666,37 +661,42 @@ export default function DocumentTemplatesScreen() {
       {/* ── Fixed Floating Bottom Action Bar ── */}
       <View
         style={[
-          styles.bottomActionBar,
+          styles.bottomBar,
           {
-            backgroundColor: theme.surface,
+            backgroundColor: theme.surfaceElevated || '#0D0F17',
             borderTopColor: theme.borderSubtle,
-            paddingBottom: Math.max(insets.bottom, 12),
+            paddingBottom: Math.max(insets.bottom, 16),
           },
         ]}
       >
-        <View style={styles.bottomBarLeft}>
-          <Text style={[styles.bottomBarTemplateName, { color: theme.textPrimary }]}>
-            {selectedTemplate.badge} · {selectedTemplate.name}
-          </Text>
-          <Text style={[styles.bottomBarHint, { color: theme.textSecondary }]}>
-            Ready to draft
-          </Text>
-        </View>
+        <View style={styles.bottomBarContent}>
+          <View style={styles.bottomBarInfo}>
+            <View style={styles.bottomBadgeRow}>
+              <View style={styles.bottomPill}>
+                <Text style={styles.bottomPillText}>{selectedTemplate.code}</Text>
+              </View>
+              <Text style={[styles.bottomTemplateName, { color: theme.textPrimary }]} numberOfLines={1}>
+                {selectedTemplate.name}
+              </Text>
+            </View>
+            <Text style={[styles.bottomStatusText, { color: theme.textSecondary }]}>
+              Rule 46 Verified · Ready to draft
+            </Text>
+          </View>
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.createButton,
-            { opacity: pressed ? 0.88 : 1 },
-          ]}
-          onPress={handleCreateDocument}
-          accessibilityRole="button"
-          accessibilityLabel={`Create ${activeConfig.title} with ${selectedTemplate.name}`}
-        >
-          <Text style={styles.createButtonText}>
-            Create Document
-          </Text>
-          <ArrowRight size={18} color="#000000" strokeWidth={2.5} style={styles.createButtonIcon} />
-        </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.createButton,
+              { opacity: pressed ? 0.9 : 1 },
+            ]}
+            onPress={handleCreateDocument}
+            accessibilityRole="button"
+            accessibilityLabel={`Create ${activeConfig.title} with ${selectedTemplate.name}`}
+          >
+            <Text style={styles.createButtonText}>Create Document</Text>
+            <ArrowRight size={17} color="#000000" strokeWidth={2.5} />
+          </Pressable>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -709,47 +709,49 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    minHeight: 56,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.full,
+    width: 40,
+    height: 40,
+    borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.xs,
+    marginRight: spacing.sm,
   },
   headerTitleWrap: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '700',
     letterSpacing: -0.3,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     marginTop: 2,
   },
-  typePillsWrap: {
-    borderBottomWidth: 1,
-  },
-  typePillsContent: {
-    paddingHorizontal: spacing.md,
+  carouselContainer: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
     paddingVertical: 10,
+  },
+  carouselContent: {
+    paddingHorizontal: spacing.lg,
     gap: 8,
   },
   typePill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: radii.full,
+  },
+  typePillSelected: {
+    backgroundColor: '#FFFFFF',
+  },
+  typePillUnselected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    minHeight: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   typePillText: {
     fontSize: 13,
@@ -758,384 +760,534 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 110,
-    maxWidth: MAX_CONTENT_WIDTH,
-    alignSelf: 'center',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+  },
+  contentConstrained: {
     width: '100%',
+    maxWidth: 720,
   },
-  previewContainer: {
-    padding: spacing.md,
+  previewSection: {
+    marginBottom: spacing.xl,
   },
-  previewHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  previewBadgeRow: {
+  previewTopBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: 10,
+    paddingHorizontal: 4,
   },
-  badgePill: {
+  previewBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: '#1E2330',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: radii.xs,
+    borderRadius: 6,
+    marginRight: 8,
   },
-  badgePillText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  previewCategoryTag: {
+  previewBadgeText: {
     fontSize: 11,
     fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  previewCategoryLabel: {
+    fontSize: 12,
+    fontWeight: '600',
     letterSpacing: 0.8,
   },
-  previewInfoHint: {
-    fontSize: 11,
+  previewSpacer: {
+    flex: 1,
   },
-  a4Sheet: {
-    borderRadius: 8,
+  previewStatusHint: {
+    fontSize: 12,
+  },
+  documentCanvas: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.card,
     borderWidth: 1,
-    padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 4,
+    borderColor: '#E2E8F0',
+    padding: 24,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
+      },
+      default: {
+        elevation: 6,
+      },
+    }),
   },
-  mockExecHeader: {
+  // Executive Header
+  execHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#CBD5E1',
-    marginBottom: 12,
-  },
-  mockExecLeft: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  mockExecDivider: {
-    width: 1,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: 8,
-  },
-  mockExecRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  mockLedgerHeader: {
-    marginBottom: 12,
-  },
-  mockLedgerTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  mockLedgerBand: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 4,
-    padding: 6,
-    justifyContent: 'space-between',
-  },
-  mockBandCol: {
-    flex: 1,
-  },
-  mockBandLabel: {
-    fontSize: 9,
-    color: '#64748B',
-    fontWeight: '700',
-  },
-  mockBandVal: {
-    fontSize: 10,
-    color: '#0F172A',
-    fontWeight: '600',
-  },
-  mockStandardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingBottom: 10,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    marginBottom: 16,
   },
-  mockStandardRight: {
+  execLeft: {
+    flex: 1.2,
+  },
+  execDivider: {
+    width: 1,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 16,
+  },
+  execRight: {
+    flex: 1,
     alignItems: 'flex-end',
   },
-  mockOrgName: {
-    fontSize: 14,
+  docBrandName: {
+    fontSize: 17,
     fontWeight: '800',
     color: '#0F172A',
+    marginBottom: 4,
+    letterSpacing: -0.2,
   },
-  mockOrgMeta: {
-    fontSize: 10,
-    color: '#475569',
-    marginTop: 1,
+  docBrandMeta: {
+    fontSize: 11,
+    color: '#64748B',
+    lineHeight: 16,
   },
-  mockDocTitle: {
-    fontSize: 13,
+  docTitleMain: {
+    fontSize: 14,
     fontWeight: '800',
     color: '#0F172A',
     letterSpacing: 0.5,
   },
-  mockDocNumber: {
-    fontSize: 11,
+  docNumberMain: {
+    fontSize: 12,
     fontWeight: '700',
-    color: '#2563EB',
-    marginTop: 1,
+    color: '#0F172A',
+    marginTop: 2,
+    marginBottom: 4,
   },
-  mockDocMeta: {
-    fontSize: 10,
-    color: '#475569',
-    marginTop: 1,
-  },
-  mockPartyBox: {
-    backgroundColor: '#F8FAFC',
-    padding: 8,
-    borderRadius: 4,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#0F172A',
-  },
-  mockPartyHeading: {
-    fontSize: 9,
-    fontWeight: '800',
+  docDateMeta: {
+    fontSize: 11,
     color: '#64748B',
+    lineHeight: 15,
+  },
+  // Ledger Header
+  ledgerHeader: {
+    marginBottom: 16,
+  },
+  ledgerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  ledgerBand: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
+  },
+  ledgerBandCol: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRightWidth: 1,
+    borderRightColor: '#0F172A',
+  },
+  ledgerBandLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
     marginBottom: 2,
   },
-  mockClientName: {
+  ledgerBandVal: {
     fontSize: 11,
     fontWeight: '700',
     color: '#0F172A',
   },
-  mockClientMeta: {
-    fontSize: 10,
-    color: '#475569',
-  },
-  mockTable: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 4,
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  mockTableHeader: {
+  // Minimal Header
+  minimalHeader: {
     flexDirection: 'row',
-    backgroundColor: '#0F172A',
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-  },
-  mockTh: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  mockTableRow: {
-    flexDirection: 'row',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingBottom: 16,
+    marginBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  mockTd: {
-    fontSize: 10,
-    color: '#1E293B',
+  minimalRight: {
+    alignItems: 'flex-end',
   },
-  mockTotalsWrap: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: 12,
+  minimalNumber: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  mockTotalsCol: {
-    width: 200,
+  minimalDate: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
-  mockTotalRow: {
+  // Corporate Header
+  corporateHeader: {
+    marginBottom: 16,
+  },
+  corpTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  mockTotalLabel: {
-    fontSize: 10,
+  corpBadgePill: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  corpBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  corpDualPanels: {
+    flexDirection: 'row',
+  },
+  corpPanel: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 10,
+    borderRadius: 6,
+  },
+  corpPanelTag: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  corpPartyName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  corpPartyGstin: {
+    fontSize: 11,
     color: '#64748B',
   },
-  mockTotalVal: {
-    fontSize: 10,
-    color: '#0F172A',
-    fontWeight: '600',
+  // Supply Chain Header
+  supplyHeader: {
+    marginBottom: 16,
   },
-  mockGrandTotalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#0F172A',
-    paddingTop: 4,
-    marginTop: 4,
+  supplyTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  mockGrandTotalLabel: {
+  supplyTransportStrip: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 6,
+  },
+  transportCol: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRightWidth: 1,
+    borderRightColor: '#E2E8F0',
+  },
+  transportLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  transportVal: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
   },
-  mockGrandTotalVal: {
+  // Party Box
+  partyBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 16,
+  },
+  partyBoxLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  partyName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  partyMeta: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  // Table
+  tableBlock: {
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#0F172A',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  tableTh: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  tableTd: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#0F172A',
+    color: '#1E293B',
   },
-  mockFooter: {
+  // Bottom Summary
+  bottomSummaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
     paddingTop: 8,
   },
-  mockTerms: {
-    fontSize: 8,
-    color: '#94A3B8',
+  signatorySide: {
     flex: 1,
-    paddingRight: 10,
+    maxWidth: 180,
   },
-  mockSignBlock: {
-    alignItems: 'center',
-    width: 120,
-  },
-  mockSignOrg: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  mockSignLine: {
-    width: '100%',
+  signLine: {
     height: 1,
     backgroundColor: '#CBD5E1',
-    marginTop: 22,
-    marginBottom: 3,
+    marginBottom: 6,
   },
-  mockSignLabel: {
-    fontSize: 8,
+  signatoryLabel: {
+    fontSize: 10,
     color: '#64748B',
   },
-  selectorSection: {
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.sm,
-  },
-  selectorSectionHeader: {
-    marginBottom: spacing.md,
-  },
-  selectorTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.0,
-    textTransform: 'uppercase',
-  },
-  selectorSubtitle: {
-    fontSize: 13,
+  signatoryOrg: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0F172A',
     marginTop: 2,
   },
-  templateCardsList: {
-    gap: 12,
+  totalsSide: {
+    width: 170,
   },
-  templateCard: {
-    borderRadius: radii.md,
-    borderWidth: 1,
-    padding: spacing.md,
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
-  templateCardSelected: {
-    borderWidth: 2,
+  totalLabel: {
+    fontSize: 11,
+    color: '#64748B',
   },
-  templateCardTop: {
+  totalVal: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  grandTotalBlock: {
+    backgroundColor: '#0F172A',
+    borderRadius: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginTop: 6,
   },
-  templateBadgeRow: {
+  grandTotalLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  grandTotalVal: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  // Selector Section
+  selectorSection: {
+    width: '100%',
+  },
+  selectorHeader: {
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  selectorTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  templatesList: {
+    gap: 10,
+  },
+  templateCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: radii.card,
+    borderWidth: 1,
   },
-  templateCodeBadge: {
-    paddingHorizontal: 6,
+  templateCardSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: '#FFFFFF',
+    ...Platform.select({
+      web: {
+        boxShadow: '0 0 0 1px #FFFFFF, 0 4px 20px rgba(255, 255, 255, 0.08)',
+      },
+      default: {},
+    }),
+  },
+  cardMain: {
+    flex: 1,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  cardBadge: {
+    backgroundColor: '#1E2330',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: radii.xs,
+    borderRadius: 5,
   },
-  templateCodeText: {
+  cardBadgeText: {
     fontSize: 11,
-    fontWeight: '800',
-  },
-  templateNameText: {
-    fontSize: 15,
     fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
-  checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cardTagline: {
+    fontSize: 13,
+  },
+  radioArea: {
+    marginLeft: 14,
+  },
+  radioSelected: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  uncheckCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  radioUnselected: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
-  targetOrgText: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  featuresRow: {
-    borderTopWidth: 1,
-    paddingTop: 8,
-  },
-  featuresText: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  bottomActionBar: {
+  // Floating Bottom Bar
+  bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 14,
+    paddingHorizontal: spacing.lg,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.5)',
+      },
+      default: {
+        elevation: 12,
+      },
+    }),
+  },
+  bottomBarContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 12,
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
-  bottomBarLeft: {
+  bottomBarInfo: {
     flex: 1,
-    paddingRight: spacing.md,
+    marginRight: 16,
   },
-  bottomBarTemplateName: {
-    fontSize: 14,
+  bottomBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  bottomPill: {
+    backgroundColor: '#1E2330',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  bottomPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  bottomTemplateName: {
+    fontSize: 15,
     fontWeight: '700',
   },
-  bottomBarHint: {
+  bottomStatusText: {
     fontSize: 12,
-    marginTop: 1,
   },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
     backgroundColor: '#FFFFFF',
-    height: 48,
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 24,
-    minHeight: MIN_TOUCH_TARGET,
+    borderRadius: radii.button,
   },
   createButtonText: {
     fontSize: 14,
     fontWeight: '700',
     color: '#000000',
-  },
-  createButtonIcon: {
-    marginLeft: 6,
   },
 });

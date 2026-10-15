@@ -431,9 +431,14 @@ export default function DocumentsScreen() {
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: theme.textPrimary }]}>
-                Create New Document
-              </Text>
+              <View>
+                <Text style={[styles.sheetTitle, { color: theme.textPrimary }]}>
+                  New Document
+                </Text>
+                <Text style={[styles.sheetSubtitle, { color: theme.textSecondary }]}>
+                  Select document type to begin
+                </Text>
+              </View>
               <IconButton
                 icon={<X size={18} color={theme.textPrimary} />}
                 onPress={() => setShowCreateSheet(false)}
@@ -444,149 +449,41 @@ export default function DocumentsScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.sheetOptions}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sheetOption,
-                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                  onPress={() => handleCreateChoice('invoice')}
-                >
-                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                    <FileText size={20} color={theme.textPrimary} />
-                  </View>
-                  <View style={styles.optionTextBox}>
-                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Tax Invoice</Text>
-                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                      Commercial invoice with GST, tax calculation and line items
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sheetOption,
-                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                  onPress={() => handleCreateChoice('estimate')}
-                >
-                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                    <Briefcase size={20} color={theme.textPrimary} />
-                  </View>
-                  <View style={styles.optionTextBox}>
-                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Estimate / Quote</Text>
-                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                      Cost proposal or quotation with revision tracking
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sheetOption,
-                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                  onPress={() => handleCreateChoice('quick-bill')}
-                >
-                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                    <Zap size={20} color={theme.textPrimary} />
-                  </View>
-                  <View style={styles.optionTextBox}>
-                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Quick Counter Bill</Text>
-                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                      Fast 30-second retail bill with instant thermal / digital receipt
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sheetOption,
-                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                  onPress={() => handleCreateChoice('challan')}
-                >
-                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                    <Truck size={20} color={theme.textPrimary} />
-                  </View>
-                  <View style={styles.optionTextBox}>
-                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Delivery Challan</Text>
-                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                      Goods dispatch, vehicle transfer note & transit documentation
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sheetOption,
-                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                  onPress={() => handleCreateChoice('credit_note')}
-                >
-                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                    <RotateCcw size={20} color={theme.textPrimary} />
-                  </View>
-                  <View style={styles.optionTextBox}>
-                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Credit Note / Debit Note</Text>
-                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                      Sales returns, tax adjustments, price variations & customer refunds
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sheetOption,
-                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                  onPress={() => handleCreateChoice('purchase_order')}
-                >
-                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                    <ShoppingBag size={20} color={theme.textPrimary} />
-                  </View>
-                  <View style={styles.optionTextBox}>
-                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Purchase Order</Text>
-                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                      Official procurement orders sent to vendors & contractors
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sheetOption,
-                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                  onPress={() => handleCreateChoice('work_order')}
-                >
-                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                    <ClipboardList size={20} color={theme.textPrimary} />
-                  </View>
-                  <View style={styles.optionTextBox}>
-                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Work Order & Contract</Text>
-                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                      Scope of work, milestone deliverables, technical terms & legal signoff
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sheetOption,
-                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                  onPress={() => handleCreateChoice('receipt')}
-                >
-                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                    <Receipt size={20} color={theme.textPrimary} />
-                  </View>
-                  <View style={styles.optionTextBox}>
-                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Payment Receipt</Text>
-                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                      Official payment acknowledgments, rent receipts & settlement vouchers
-                    </Text>
-                  </View>
-                </Pressable>
+                {[
+                  { id: 'invoice', name: 'Tax Invoice', tagline: 'GST commercial billing', icon: FileText },
+                  { id: 'estimate', name: 'Estimate / Quotation', tagline: 'Cost proposal & quotes', icon: Briefcase },
+                  { id: 'quick-bill', name: 'Quick Counter Bill', tagline: '30-second POS checkout', icon: Zap },
+                  { id: 'challan', name: 'Delivery Challan', tagline: 'Goods dispatch & transit', icon: Truck },
+                  { id: 'credit_note', name: 'Credit Note / Debit Note', tagline: 'Returns & tax adjustments', icon: RotateCcw },
+                  { id: 'purchase_order', name: 'Purchase Order', tagline: 'Vendor procurement', icon: ShoppingBag },
+                  { id: 'work_order', name: 'Work Order & Contract', tagline: 'Scope & deliverables', icon: ClipboardList },
+                  { id: 'receipt', name: 'Payment Receipt', tagline: 'Payment acknowledgment', icon: Receipt },
+                ].map((opt) => {
+                  const IconComp = opt.icon;
+                  return (
+                    <Pressable
+                      key={opt.id}
+                      style={({ pressed }) => [
+                        styles.sheetOption,
+                        {
+                          backgroundColor: theme.surfaceSecondary,
+                          borderColor: 'rgba(255, 255, 255, 0.06)',
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
+                      onPress={() => handleCreateChoice(opt.id)}
+                    >
+                      <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                        <IconComp size={18} color={theme.textPrimary} strokeWidth={2} />
+                      </View>
+                      <View style={styles.optionTextBox}>
+                        <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>{opt.name}</Text>
+                        <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>{opt.tagline}</Text>
+                      </View>
+                      <ChevronRight size={16} color={theme.textMuted} />
+                    </Pressable>
+                  );
+                })}
               </View>
             </ScrollView>
           </Pressable>
@@ -728,10 +625,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   sheetContainer: {
-    borderRadius: radii.lg,
+    borderRadius: radii.xl,
     borderWidth: 1,
-    padding: spacing.lg,
-    maxHeight: '80%',
+    padding: spacing.xl,
+    maxHeight: '85%',
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -740,27 +637,35 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   sheetTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
+  sheetSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
   sheetOptions: {
-    gap: spacing.sm,
+    gap: 10,
   },
   sheetOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.md,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: radii.card,
+    borderWidth: 1,
     minHeight: MIN_TOUCH_TARGET,
   },
   optionIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.sm,
+    width: 38,
+    height: 38,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   optionTextBox: {
     flex: 1,
@@ -772,6 +677,5 @@ const styles = StyleSheet.create({
   },
   optionDesc: {
     fontSize: 13,
-    lineHeight: 18,
   },
 });
