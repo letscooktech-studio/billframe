@@ -93,8 +93,7 @@ export const DRAWER_GROUPS: DrawerGroup[] = [
     items: [
       { id: 'create_doc', label: 'Create Document', route: '/document/templates?type=invoice', icon: FilePlus, keywords: ['new', 'invoice', 'gst', 'bill', 'order', 'document'] },
       { id: 'doc_library', label: 'Document Library', route: '/(tabs)/documents', icon: FolderOpen, keywords: ['all', 'files', 'records', 'history', 'drafts', 'invoices', 'receipts'] },
-      { id: 'quick_bill', label: '30s Quick Bill', route: '/quick-bill', icon: Zap, badge: 'FAST', keywords: ['quick', 'counter', 'pos', 'instant', 'upi', 'billing'] },
-      { id: 'template_studio', label: 'Universal Studio', route: '/document/templates?type=invoice', icon: Palette, badge: 'PRO', keywords: ['design', 'brand', 'rule 46', 'layouts', 'templates', 'studio'] },
+      { id: 'template_studio', label: 'Template Studio', route: '/document/templates?type=invoice', icon: Palette, badge: 'PRO', keywords: ['design', 'brand', 'rule 46', 'layouts', 'templates', 'studio'] },
       { id: 'custom_docs', label: 'Custom Document Builder', route: '/templates/create-type', icon: Sparkles, keywords: ['builder', 'creator', 'custom', 'schema', 'type'] },
     ],
   },
@@ -109,7 +108,6 @@ export const DRAWER_GROUPS: DrawerGroup[] = [
     id: 'business_work',
     title: 'BUSINESS WORK',
     items: [
-      { id: 'work_orders', label: 'Work Orders & Contracts', route: '/templates/studio?typeId=work_order', icon: ClipboardList, keywords: ['service', 'tasks', 'contract', 'job'] },
       { id: 'inventory_catalog', label: 'Item Catalog & Work', route: '/(tabs)/money', icon: Package, keywords: ['catalog', 'products', 'services', 'hsn', 'rates', 'pricing'] },
       { id: 'expenses', label: 'Expense Records', route: '/expenses/index', icon: Receipt, keywords: ['spending', 'costs', 'bills', 'outflows', 'receipts'] },
     ],

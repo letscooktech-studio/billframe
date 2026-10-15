@@ -40,7 +40,7 @@ import {
   Receipt,
   Briefcase,
   Menu,
-  Truck,
+  FileSpreadsheet,
   RotateCcw,
   ShoppingBag,
   ClipboardList,
@@ -451,9 +451,9 @@ export default function DocumentsScreen() {
               <View style={styles.sheetOptions}>
                 {[
                   { id: 'invoice', name: 'Tax Invoice', tagline: 'GST commercial billing', icon: FileText },
+                  { id: 'bill_of_supply', name: 'Bill of Supply', tagline: 'Composition & tax-exempt bill', icon: FileSpreadsheet },
                   { id: 'estimate', name: 'Estimate / Quotation', tagline: 'Cost proposal & quotes', icon: Briefcase },
                   { id: 'quick-bill', name: 'Quick Counter Bill', tagline: '30-second POS checkout', icon: Zap },
-                  { id: 'challan', name: 'Delivery Challan', tagline: 'Goods dispatch & transit', icon: Truck },
                   { id: 'credit_note', name: 'Credit Note / Debit Note', tagline: 'Returns & tax adjustments', icon: RotateCcw },
                   { id: 'purchase_order', name: 'Purchase Order', tagline: 'Vendor procurement', icon: ShoppingBag },
                   { id: 'work_order', name: 'Work Order & Contract', tagline: 'Scope & deliverables', icon: ClipboardList },
