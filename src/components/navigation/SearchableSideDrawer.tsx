@@ -61,6 +61,7 @@ import {
   HelpCircle,
   Info,
   ChevronRight,
+  Zap,
 } from 'lucide-react-native';
 import { useNavigationDrawer } from './NavigationDrawerContext';
 import { useTheme } from '../../design/ThemeContext';
@@ -79,78 +80,65 @@ interface DrawerItem {
   keywords?: string[];
 }
 
-interface DrawerGroup {
+export interface DrawerGroup {
   id: string;
   title: string;
   items: DrawerItem[];
 }
 
-const DRAWER_GROUPS: DrawerGroup[] = [
+export const DRAWER_GROUPS: DrawerGroup[] = [
   {
     id: 'documents',
     title: 'DOCUMENTS',
     items: [
-      { id: 'create_doc', label: 'Create Document', route: '/templates/studio', icon: FilePlus, keywords: ['new', 'invoice', 'order'] },
-      { id: 'doc_library', label: 'Document Library', route: '/(tabs)/documents', icon: FolderOpen, keywords: ['all', 'files', 'records'] },
-      { id: 'drafts', label: 'Drafts', route: '/(tabs)/documents', icon: Clock, keywords: ['pending', 'unissued'] },
-      { id: 'recent_docs', label: 'Recent Documents', route: '/(tabs)/documents', icon: History, keywords: ['history', 'last'] },
-      { id: 'my_templates', label: 'My Templates', route: '/templates/index', icon: Layers, keywords: ['presets', 'layouts'] },
-      { id: 'template_studio', label: 'Template Studio', route: '/templates/studio', icon: Palette, badge: 'PRO', keywords: ['design', 'brand'] },
-      { id: 'custom_docs', label: 'Custom Documents', route: '/templates/create-type', icon: Sparkles, keywords: ['builder', 'creator'] },
+      { id: 'create_doc', label: 'Create Document', route: '/document/edit', icon: FilePlus, keywords: ['new', 'invoice', 'gst', 'bill', 'order', 'document'] },
+      { id: 'doc_library', label: 'Document Library', route: '/(tabs)/documents', icon: FolderOpen, keywords: ['all', 'files', 'records', 'history', 'drafts', 'invoices', 'receipts'] },
+      { id: 'quick_bill', label: '30s Quick Bill', route: '/quick-bill', icon: Zap, badge: 'FAST', keywords: ['quick', 'counter', 'pos', 'instant', 'upi', 'billing'] },
+      { id: 'template_studio', label: 'Universal Studio', route: '/templates/studio', icon: Palette, badge: '446 DOCS', keywords: ['design', 'brand', 'rule 46', 'layouts', 'templates', 'studio'] },
+      { id: 'custom_docs', label: 'Custom Document Builder', route: '/templates/create-type', icon: Sparkles, keywords: ['builder', 'creator', 'custom', 'schema', 'type'] },
     ],
   },
   {
     id: 'people',
     title: 'PEOPLE',
     items: [
-      { id: 'customers', label: 'Customers', route: '/(tabs)/contacts', icon: Users, keywords: ['clients', 'buyers'] },
-      { id: 'employees', label: 'Employees', route: '/(tabs)/contacts', icon: UserCheck, keywords: ['staff', 'team', 'hr'] },
-      { id: 'suppliers', label: 'Suppliers', route: '/(tabs)/contacts', icon: Truck, keywords: ['vendors', 'procurement'] },
-      { id: 'contractors', label: 'Contractors', route: '/(tabs)/contacts', icon: Briefcase, keywords: ['freelancers', 'subs'] },
+      { id: 'customers', label: 'Customers & Clients', route: '/(tabs)/contacts', icon: Users, keywords: ['clients', 'buyers', 'contacts', 'directory', 'ledger'] },
     ],
   },
   {
     id: 'business_work',
     title: 'BUSINESS WORK',
     items: [
-      { id: 'projects', label: 'Projects', route: '/templates/studio', icon: FolderKanban, keywords: ['milestones', 'jobs'] },
-      { id: 'work_orders', label: 'Work Orders', route: '/templates/studio?typeId=work_order', icon: ClipboardList, keywords: ['service', 'tasks'] },
-      { id: 'services', label: 'Services', route: '/(tabs)/money', icon: Wrench, keywords: ['catalog', 'hourly', 'fees'] },
-      { id: 'inventory', label: 'Inventory', route: '/(tabs)/money', icon: Package, keywords: ['stock', 'goods', 'items'] },
-      { id: 'expenses', label: 'Expenses', route: '/expenses/index', icon: Receipt, keywords: ['spending', 'costs', 'bills'] },
+      { id: 'work_orders', label: 'Work Orders & Contracts', route: '/templates/studio?typeId=work_order', icon: ClipboardList, keywords: ['service', 'tasks', 'contract', 'job'] },
+      { id: 'inventory_catalog', label: 'Item Catalog & Work', route: '/(tabs)/money', icon: Package, keywords: ['catalog', 'products', 'services', 'hsn', 'rates', 'pricing'] },
+      { id: 'expenses', label: 'Expense Records', route: '/expenses/index', icon: Receipt, keywords: ['spending', 'costs', 'bills', 'outflows', 'receipts'] },
     ],
   },
   {
     id: 'finance',
     title: 'FINANCE',
     items: [
-      { id: 'invoices', label: 'Invoices', route: '/(tabs)/documents', icon: CreditCard, keywords: ['billing', 'sales', 'tax'] },
-      { id: 'receipts', label: 'Receipts', route: '/(tabs)/documents', icon: FileCheck, keywords: ['payments', 'clearance'] },
-      { id: 'collections', label: 'Collections', route: '/collections/index', icon: Wallet, badge: 'AUTO', keywords: ['overdue', 'aging', 'reminders'] },
-      { id: 'payment_settings', label: 'Payment & UPI', route: '/settings/payments', icon: QrCode, keywords: ['qr', 'vpa', 'gateway'] },
-      { id: 'reports', label: 'Reports', route: '/reports/index', icon: BarChart3, keywords: ['analytics', 'p&l', 'gst', 'summary'] },
+      { id: 'collections', label: 'Collections Hub', route: '/collections/index', icon: Wallet, badge: 'AUTO', keywords: ['overdue', 'aging', 'reminders', 'receivables', 'collections'] },
+      { id: 'reports', label: 'Financial Reports & Tax', route: '/reports/index', icon: BarChart3, keywords: ['analytics', 'p&l', 'gst', 'summary', 'cashflow', 'tax'] },
+      { id: 'payment_settings', label: 'Payment Gateways & UPI', route: '/settings/payments', icon: QrCode, keywords: ['qr', 'vpa', 'gateway', 'razorpay', 'cashfree', 'upi'] },
     ],
   },
   {
     id: 'organization',
     title: 'ORGANIZATION',
     items: [
-      { id: 'business_profile', label: 'Business Profile', route: '/onboarding/setup', icon: Building2, keywords: ['address', 'tax', 'legal', 'company'] },
-      { id: 'brand_kit', label: 'Brand Kit', route: '/templates/studio', icon: ImageIcon, keywords: ['logo', 'color', 'typography'] },
-      { id: 'document_defaults', label: 'Document Defaults', route: '/(tabs)/settings', icon: Sliders, keywords: ['terms', 'notes', 'currency'] },
-      { id: 'workspace_prefs', label: 'Workspace Preferences', route: '/settings/workspace', icon: Settings2, keywords: ['layout', 'intent', 'modules'] },
+      { id: 'business_profile', label: 'Business Profile', route: '/onboarding/setup', icon: Building2, keywords: ['address', 'tax', 'legal', 'company', 'gstin', 'pan'] },
+      { id: 'brand_kit', label: 'Brand Kit & Letterhead', route: '/templates/edit', icon: ImageIcon, keywords: ['logo', 'color', 'typography', 'brand', 'letterhead', 'signature'] },
+      { id: 'workspace_prefs', label: 'Tax Engine & Rules', route: '/settings/workspace', icon: Sliders, keywords: ['tax', 'igst', 'cgst', 'sgst', 'rules', 'thresholds'] },
     ],
   },
   {
     id: 'application',
     title: 'APPLICATION',
     items: [
-      { id: 'appearance', label: 'Appearance & Theme', route: '/(tabs)/settings', icon: SunMedium, keywords: ['dark', 'light', 'system'] },
-      { id: 'security', label: 'Security & PIN Lock', route: '/security-pin', icon: ShieldCheck, keywords: ['biometric', 'app lock'] },
-      { id: 'backup_restore', label: 'Backup & Restore', route: '/backup', icon: Database, keywords: ['export', 'import', 'offline'] },
-      { id: 'data_management', label: 'Data Management', route: '/(tabs)/settings', icon: HardDrive, keywords: ['storage', 'clear'] },
-      { id: 'help', label: 'Help & Knowledge', route: '/(tabs)/settings', icon: HelpCircle, keywords: ['faq', 'guide', 'support'] },
-      { id: 'about', label: 'About Billframe', route: '/(tabs)/settings', icon: Info, keywords: ['version', 'license', 'offline'] },
+      { id: 'appearance', label: 'Settings & Preferences', route: '/(tabs)/settings', icon: Settings2, keywords: ['dark', 'light', 'system', 'preferences', 'settings', 'theme'] },
+      { id: 'security', label: 'Security & PIN Lock', route: '/security-pin', icon: ShieldCheck, keywords: ['biometric', 'app lock', 'pin', 'security'] },
+      { id: 'backup_restore', label: 'Backup & Restore', route: '/backup', icon: Database, keywords: ['export', 'import', 'offline', 'backup', 'sqlite'] },
     ],
   },
 ];

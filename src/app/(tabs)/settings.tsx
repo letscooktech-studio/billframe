@@ -127,114 +127,27 @@ export default function SettingsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.container}>
-            {/* Header */}
+            {/* Header Row with Hamburger Drawer Toggle */}
             <View style={styles.header}>
-              <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>All Features</Text>
-              <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-                Complete Workspace Directory & Settings
-              </Text>
-            </View>
-
-            {/* Search & Discover Drawer Action Hero */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.drawerHeroBtn,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.borderDefault,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-              onPress={openDrawer}
-              accessibilityRole="button"
-              accessibilityLabel="Open all features navigation drawer"
-            >
-              <View style={styles.drawerHeroLeft}>
-                <View style={[styles.drawerHeroIconBox, { backgroundColor: theme.surfaceSecondary }]}>
-                  <Search color={theme.textPrimary} size={18} strokeWidth={2} />
-                </View>
-                <View style={styles.drawerHeroTextWrap}>
-                  <Text style={[styles.drawerHeroTitle, { color: theme.textPrimary }]}>
-                    Search All Features & Documents
-                  </Text>
-                  <Text style={[styles.drawerHeroSub, { color: theme.textSecondary }]}>
-                    Open navigation drawer to discover every tool and record
-                  </Text>
-                </View>
+              <Pressable
+                onPress={openDrawer}
+                style={styles.headerMenuBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Open navigation drawer"
+                hitSlop={8}
+              >
+                <Menu size={22} color={theme.textPrimary} strokeWidth={2} />
+              </Pressable>
+              <View style={styles.headerTextCol}>
+                <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Settings</Text>
+                <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
+                  Preferences, Security & System Configuration
+                </Text>
               </View>
-              <ChevronRight color={theme.textSecondary} size={18} strokeWidth={2} />
-            </Pressable>
-
-            {/* Section 1: Sales & Documents */}
-            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>SALES & DOCUMENTS</Text>
-            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-              {renderItem({
-                icon: <FileText color={theme.brandAnchor} size={20} />,
-                title: 'Invoices & Estimates',
-                subtitle: 'Official tax invoices, quotes & proforma documents',
-                onPress: () => router.push('/(tabs)/documents'),
-              })}
-              {renderItem({
-                icon: <Zap color={theme.brandAnchor} size={20} />,
-                title: '30s Quick Bill',
-                subtitle: 'Instant counter billing with dynamic offline UPI QR code',
-                badge: 'Fast',
-                onPress: () => router.push('/quick-bill'),
-              })}
-              {renderItem({
-                icon: <Palette color={theme.brandAnchor} size={20} />,
-                title: 'Template Studio',
-                subtitle: 'Customize PDF typography, layout, brand colors & Rule 46 tables',
-                badge: 'Studio',
-                onPress: () => router.push('/templates' as any),
-                isLast: true,
-              })}
             </View>
 
-            {/* Section 2: Payments & Collections */}
-            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>PAYMENTS & COLLECTIONS</Text>
-            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-              {renderItem({
-                icon: <Clock color={theme.brandAnchor} size={20} />,
-                title: 'Collections Hub',
-                subtitle: 'Accounts receivable aging, payment reminders & overdue tracking',
-                onPress: () => router.push('/collections'),
-              })}
-              {renderItem({
-                icon: <QrCode color={theme.brandAnchor} size={20} />,
-                title: 'Payment Gateways & UPI',
-                subtitle: 'Direct UPI VPA, QR codes, Razorpay, Cashfree & Stripe',
-                onPress: () => router.push('/settings/payments'),
-                isLast: true,
-              })}
-            </View>
-
-            {/* Section 3: Business Operations */}
-            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>BUSINESS OPERATIONS</Text>
-            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
-              {renderItem({
-                icon: <Package color={theme.brandAnchor} size={20} />,
-                title: 'Item Catalog & Inventory',
-                subtitle: 'Products, services, HSN/SAC codes & unit pricing',
-                onPress: () => router.push('/catalog'),
-              })}
-              {renderItem({
-                icon: <Receipt color={theme.brandAnchor} size={20} />,
-                title: 'Expense Records',
-                subtitle: 'Categorized business expenses, receipts & operational outflows',
-                onPress: () => router.push('/expenses'),
-              })}
-              {renderItem({
-                icon: <FileSpreadsheet color={theme.brandAnchor} size={20} />,
-                title: 'Financial Reports & Tax',
-                subtitle: 'Profit & loss, cash flow, GST summary & sales tax export',
-                onPress: () => router.push('/reports'),
-                isLast: true,
-              })}
-            </View>
-
-            {/* Section 4: Data & System Configuration */}
-            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>DATA & SYSTEM</Text>
+            {/* Section 1: Organization & Regional Tax */}
+            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>ORGANIZATION & TAX</Text>
             <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
               {renderItem({
                 icon: <Building2 color={theme.brandAnchor} size={20} />,
@@ -256,6 +169,18 @@ export default function SettingsScreen() {
                 onPress: () => router.push('/settings/workspace'),
               })}
               {renderItem({
+                icon: <QrCode color={theme.brandAnchor} size={20} />,
+                title: 'Payment Gateways & UPI',
+                subtitle: 'Direct UPI VPA, QR codes, Razorpay, Cashfree & Stripe',
+                onPress: () => router.push('/settings/payments'),
+                isLast: true,
+              })}
+            </View>
+
+            {/* Section 2: Security & Local Database */}
+            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>SECURITY & DATA</Text>
+            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              {renderItem({
                 icon: <Lock color={theme.brandAnchor} size={20} />,
                 title: 'Security & App Lock',
                 subtitle: 'Device biometrics and PIN lock on application resume',
@@ -272,7 +197,13 @@ export default function SettingsScreen() {
                 title: 'Sovereign Privacy',
                 subtitle: 'Zero cloud tracking, zero analytics, 100% on-device data',
                 onPress: handlePrivacy,
+                isLast: true,
               })}
+            </View>
+
+            {/* Section 3: Preferences & System */}
+            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>PREFERENCES & SYSTEM</Text>
+            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
               {renderItem({
                 icon: <Moon color={theme.brandAnchor} size={20} />,
                 title: 'Appearance & Theme',
@@ -313,7 +244,20 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     paddingVertical: spacing.md,
+  },
+  headerMenuBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTextCol: {
+    flex: 1,
   },
   screenTitle: {
     fontSize: typography.screenTitle.fontSize,

@@ -72,11 +72,11 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Briefcase color={color} size={22} strokeWidth={2} />,
         }}
       />
+      {/* Hidden tabs — feature directory transferred to side navigation bar */}
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'All',
-          tabBarIcon: ({ color }) => <LayoutGrid color={color} size={22} strokeWidth={2} />,
+          href: null,
         }}
       />
 
