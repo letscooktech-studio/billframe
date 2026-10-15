@@ -50,6 +50,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 export interface FeaturePalette {
   primary: string;
   secondary: string;
+  accentColor?: string;
   bg?: string;
   coreHighlight?: string;
   stream?: string;
@@ -62,121 +63,97 @@ export const FEATURE_PALETTES: Record<string, FeaturePalette> = {
   template_studio: {
     primary: '#4841C8',
     secondary: '#AAA1ED',
-    bg: '#080C1E',
-    coreHighlight: '#D9F6FF',
-    stream: '#77A2FF',
-    diffuse: '#17244E',
-    border: '#1E2540',
-    accentText: '#939AFF',
+    accentColor: '#8B5CF6',
+    bg: '#000000',
+    border: 'rgba(139, 92, 246, 0.25)',
+    accentText: '#A78BFA',
   },
   clients: {
     primary: '#087F78',
     secondary: '#78D7C9',
-    bg: '#061011',
-    coreHighlight: '#D4FFFF',
-    stream: '#79FFF3',
-    diffuse: '#032028',
-    border: '#102B2D',
-    accentText: '#79FFF3',
+    accentColor: '#1EC1CB',
+    bg: '#000000',
+    border: 'rgba(30, 193, 203, 0.25)',
+    accentText: '#1EC1CB',
   },
   payments: {
     primary: '#173C8C',
     secondary: '#6DAAF5',
-    bg: '#080A1C',
-    coreHighlight: '#DAF8FF',
-    stream: '#95A1FF',
-    diffuse: '#182B4C',
-    border: '#1A2244',
-    accentText: '#95A1FF',
+    accentColor: '#3B82F6',
+    bg: '#000000',
+    border: 'rgba(59, 130, 246, 0.25)',
+    accentText: '#60A5FA',
   },
   documents: {
     primary: '#234ED8',
     secondary: '#839DF6',
-    bg: '#090B18',
-    coreHighlight: '#DAF0FF',
-    stream: '#69A1FF',
-    diffuse: '#0E183B',
-    border: '#1C2346',
-    accentText: '#91ADFF',
+    accentColor: '#2563EB',
+    bg: '#000000',
+    border: 'rgba(37, 99, 235, 0.25)',
+    accentText: '#60A5FA',
   },
   collections: {
     primary: '#9E603B',
     secondary: '#EDB788',
-    bg: '#140C08',
-    coreHighlight: '#FFF1E6',
-    stream: '#FDBA74',
-    diffuse: '#381E12',
-    border: '#331B10',
-    accentText: '#FDBA74',
+    accentColor: '#F59E0B',
+    bg: '#000000',
+    border: 'rgba(245, 158, 11, 0.25)',
+    accentText: '#FBBF24',
   },
   reports: {
     primary: '#435575',
     secondary: '#A5B7D0',
-    bg: '#090E16',
-    coreHighlight: '#E0F2FE',
-    stream: '#7DD3FC',
-    diffuse: '#0C243B',
-    border: '#132B45',
-    accentText: '#7DD3FC',
+    accentColor: '#38BDF8',
+    bg: '#000000',
+    border: 'rgba(56, 189, 248, 0.25)',
+    accentText: '#38BDF8',
   },
   hr: {
     primary: '#654A7A',
     secondary: '#B6A5D4',
-    bg: '#11091A',
-    coreHighlight: '#FAE8FF',
-    stream: '#E879F9',
-    diffuse: '#341445',
-    border: '#2C113D',
+    accentColor: '#D946EF',
+    bg: '#000000',
+    border: 'rgba(217, 70, 239, 0.25)',
     accentText: '#E879F9',
   },
   projects: {
     primary: '#235D50',
     secondary: '#93B8A3',
-    bg: '#06120D',
-    coreHighlight: '#ECFDF5',
-    stream: '#6EE7B7',
-    diffuse: '#0E3321',
-    border: '#123825',
-    accentText: '#6EE7B7',
+    accentColor: '#10B981',
+    bg: '#000000',
+    border: 'rgba(16, 185, 129, 0.25)',
+    accentText: '#34D399',
   },
   inventory: {
     primary: '#344D5E',
     secondary: '#85BAC6',
-    bg: '#0A1116',
-    coreHighlight: '#E0F7FA',
-    stream: '#4DD0E1',
-    diffuse: '#0D2A35',
-    border: '#13323F',
-    accentText: '#4DD0E1',
+    accentColor: '#06B6D4',
+    bg: '#000000',
+    border: 'rgba(6, 182, 212, 0.25)',
+    accentText: '#22D3EE',
   },
   brand_kit: {
     primary: '#34363C',
     secondary: '#A4A9B3',
-    bg: '#121214',
-    coreHighlight: '#FFFFFF',
-    stream: '#D4D4D8',
-    diffuse: '#27272A',
-    border: '#2E2E33',
-    accentText: '#D4D4D8',
+    accentColor: '#CBD5E1',
+    bg: '#000000',
+    border: 'rgba(203, 213, 225, 0.2)',
+    accentText: '#E2E8F0',
   },
   security: {
     primary: '#263C5B',
     secondary: '#A7B5C6',
-    bg: '#080F18',
-    coreHighlight: '#EFF6FF',
-    stream: '#93C5FD',
-    diffuse: '#132845',
-    border: '#173050',
+    accentColor: '#60A5FA',
+    bg: '#000000',
+    border: 'rgba(96, 165, 250, 0.25)',
     accentText: '#93C5FD',
   },
   expenses: {
     primary: '#713E50',
     secondary: '#CF98A8',
-    bg: '#16080E',
-    coreHighlight: '#FFE4E6',
-    stream: '#FB7185',
-    diffuse: '#3B111E',
-    border: '#33101C',
+    accentColor: '#F43F5E',
+    bg: '#000000',
+    border: 'rgba(244, 63, 94, 0.25)',
     accentText: '#FB7185',
   },
 };
@@ -269,15 +246,18 @@ export function FeatureIntroductionSheet({
   const palette = useMemo(() => {
     const base = FEATURE_PALETTES[featureId] || FEATURE_PALETTES.documents;
     const merged = customPalette ? { ...base, ...customPalette } : base;
+    const singleColor = merged.accentColor || merged.stream || merged.secondary || merged.primary;
     return {
       primary: merged.primary,
       secondary: merged.secondary,
-      bg: merged.bg || '#080C1E',
+      singleAccent: singleColor,
+      bg: merged.bg || '#000000',
+      deepNavy: '#1C1C28',
       coreHighlight: merged.coreHighlight || '#FFFFFF',
-      stream: merged.stream || merged.secondary,
+      stream: merged.stream || singleColor,
       diffuse: merged.diffuse || merged.primary,
-      border: merged.border || 'rgba(255, 255, 255, 0.15)',
-      accentText: merged.accentText || merged.secondary,
+      border: merged.border || 'rgba(255, 255, 255, 0.12)',
+      accentText: merged.accentText || singleColor,
     };
   }, [customPalette, featureId]);
 
@@ -362,18 +342,13 @@ export function FeatureIntroductionSheet({
 
   // Half-middle height (~52% of screen height)
   const SHEET_HEIGHT = Math.max(400, Math.min(Math.round(SCREEN_HEIGHT * 0.52), 480)) + Math.max(insets.bottom, 16);
-  const gradBloom = `grad_b_${featureId}`;
-  const gradRibbon = `grad_r_${featureId}`;
-  const gradHighlight = `grad_h_${featureId}`;
 
-  // Electric wave control points
-  const pStart = `${SCREEN_WIDTH * 0.42} ${SHEET_HEIGHT * 0.95}`;
-  const pCtrl1 = `${SCREEN_WIDTH * 0.62} ${SHEET_HEIGHT * 0.72}`;
-  const pMid = `${SCREEN_WIDTH * 0.75} ${SHEET_HEIGHT * 0.52}`;
-  const pCtrl2 = `${SCREEN_WIDTH * 0.92} ${SHEET_HEIGHT * 0.35}`;
-  const pEnd = `${SCREEN_WIDTH * 1.05} ${SHEET_HEIGHT * 0.15}`;
-
-  const wavePath = `M ${pStart} Q ${pCtrl1}, ${pMid} T ${pEnd}`;
+  // Gradient IDs for SVG atmospheric lighting (Single Color + Black Gradiency)
+  const baseDarkGradId = `base_dark_${featureId}`;
+  const horizonAuroraId = `horizon_aurora_${featureId}`;
+  const ambientBloomId = `ambient_bloom_${featureId}`;
+  const softFillId = `soft_fill_${featureId}`;
+  const topMeltId = `top_melt_${featureId}`;
 
   return (
     <View style={styles.modalRoot} pointerEvents="box-none">
@@ -400,7 +375,7 @@ export function FeatureIntroductionSheet({
           },
         ]}
       >
-        {/* ── Atmospheric Plasma Gradient Wave Engine with Breathing Pulse ── */}
+        {/* ── Atmospheric 1-Color + Black Horizon Aurora Engine (Zero Lines / Zero Geometric Shapes) ── */}
         <Animated.View
           style={[
             styles.atmosphereBackground,
@@ -412,84 +387,78 @@ export function FeatureIntroductionSheet({
         >
           <Svg width={SCREEN_WIDTH} height={SHEET_HEIGHT} style={StyleSheet.absoluteFill}>
             <Defs>
-              {/* Diffuse atmospheric bloom on right */}
-              <RadialGradient
-                id={gradBloom}
-                cx="82%"
-                cy="42%"
-                rx="68%"
-                ry="58%"
-                fx="82%"
-                fy="42%"
-                gradientUnits="userSpaceOnUse"
-              >
-                <Stop offset="0%" stopColor={palette.primary} stopOpacity="0.75" />
-                <Stop offset="45%" stopColor={palette.secondary} stopOpacity="0.35" />
-                <Stop offset="75%" stopColor={palette.diffuse} stopOpacity="0.15" />
-                <Stop offset="100%" stopColor={palette.bg} stopOpacity="0" />
-              </RadialGradient>
-
-              {/* Luminous stream linear gradient */}
-              <LinearGradient id={gradRibbon} x1="0" y1="1" x2="1" y2="0">
-                <Stop offset="0%" stopColor={palette.primary} stopOpacity="0.2" />
-                <Stop offset="40%" stopColor={palette.secondary} stopOpacity="0.8" />
-                <Stop offset="80%" stopColor={palette.stream} stopOpacity="0.95" />
-                <Stop offset="100%" stopColor={palette.coreHighlight} stopOpacity="1" />
+              {/* 1. Deep Navy to Pitch Black Base Gradient (#1C1C28 from dyslove.design reference) */}
+              <LinearGradient id={baseDarkGradId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0%" stopColor="#000000" stopOpacity="1" />
+                <Stop offset="55%" stopColor="#070910" stopOpacity="1" />
+                <Stop offset="100%" stopColor="#1C1C28" stopOpacity="1" />
               </LinearGradient>
 
-              {/* Ultra-bright plasma core */}
-              <LinearGradient id={gradHighlight} x1="0" y1="1" x2="1" y2="0">
-                <Stop offset="0%" stopColor={palette.secondary} stopOpacity="0" />
-                <Stop offset="50%" stopColor={palette.coreHighlight} stopOpacity="0.85" />
-                <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.95" />
+              {/* 2. Soft Horizontal Aurora Glow (Decreased pattern matching 3rd reference: 1 color with black gradiency) */}
+              <LinearGradient id={horizonAuroraId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0%" stopColor="#000000" stopOpacity="0" />
+                <Stop offset="38%" stopColor="#000000" stopOpacity="0" />
+                <Stop offset="65%" stopColor={palette.singleAccent} stopOpacity="0.26" />
+                <Stop offset="88%" stopColor={palette.singleAccent} stopOpacity="0.52" />
+                <Stop offset="100%" stopColor={palette.singleAccent} stopOpacity="0.28" />
+              </LinearGradient>
+
+              {/* 3. Diffused Right-Hand Ambient Light Pool (Completely smooth Gaussian-style blur, NO sharp lines) */}
+              <RadialGradient
+                id={ambientBloomId}
+                cx="82%"
+                cy="78%"
+                rx="70%"
+                ry="55%"
+                fx="82%"
+                fy="78%"
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop offset="0%" stopColor={palette.singleAccent} stopOpacity="0.58" />
+                <Stop offset="35%" stopColor={palette.singleAccent} stopOpacity="0.30" />
+                <Stop offset="72%" stopColor={palette.singleAccent} stopOpacity="0.08" />
+                <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+              </RadialGradient>
+
+              {/* 4. Left-Center Ambient Glow for seamless horizontal continuity across the card */}
+              <RadialGradient
+                id={softFillId}
+                cx="32%"
+                cy="85%"
+                rx="55%"
+                ry="44%"
+                fx="32%"
+                fy="85%"
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop offset="0%" stopColor={palette.singleAccent} stopOpacity="0.30" />
+                <Stop offset="55%" stopColor={palette.singleAccent} stopOpacity="0.07" />
+                <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+              </RadialGradient>
+
+              {/* 5. Top Black Contrast Protection Mask: Guarantees pure solid black at top for pristine text legibility */}
+              <LinearGradient id={topMeltId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0%" stopColor="#000000" stopOpacity="0.92" />
+                <Stop offset="45%" stopColor="#000000" stopOpacity="0.55" />
+                <Stop offset="78%" stopColor="#000000" stopOpacity="0.05" />
+                <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
               </LinearGradient>
             </Defs>
 
-            {/* Base Background Fill */}
-            <Rect x="0" y="0" width={SCREEN_WIDTH} height={SHEET_HEIGHT} fill={palette.bg} />
+            {/* Base Fill */}
+            <Rect x="0" y="0" width={SCREEN_WIDTH} height={SHEET_HEIGHT} fill={`url(#${baseDarkGradId})`} />
 
-            {/* Atmospheric Right-Hand Bloom */}
-            <Rect x="0" y="0" width={SCREEN_WIDTH} height={SHEET_HEIGHT} fill={`url(#${gradBloom})`} />
+            {/* Right-Hand Diffused Ambient Bloom */}
+            <Rect x="0" y="0" width={SCREEN_WIDTH} height={SHEET_HEIGHT} fill={`url(#${ambientBloomId})`} />
 
-            {/* Outer Atmospheric Glow */}
-            <Path
-              d={wavePath}
-              stroke={palette.primary}
-              strokeWidth="110"
-              strokeOpacity="0.28"
-              strokeLinecap="round"
-              fill="none"
-            />
+            {/* Left-Center Soft Fill */}
+            <Rect x="0" y="0" width={SCREEN_WIDTH} height={SHEET_HEIGHT} fill={`url(#${softFillId})`} />
 
-            {/* Mid Atmospheric Fluid Stream */}
-            <Path
-              d={wavePath}
-              stroke={`url(#${gradRibbon})`}
-              strokeWidth="54"
-              strokeOpacity="0.65"
-              strokeLinecap="round"
-              fill="none"
-            />
+            {/* Horizontal Aurora Horizon Band */}
+            <Rect x="0" y="0" width={SCREEN_WIDTH} height={SHEET_HEIGHT} fill={`url(#${horizonAuroraId})`} />
 
-            {/* Neon Accent Stream */}
-            <Path
-              d={wavePath}
-              stroke={palette.stream}
-              strokeWidth="22"
-              strokeOpacity="0.82"
-              strokeLinecap="round"
-              fill="none"
-            />
-
-            {/* Intense Bright Plasma Core */}
-            <Path
-              d={wavePath}
-              stroke={`url(#${gradHighlight})`}
-              strokeWidth="7"
-              strokeOpacity="0.95"
-              strokeLinecap="round"
-              fill="none"
-            />
+            {/* Top Black Melt Mask */}
+            <Rect x="0" y="0" width={SCREEN_WIDTH} height={SHEET_HEIGHT} fill={`url(#${topMeltId})`} />
           </Svg>
         </Animated.View>
 
