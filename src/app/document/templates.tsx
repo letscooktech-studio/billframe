@@ -1,15 +1,13 @@
 /**
- * DOCUMENT TEMPLATE SELECTION SCREEN — BILLFRAME LUXURY BLACK & WHITE ARCHITECTURE
+ * DOCUMENT TEMPLATE SELECTION STUDIO — BILLFRAME LUXURY MINIMALIST ARCHITECTURE
  * 
- * Key Highlights:
- * - Responsive Studio Layout: Side-by-side split screen on desktop (canvas on left, template gallery on right),
- *   and stacked touch-friendly studio on mobile.
- * - Removed redundant top document carousel to eliminate clutter.
- * - 5+ verified professional layouts for EVERY document type (Executive, Ledger, Minimal, Corporate, Retail/Supply).
- * - Visual Miniature Wireframe Schematics on every template card.
- * - "Similar Templates" recommendation row & category filters (Executive, Ledger, Minimal, Corporate, Trade/Retail).
- * - Instant live preview update on selection with zero scroll displacement.
- * - Crisp, high-contrast Black & White luxury typography and layout.
+ * Design Invariants:
+ * - Generous Whitespace & Breathing Room: Airy page margins, spacious line items, soft visual breathing room.
+ * - Refined Modern Typography: Clean font weights (300/400/500/600), subtle letter-spacing, zero heavy font overload.
+ * - No Text Clutter: Removed noisy bullet tags, redundant badges, and text crowding.
+ * - Delicate Hairline Geometry: Fine borders (#E4E4E7 / rgba(255,255,255,0.08)) instead of harsh solid black blocks.
+ * - Responsive Studio: Side-by-side split canvas on desktop, elegant spacious stack on mobile.
+ * - Interactive Similar Layouts: Quick, quiet chips to browse related aesthetics.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -34,18 +32,16 @@ import {
   ShoppingBag,
   ClipboardList,
   Receipt,
-  ShieldCheck,
   FileSpreadsheet,
   Layers,
   Sparkles,
-  Zap,
 } from 'lucide-react-native';
-import { spacing, radii } from '../../design/tokens';
+import { radii } from '../../design/tokens';
 import { useTheme } from '../../design/ThemeContext';
 import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
 import { BusinessProfile } from '../../domain/profile/types';
 
-export type TemplateCategory = 'executive' | 'ledger' | 'minimal' | 'corporate' | 'supply_chain' | 'retail';
+export type TemplateCategory = 'executive' | 'ledger' | 'minimal' | 'corporate' | 'retail';
 
 export interface DocumentTemplateItem {
   id: string;
@@ -55,7 +51,6 @@ export interface DocumentTemplateItem {
   category: TemplateCategory;
   categoryLabel: string;
   similarTemplateIds: string[];
-  highlights: string[];
 }
 
 export interface DocumentTypeConfig {
@@ -81,11 +76,10 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         id: 'gst_executive',
         code: 'GST-01',
         name: 'Executive Letterhead',
-        tagline: 'Formal masthead with vertical divider, serif headings & generous margins',
+        tagline: 'Classic brand masthead with vertical divider and generous margins',
         category: 'executive',
         categoryLabel: 'Executive',
-        similarTemplateIds: ['gst_corporate', 'gst_minimal'],
-        highlights: ['Formal Brand Masthead', 'Vertical Rule Layout', 'Standard GST Tally'],
+        similarTemplateIds: ['gst_minimal', 'gst_corporate'],
       },
       {
         id: 'gst_ledger',
@@ -94,38 +88,34 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         tagline: 'High-density itemized grid with 4-compartment metadata band',
         category: 'ledger',
         categoryLabel: 'Ledger',
-        similarTemplateIds: ['gst_supply_chain', 'gst_corporate'],
-        highlights: ['4-Band Metadata', 'High-Density Item Grid', 'HSN/SAC Breakup'],
+        similarTemplateIds: ['gst_corporate', 'gst_retail'],
       },
       {
         id: 'gst_minimal',
         code: 'GST-03',
         name: 'Minimal Professional',
-        tagline: 'Clean borderless typography with bold numbering & quiet whitespace',
+        tagline: 'Clean borderless typography with hero numbering and quiet whitespace',
         category: 'minimal',
         categoryLabel: 'Minimal',
         similarTemplateIds: ['gst_executive', 'gst_ledger'],
-        highlights: ['Hero Numbering', 'Borderless Item List', 'Modern Swiss Aesthetic'],
       },
       {
         id: 'gst_corporate',
         code: 'GST-04',
         name: 'Corporate B2B',
-        tagline: 'Dual buyer/consignee panels & enterprise tax breakdown block',
+        tagline: 'Dual buyer/consignee panels and enterprise tax breakdown block',
         category: 'corporate',
         categoryLabel: 'Corporate',
-        similarTemplateIds: ['gst_executive', 'gst_supply_chain'],
-        highlights: ['Buyer & Consignee Boxes', 'Statutory Stamp Area', 'Multi-Rate Tax Summary'],
+        similarTemplateIds: ['gst_executive', 'gst_retail'],
       },
       {
-        id: 'gst_supply_chain',
+        id: 'gst_retail',
         code: 'GST-05',
         name: 'Trade Supply Chain',
-        tagline: 'Logistics transport dispatch strip & multi-depot shipping tally',
-        category: 'supply_chain',
+        tagline: 'Logistics transport dispatch strip and multi-depot shipping tally',
+        category: 'retail',
         categoryLabel: 'Trade',
         similarTemplateIds: ['gst_ledger', 'gst_corporate'],
-        highlights: ['Vehicle & LR Details', 'Warehouse Dispatch', 'Packing List Alignment'],
       },
     ],
   },
@@ -145,17 +135,15 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         category: 'executive',
         categoryLabel: 'Executive',
         similarTemplateIds: ['bos_minimal', 'bos_corporate'],
-        highlights: ['Statutory Composition Notice', 'Executive Divider', 'Exempt Supply Summary'],
       },
       {
         id: 'bos_ledger',
         code: 'BOS-02',
         name: 'Structured Trade Ledger',
-        tagline: 'High-density tabular grid for nil-rated & exempt trade inventory',
+        tagline: 'High-density tabular grid for nil-rated and exempt trade inventory',
         category: 'ledger',
         categoryLabel: 'Ledger',
         similarTemplateIds: ['bos_retail', 'bos_corporate'],
-        highlights: ['Itemized Grid', 'Nil-Rate Indicator', '4-Field Reference Band'],
       },
       {
         id: 'bos_minimal',
@@ -165,7 +153,6 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         category: 'minimal',
         categoryLabel: 'Minimal',
         similarTemplateIds: ['bos_executive', 'bos_retail'],
-        highlights: ['Compact Notice', 'Quiet Whitespace', 'Bold Document #'],
       },
       {
         id: 'bos_corporate',
@@ -175,7 +162,6 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         category: 'corporate',
         categoryLabel: 'Corporate',
         similarTemplateIds: ['bos_executive', 'bos_ledger'],
-        highlights: ['Dual Recipient Panels', 'Corporate Contract Ref', 'Exempt Declaration'],
       },
       {
         id: 'bos_retail',
@@ -185,7 +171,6 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         category: 'retail',
         categoryLabel: 'Retail',
         similarTemplateIds: ['bos_minimal', 'bos_ledger'],
-        highlights: ['Counter POS Layout', 'Instant Cash Tally', 'Customer Receipt Slip'],
       },
     ],
   },
@@ -204,48 +189,43 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         tagline: 'Scope narrative with milestone pricing schedule and signoff block',
         category: 'executive',
         categoryLabel: 'Executive',
-        similarTemplateIds: ['est_proforma', 'est_minimal'],
-        highlights: ['Milestone Pricing', 'Scope Description', 'Client Acceptance Block'],
+        similarTemplateIds: ['est_minimal', 'est_corporate'],
       },
       {
-        id: 'est_itemized',
+        id: 'est_ledger',
         code: 'EST-02',
         name: 'Itemized Quotation',
         tagline: 'Detailed unit rates with revision versioning and validity terms',
         category: 'ledger',
         categoryLabel: 'Ledger',
-        similarTemplateIds: ['est_proforma', 'est_corporate'],
-        highlights: ['Unit Rate Tally', 'Validity Period', 'Revision Control'],
+        similarTemplateIds: ['est_corporate', 'est_retail'],
       },
       {
         id: 'est_minimal',
         code: 'EST-03',
         name: 'Modern Minimal Quote',
-        tagline: 'Crisp borderless layout with bold total and acceptance timeline',
+        tagline: 'Crisp borderless layout with quiet typography and acceptance terms',
         category: 'minimal',
         categoryLabel: 'Minimal',
-        similarTemplateIds: ['est_executive', 'est_itemized'],
-        highlights: ['Clean Typography', 'Prominent Quote Total', 'Terms Summary'],
-      },
-      {
-        id: 'est_proforma',
-        code: 'EST-04',
-        name: 'Commercial Proforma',
-        tagline: 'Advance wire coordinates & international commercial trade numbering',
-        category: 'corporate',
-        categoryLabel: 'Corporate',
-        similarTemplateIds: ['est_executive', 'est_itemized'],
-        highlights: ['Bank Wire Details', 'Proforma Trade Stamp', 'Advance Deposit Terms'],
+        similarTemplateIds: ['est_executive', 'est_ledger'],
       },
       {
         id: 'est_corporate',
-        code: 'EST-05',
-        name: 'Enterprise Tender Quote',
-        tagline: 'Dual buyer/consignee specification for formal procurement tenders',
+        code: 'EST-04',
+        name: 'Commercial Proforma',
+        tagline: 'Advance wire coordinates and international commercial trade numbering',
         category: 'corporate',
         categoryLabel: 'Corporate',
-        similarTemplateIds: ['est_proforma', 'est_executive'],
-        highlights: ['Dual Entity Details', 'Tender Reference', 'Formal Authorization'],
+        similarTemplateIds: ['est_executive', 'est_ledger'],
+      },
+      {
+        id: 'est_retail',
+        code: 'EST-05',
+        name: 'Quick Rate Estimate',
+        tagline: 'Compact quotation tally for retail and direct service consultations',
+        category: 'retail',
+        categoryLabel: 'Retail',
+        similarTemplateIds: ['est_minimal', 'est_ledger'],
       },
     ],
   },
@@ -264,38 +244,34 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         tagline: 'Formal letterhead credit memo with original invoice cross-reference',
         category: 'executive',
         categoryLabel: 'Executive',
-        similarTemplateIds: ['cn_ledger', 'cn_corporate'],
-        highlights: ['Original Invoice Cross-Ref', 'Executive Masthead', 'Net Adjustment Block'],
+        similarTemplateIds: ['cn_minimal', 'cn_corporate'],
       },
       {
         id: 'cn_ledger',
         code: 'CN-02',
         name: 'Tax Credit Note',
-        tagline: 'Rule 53 GST invoice reversal & itemized net tax credit ledger',
+        tagline: 'Rule 53 GST invoice reversal and itemized net tax credit ledger',
         category: 'ledger',
         categoryLabel: 'Ledger',
         similarTemplateIds: ['cn_executive', 'cn_corporate'],
-        highlights: ['Rule 53 Compliant', 'Itemized GST Reversal', '4-Point Metadata Band'],
       },
       {
         id: 'cn_minimal',
         code: 'CN-03',
         name: 'Modern Minimal Note',
-        tagline: 'Quiet typography with bold credit balance & reason for issuance',
+        tagline: 'Quiet typography with clean credit refund balance and reason block',
         category: 'minimal',
         categoryLabel: 'Minimal',
         similarTemplateIds: ['cn_executive', 'cn_retail'],
-        highlights: ['Hero Credit Amount', 'Reason for Credit', 'Clean Signature'],
       },
       {
         id: 'cn_corporate',
         code: 'DN-01',
         name: 'Corporate Debit Memo',
-        tagline: 'Enterprise rate revision claim & revised payable balance breakdown',
+        tagline: 'Enterprise rate revision claim and revised payable balance breakdown',
         category: 'corporate',
         categoryLabel: 'Corporate',
         similarTemplateIds: ['cn_ledger', 'cn_executive'],
-        highlights: ['Dual Party Panels', 'Revised Payable Balance', 'Debit Adjustment'],
       },
       {
         id: 'cn_retail',
@@ -305,7 +281,6 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         category: 'retail',
         categoryLabel: 'Retail',
         similarTemplateIds: ['cn_minimal', 'cn_ledger'],
-        highlights: ['POS Return Slip', 'Instant Credit Voucher', 'Store Credit Stamp'],
       },
     ],
   },
@@ -321,51 +296,46 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         id: 'po_executive',
         code: 'PO-01',
         name: 'Executive Procurement',
-        tagline: 'Formal procurement order with vendor instructions & signoff',
+        tagline: 'Formal procurement order with vendor instructions and signoff block',
         category: 'executive',
         categoryLabel: 'Executive',
         similarTemplateIds: ['po_corporate', 'po_ledger'],
-        highlights: ['Vendor Instructions', 'Executive Letterhead', 'Signoff Block'],
       },
       {
         id: 'po_ledger',
         code: 'PO-02',
         name: 'Industrial Supply Order',
-        tagline: 'Technical bill of materials, inspection criteria & delivery schedule',
+        tagline: 'Technical bill of materials, inspection criteria and delivery schedule',
         category: 'ledger',
         categoryLabel: 'Ledger',
         similarTemplateIds: ['po_executive', 'po_corporate'],
-        highlights: ['Bill of Materials', 'Delivery Schedule', 'Technical Criteria'],
       },
       {
         id: 'po_minimal',
         code: 'PO-03',
         name: 'Modern Minimal PO',
-        tagline: 'Clean procurement order with bold PO number and concise terms',
+        tagline: 'Clean procurement order with prominent PO number and concise terms',
         category: 'minimal',
         categoryLabel: 'Minimal',
         similarTemplateIds: ['po_executive', 'po_ledger'],
-        highlights: ['Bold PO Number', 'Concise Vendor Terms', 'Clean Table'],
       },
       {
         id: 'po_corporate',
         code: 'PO-04',
         name: 'Corporate Multi-Site PO',
-        tagline: 'Dual billing & warehouse shipping panels with tax tally',
+        tagline: 'Dual billing and warehouse shipping panels with tax tally',
         category: 'corporate',
         categoryLabel: 'Corporate',
         similarTemplateIds: ['po_executive', 'po_ledger'],
-        highlights: ['Ship-To Depot Panel', 'Enterprise Billing', 'Vendor Tax ID'],
       },
       {
         id: 'po_retail',
         code: 'PO-05',
         name: 'Stock Replenishment Order',
-        tagline: 'Fast restocking order tally for retail inventory & distribution',
+        tagline: 'Fast restocking order tally for retail inventory and distribution',
         category: 'retail',
         categoryLabel: 'Retail',
         similarTemplateIds: ['po_ledger', 'po_minimal'],
-        highlights: ['SKU Barcode Tally', 'Fast Restock Units', 'Warehouse Bay Ref'],
       },
     ],
   },
@@ -381,51 +351,46 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         id: 'wo_executive',
         code: 'WO-01',
         name: 'Retainer Agreement',
-        tagline: 'Formal engagement terms, milestone schedule & legal signature block',
+        tagline: 'Formal engagement terms, milestone schedule and signature blocks',
         category: 'executive',
         categoryLabel: 'Executive',
         similarTemplateIds: ['wo_corporate', 'wo_minimal'],
-        highlights: ['Master Retainer Terms', 'Dual Signature Blocks', 'Milestone Schedule'],
       },
       {
         id: 'wo_ledger',
         code: 'WO-02',
         name: 'Technical Service Order',
-        tagline: 'Scope deliverables, materials provided & completion signoff',
+        tagline: 'Scope deliverables, materials provided and completion signoff',
         category: 'ledger',
         categoryLabel: 'Ledger',
         similarTemplateIds: ['wo_corporate', 'wo_executive'],
-        highlights: ['Itemized Milestones', 'Deliverables Breakdown', 'Signoff Criteria'],
       },
       {
         id: 'wo_minimal',
         code: 'WO-03',
         name: 'Modern Statement of Work',
-        tagline: 'Clean agile deliverables list with transparent hourly / milestone billing',
+        tagline: 'Clean agile deliverables list with transparent milestone billing',
         category: 'minimal',
         categoryLabel: 'Minimal',
         similarTemplateIds: ['wo_executive', 'wo_ledger'],
-        highlights: ['Agile Deliverables', 'Sprint Timelines', 'Modern Whitespace'],
       },
       {
         id: 'wo_corporate',
         code: 'WO-04',
         name: 'Enterprise SOW Contract',
-        tagline: 'Dual party liability, acceptance criteria & formal governance',
+        tagline: 'Dual party liability, acceptance criteria and formal governance',
         category: 'corporate',
         categoryLabel: 'Corporate',
         similarTemplateIds: ['wo_executive', 'wo_ledger'],
-        highlights: ['Client & Vendor Panels', 'Governance Terms', 'Formal Verification'],
       },
       {
         id: 'wo_retail',
         code: 'WO-05',
         name: 'Field Service Dispatch',
-        tagline: 'On-site engineer report, equipment checklist & customer signoff',
+        tagline: 'On-site engineer report, equipment checklist and customer signoff',
         category: 'retail',
         categoryLabel: 'Retail',
         similarTemplateIds: ['wo_minimal', 'wo_ledger'],
-        highlights: ['Site Equipment Log', 'Work Performed Log', 'Customer Signoff'],
       },
     ],
   },
@@ -441,41 +406,37 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         id: 'rec_executive',
         code: 'REC-01',
         name: 'Executive Payment Voucher',
-        tagline: 'Bank UTR reference, payment mode & invoice clearance voucher',
+        tagline: 'Bank UTR reference, payment mode and invoice clearance voucher',
         category: 'executive',
         categoryLabel: 'Executive',
         similarTemplateIds: ['rec_corporate', 'rec_minimal'],
-        highlights: ['Bank Transaction Seal', 'Invoice Clearance Ref', 'Formal Masthead'],
       },
       {
         id: 'rec_ledger',
         code: 'REC-02',
         name: 'Account Settlement Ledger',
-        tagline: 'Full balance clearance & statement account reconciliation tally',
+        tagline: 'Full balance clearance and statement account reconciliation tally',
         category: 'ledger',
         categoryLabel: 'Ledger',
         similarTemplateIds: ['rec_executive', 'rec_corporate'],
-        highlights: ['Full Balance Clearance', 'Account Statement Tally', '4-Band Grid'],
       },
       {
         id: 'rec_minimal',
         code: 'REC-03',
         name: 'Modern Payment Receipt',
-        tagline: 'Ultra-clean receipt with bold amount and payment method badge',
+        tagline: 'Quiet receipt with clean amount display and payment method badge',
         category: 'minimal',
         categoryLabel: 'Minimal',
         similarTemplateIds: ['rec_executive', 'rec_retail'],
-        highlights: ['Hero Amount Display', 'UPI / Mode Badge', 'Clean Stamp'],
       },
       {
         id: 'rec_corporate',
         code: 'REC-04',
         name: 'Corporate Remittance Advice',
-        tagline: 'Dual entity billing details, TDS tax deduction & UTR settlement',
+        tagline: 'Dual entity billing details, TDS tax deduction and UTR settlement',
         category: 'corporate',
         categoryLabel: 'Corporate',
         similarTemplateIds: ['rec_executive', 'rec_ledger'],
-        highlights: ['Dual Entity Details', 'TDS Deduction Breakdown', 'Remittance Seal'],
       },
       {
         id: 'rec_retail',
@@ -485,15 +446,14 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
         category: 'retail',
         categoryLabel: 'Retail',
         similarTemplateIds: ['rec_minimal', 'rec_ledger'],
-        highlights: ['POS Receipt Slip', 'UPI QR Clearance', 'Customer Copy'],
       },
     ],
   },
 };
 
 /**
- * Miniature Wireframe Schematic Thumbnail
- * Renders a high-contrast visual diagram of the layout anatomy for each template.
+ * Miniature Wireframe Schematic
+ * Refined, airy visual geometry with delicate hairlines.
  */
 function TemplateWireframeThumbnail({
   category,
@@ -502,109 +462,101 @@ function TemplateWireframeThumbnail({
   category: TemplateCategory;
   isSelected: boolean;
 }) {
-  const fg = isSelected ? '#FFFFFF' : '#94A3B8';
-  const borderCol = isSelected ? '#FFFFFF' : 'rgba(255, 255, 255, 0.25)';
-  const fillCol = isSelected ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)';
+  const lineCol = isSelected ? '#FFFFFF' : '#71717A';
+  const borderCol = isSelected ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.12)';
+  const bgCol = isSelected ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)';
 
   return (
-    <View style={[styles.wireframeBox, { borderColor: borderCol, backgroundColor: fillCol }]}>
-      {/* Executive: Top header split by vertical line */}
+    <View style={[styles.wireframeBox, { borderColor: borderCol, backgroundColor: bgCol }]}>
       {category === 'executive' && (
         <View style={styles.wfInner}>
-          <View style={styles.wfExecTop}>
-            <View style={[styles.wfLine, { width: '42%', height: 5, backgroundColor: fg }]} />
-            <View style={[styles.wfDivider, { backgroundColor: fg }]} />
-            <View style={[styles.wfLine, { width: '42%', height: 4, backgroundColor: fg }]} />
+          <View style={styles.wfRowBetween}>
+            <View style={[styles.wfBar, { width: '40%', height: 3, backgroundColor: lineCol }]} />
+            <View style={[styles.wfDivider, { backgroundColor: lineCol }]} />
+            <View style={[styles.wfBar, { width: '40%', height: 3, backgroundColor: lineCol }]} />
           </View>
-          <View style={[styles.wfRule, { backgroundColor: fg, marginVertical: 3 }]} />
-          <View style={[styles.wfLine, { width: '60%', height: 3, backgroundColor: fg, marginBottom: 2 }]} />
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.5, marginBottom: 2 }]} />
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.5, marginBottom: 2 }]} />
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.5, marginBottom: 4 }]} />
-          <View style={styles.wfBottomRow}>
-            <View style={[styles.wfLine, { width: '30%', height: 3, backgroundColor: fg, opacity: 0.4 }]} />
-            <View style={[styles.wfLine, { width: '35%', height: 5, backgroundColor: fg }]} />
+          <View style={[styles.wfHairline, { backgroundColor: lineCol, marginVertical: 4 }]} />
+          <View style={[styles.wfBar, { width: '55%', height: 2, backgroundColor: lineCol, opacity: 0.5, marginBottom: 3 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginBottom: 2.5 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginBottom: 2.5 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginBottom: 5 }]} />
+          <View style={styles.wfRowBetween}>
+            <View style={[styles.wfBar, { width: '25%', height: 2, backgroundColor: lineCol, opacity: 0.3 }]} />
+            <View style={[styles.wfBar, { width: '35%', height: 3.5, backgroundColor: lineCol }]} />
           </View>
         </View>
       )}
 
-      {/* Ledger: Top bar + 4-compartment grid band + table */}
       {category === 'ledger' && (
         <View style={styles.wfInner}>
-          <View style={styles.wfLedgerTop}>
-            <View style={[styles.wfLine, { width: '45%', height: 4, backgroundColor: fg }]} />
-            <View style={[styles.wfLine, { width: '35%', height: 4, backgroundColor: fg }]} />
+          <View style={styles.wfRowBetween}>
+            <View style={[styles.wfBar, { width: '45%', height: 3, backgroundColor: lineCol }]} />
+            <View style={[styles.wfBar, { width: '30%', height: 3, backgroundColor: lineCol }]} />
           </View>
-          <View style={[styles.wfGridBand, { borderColor: fg }]}>
-            <View style={[styles.wfGridCol, { borderRightColor: fg }]} />
-            <View style={[styles.wfGridCol, { borderRightColor: fg }]} />
-            <View style={[styles.wfGridCol, { borderRightColor: fg }]} />
-            <View style={styles.wfGridCol} />
+          <View style={[styles.wfGridBand, { borderColor: lineCol }]}>
+            <View style={[styles.wfGridCell, { borderRightColor: lineCol }]} />
+            <View style={[styles.wfGridCell, { borderRightColor: lineCol }]} />
+            <View style={[styles.wfGridCell, { borderRightColor: lineCol }]} />
+            <View style={styles.wfGridCell} />
           </View>
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.6, marginVertical: 2 }]} />
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.6, marginBottom: 2 }]} />
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.6, marginBottom: 3 }]} />
-          <View style={styles.wfBottomRow}>
-            <View style={[styles.wfLine, { width: '30%', height: 3, backgroundColor: fg, opacity: 0.4 }]} />
-            <View style={[styles.wfTotalBox, { borderColor: fg }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginVertical: 2.5 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginBottom: 2.5 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginBottom: 4 }]} />
+          <View style={styles.wfRowBetween}>
+            <View style={[styles.wfBar, { width: '25%', height: 2, backgroundColor: lineCol, opacity: 0.3 }]} />
+            <View style={[styles.wfBoxOutline, { borderColor: lineCol }]} />
           </View>
         </View>
       )}
 
-      {/* Minimal: Clean single lines, large number on top right */}
       {category === 'minimal' && (
         <View style={styles.wfInner}>
-          <View style={styles.wfMinTop}>
-            <View style={{ flex: 1 }}>
-              <View style={[styles.wfLine, { width: '55%', height: 4, backgroundColor: fg, marginBottom: 2 }]} />
-              <View style={[styles.wfLine, { width: '40%', height: 2, backgroundColor: fg, opacity: 0.5 }]} />
-            </View>
-            <View style={[styles.wfLine, { width: 14, height: 10, backgroundColor: fg }]} />
+          <View style={styles.wfRowBetween}>
+            <View style={[styles.wfBar, { width: '50%', height: 3, backgroundColor: lineCol }]} />
+            <View style={[styles.wfBar, { width: 10, height: 6, backgroundColor: lineCol }]} />
           </View>
           <View style={{ height: 6 }} />
-          <View style={[styles.wfLine, { width: '100%', height: 1.5, backgroundColor: fg, opacity: 0.5, marginBottom: 3 }]} />
-          <View style={[styles.wfLine, { width: '100%', height: 1.5, backgroundColor: fg, opacity: 0.5, marginBottom: 3 }]} />
-          <View style={[styles.wfLine, { width: '100%', height: 1.5, backgroundColor: fg, opacity: 0.5, marginBottom: 5 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1, backgroundColor: lineCol, opacity: 0.3, marginBottom: 3 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1, backgroundColor: lineCol, opacity: 0.3, marginBottom: 3 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1, backgroundColor: lineCol, opacity: 0.3, marginBottom: 6 }]} />
           <View style={{ alignItems: 'flex-end' }}>
-            <View style={[styles.wfLine, { width: '40%', height: 4, backgroundColor: fg }]} />
+            <View style={[styles.wfBar, { width: '35%', height: 3, backgroundColor: lineCol }]} />
           </View>
         </View>
       )}
 
-      {/* Corporate: Dual side-by-side party boxes */}
       {category === 'corporate' && (
         <View style={styles.wfInner}>
-          <View style={[styles.wfLine, { width: '50%', height: 4, backgroundColor: fg, marginBottom: 4 }]} />
-          <View style={styles.wfCorpPanels}>
-            <View style={[styles.wfPanel, { borderColor: fg }]} />
-            <View style={[styles.wfPanel, { borderColor: fg }]} />
+          <View style={[styles.wfBar, { width: '45%', height: 3, backgroundColor: lineCol, marginBottom: 3 }]} />
+          <View style={styles.wfRowPanels}>
+            <View style={[styles.wfPanel, { borderColor: lineCol }]} />
+            <View style={[styles.wfPanel, { borderColor: lineCol }]} />
           </View>
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.5, marginVertical: 3 }]} />
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.5, marginBottom: 3 }]} />
-          <View style={styles.wfBottomRow}>
-            <View style={[styles.wfLine, { width: '35%', height: 3, backgroundColor: fg, opacity: 0.4 }]} />
-            <View style={[styles.wfLine, { width: '35%', height: 5, backgroundColor: fg }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginVertical: 3 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginBottom: 4 }]} />
+          <View style={styles.wfRowBetween}>
+            <View style={[styles.wfBar, { width: '30%', height: 2, backgroundColor: lineCol, opacity: 0.3 }]} />
+            <View style={[styles.wfBar, { width: '30%', height: 3.5, backgroundColor: lineCol }]} />
           </View>
         </View>
       )}
 
-      {/* Supply Chain / Trade / Retail: Transport strip or counter layout */}
-      {(category === 'supply_chain' || category === 'retail') && (
+      {category === 'retail' && (
         <View style={styles.wfInner}>
-          <View style={styles.wfSupplyTop}>
-            <View style={[styles.wfLine, { width: '45%', height: 4, backgroundColor: fg }]} />
-            <View style={[styles.wfBadgeDot, { backgroundColor: fg }]} />
+          <View style={styles.wfRowBetween}>
+            <View style={[styles.wfBar, { width: '45%', height: 3, backgroundColor: lineCol }]} />
+            <View style={[styles.wfDot, { backgroundColor: lineCol }]} />
           </View>
-          <View style={[styles.wfStrip, { borderColor: fg }]}>
-            <View style={[styles.wfLine, { width: '30%', height: 2, backgroundColor: fg }]} />
-            <View style={[styles.wfLine, { width: '30%', height: 2, backgroundColor: fg }]} />
-            <View style={[styles.wfLine, { width: '30%', height: 2, backgroundColor: fg }]} />
+          <View style={[styles.wfStrip, { borderColor: lineCol }]}>
+            <View style={[styles.wfBar, { width: '28%', height: 1.5, backgroundColor: lineCol }]} />
+            <View style={[styles.wfBar, { width: '28%', height: 1.5, backgroundColor: lineCol }]} />
+            <View style={[styles.wfBar, { width: '28%', height: 1.5, backgroundColor: lineCol }]} />
           </View>
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.5, marginVertical: 2 }]} />
-          <View style={[styles.wfLine, { width: '100%', height: 2, backgroundColor: fg, opacity: 0.5, marginBottom: 3 }]} />
-          <View style={styles.wfBottomRow}>
-            <View style={[styles.wfLine, { width: '25%', height: 3, backgroundColor: fg, opacity: 0.4 }]} />
-            <View style={[styles.wfLine, { width: '40%', height: 5, backgroundColor: fg }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginVertical: 2.5 }]} />
+          <View style={[styles.wfBar, { width: '100%', height: 1.5, backgroundColor: lineCol, opacity: 0.3, marginBottom: 4 }]} />
+          <View style={styles.wfRowBetween}>
+            <View style={[styles.wfBar, { width: '25%', height: 2, backgroundColor: lineCol, opacity: 0.3 }]} />
+            <View style={[styles.wfBar, { width: '35%', height: 3.5, backgroundColor: lineCol }]} />
           </View>
         </View>
       )}
@@ -619,7 +571,6 @@ export default function DocumentTemplateSelectionScreen() {
   const { theme } = useTheme();
   const { width } = useWindowDimensions();
 
-  // Desktop Responsive Mode
   const isDesktop = width >= 880;
 
   const [activeDocType] = useState<string>(() => {
@@ -640,7 +591,6 @@ export default function DocumentTemplateSelectionScreen() {
     return activeConfig.defaultTemplateId;
   });
 
-  // Category filter in the gallery
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
 
   const selectedTemplate = useMemo(() => {
@@ -650,20 +600,17 @@ export default function DocumentTemplateSelectionScreen() {
     );
   }, [activeConfig, selectedTemplateId]);
 
-  // Filtered templates list based on category filter
   const visibleTemplates = useMemo(() => {
     if (selectedCategoryFilter === 'all') return activeConfig.templates;
     return activeConfig.templates.filter((t) => t.category === selectedCategoryFilter);
   }, [activeConfig, selectedCategoryFilter]);
 
-  // Similar templates resolved items
   const similarTemplates = useMemo(() => {
     return activeConfig.templates.filter(
       (t) => t.id !== selectedTemplate.id && selectedTemplate.similarTemplateIds.includes(t.id)
     );
   }, [activeConfig, selectedTemplate]);
 
-  // Organization Profile for realistic live preview
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
 
   useEffect(() => {
@@ -672,7 +619,7 @@ export default function DocumentTemplateSelectionScreen() {
         const profile = await BusinessProfileRepository.getActiveProfile();
         if (profile) setBusinessProfile(profile);
       } catch {
-        // Fallback to sample studio
+        // Safe fallback
       }
     };
     loadProfile();
@@ -694,21 +641,20 @@ export default function DocumentTemplateSelectionScreen() {
     }
   };
 
-  const orgName = businessProfile?.name || 'Apex Studio Pvt Ltd';
+  const orgName = businessProfile?.name || 'Apex Studio';
   const orgGstin = businessProfile?.tax_id || '27AABCU9603R1ZM';
-  const orgAddress = businessProfile?.address_line1 || '101, Maker Chambers V, Nariman Point, Mumbai';
+  const orgAddress = businessProfile?.address_line1 || '101, Maker Chambers V, Mumbai';
 
   const filterTabs = [
-    { key: 'all', label: 'All Designs' },
+    { key: 'all', label: 'All' },
     { key: 'executive', label: 'Executive' },
-    { key: 'ledger', label: 'Ledger' },
     { key: 'minimal', label: 'Minimal' },
+    { key: 'ledger', label: 'Ledger' },
     { key: 'corporate', label: 'Corporate' },
-    { key: 'retail', label: 'Retail / Trade' },
   ];
 
   /* ───────────────────────────────────────────────────────────────────
-     RENDER DOCUMENT SHEET CANVAS (Used both on Desktop & Mobile)
+     RENDER DOCUMENT CANVAS (Airy Luxury Stationery Aesthetics)
   ─────────────────────────────────────────────────────────────────── */
   const renderDocumentCanvas = () => {
     const isComposition = activeDocType === 'bill_of_supply';
@@ -717,7 +663,7 @@ export default function DocumentTemplateSelectionScreen() {
 
     return (
       <View style={styles.documentCanvas}>
-        {/* 1. Category Header: Executive */}
+        {/* Category Header: Executive */}
         {selectedTemplate.category === 'executive' && (
           <View style={styles.execHeader}>
             <View style={styles.execLeft}>
@@ -727,24 +673,23 @@ export default function DocumentTemplateSelectionScreen() {
             </View>
             <View style={styles.execDivider} />
             <View style={styles.execRight}>
-              <Text style={styles.docTitleMain}>{activeConfig.shortName.toUpperCase()}</Text>
-              <Text style={styles.docNumberMain}>#{selectedTemplate.code}-2026-001</Text>
-              <Text style={styles.docDateMeta}>Date: 15 Oct 2026</Text>
-              <Text style={styles.docDateMeta}>Terms: Net 30 Days</Text>
+              <Text style={styles.docTitleMain}>{activeConfig.shortName}</Text>
+              <Text style={styles.docNumberMain}>#{selectedTemplate.code}-001</Text>
+              <Text style={styles.docDateMeta}>15 Oct 2026 · Net 30</Text>
             </View>
           </View>
         )}
 
-        {/* 2. Category Header: Ledger */}
+        {/* Category Header: Ledger */}
         {selectedTemplate.category === 'ledger' && (
           <View style={styles.ledgerHeader}>
             <View style={styles.ledgerTopRow}>
               <Text style={styles.docBrandName}>{orgName}</Text>
-              <Text style={styles.docTitleMain}>{activeConfig.shortName.toUpperCase()}</Text>
+              <Text style={styles.docTitleMain}>{activeConfig.shortName}</Text>
             </View>
             <View style={styles.ledgerBand}>
               <View style={styles.ledgerBandCol}>
-                <Text style={styles.ledgerBandLabel}>DOC NUMBER</Text>
+                <Text style={styles.ledgerBandLabel}>NUMBER</Text>
                 <Text style={styles.ledgerBandVal}>{selectedTemplate.code}-001</Text>
               </View>
               <View style={styles.ledgerBandCol}>
@@ -752,8 +697,8 @@ export default function DocumentTemplateSelectionScreen() {
                 <Text style={styles.ledgerBandVal}>15-OCT-2026</Text>
               </View>
               <View style={styles.ledgerBandCol}>
-                <Text style={styles.ledgerBandLabel}>STATE CODE</Text>
-                <Text style={styles.ledgerBandVal}>27 (MAH)</Text>
+                <Text style={styles.ledgerBandLabel}>STATE</Text>
+                <Text style={styles.ledgerBandVal}>27 (MH)</Text>
               </View>
               <View style={[styles.ledgerBandCol, { borderRightWidth: 0 }]}>
                 <Text style={styles.ledgerBandLabel}>TERMS</Text>
@@ -763,149 +708,138 @@ export default function DocumentTemplateSelectionScreen() {
           </View>
         )}
 
-        {/* 3. Category Header: Minimal */}
+        {/* Category Header: Minimal */}
         {selectedTemplate.category === 'minimal' && (
           <View style={styles.minimalHeader}>
             <View>
               <Text style={styles.docBrandName}>{orgName}</Text>
-              <Text style={styles.docBrandMeta}>GSTIN: {orgGstin}</Text>
-              <Text style={styles.docBrandMeta}>{orgAddress}</Text>
+              <Text style={styles.docBrandMeta}>GSTIN: {orgGstin} · {orgAddress}</Text>
             </View>
             <View style={styles.minimalRight}>
               <Text style={styles.minimalNumber}>#001</Text>
-              <Text style={styles.minimalDate}>15 Oct 2026 · Net 30</Text>
+              <Text style={styles.minimalDate}>15 Oct 2026</Text>
             </View>
           </View>
         )}
 
-        {/* 4. Category Header: Corporate */}
+        {/* Category Header: Corporate */}
         {selectedTemplate.category === 'corporate' && (
           <View style={styles.corporateHeader}>
             <View style={styles.corpTopRow}>
               <Text style={styles.docBrandName}>{orgName}</Text>
-              <View style={styles.corpBadgePill}>
-                <Text style={styles.corpBadgeText}>ORIGINAL FOR RECIPIENT</Text>
-              </View>
+              <Text style={styles.corpTitleTag}>{activeConfig.shortName.toUpperCase()}</Text>
             </View>
             <View style={styles.corpDualPanels}>
               <View style={styles.corpPanel}>
-                <Text style={styles.corpPanelTag}>BUYER / RECIPIENT</Text>
-                <Text style={styles.corpPartyName}>Reliance Retail Limited</Text>
-                <Text style={styles.corpPartyGstin}>GSTIN: 27AABCR1234F1Z8</Text>
+                <Text style={styles.corpPanelTag}>BILLED TO</Text>
+                <Text style={styles.corpPartyName}>Reliance Retail Ltd</Text>
+                <Text style={styles.corpPartyMeta}>GSTIN: 27AABCR1234F1Z8</Text>
               </View>
-              <View style={[styles.corpPanel, { marginLeft: 10 }]}>
-                <Text style={styles.corpPanelTag}>CONSIGNEE / SHIP TO</Text>
+              <View style={[styles.corpPanel, { marginLeft: 16 }]}>
+                <Text style={styles.corpPanelTag}>SHIPPED TO</Text>
                 <Text style={styles.corpPartyName}>Reliance Logistics Hub</Text>
-                <Text style={styles.corpPartyGstin}>Bhiwandi Depot, MH 421302</Text>
+                <Text style={styles.corpPartyMeta}>Bhiwandi Depot, MH</Text>
               </View>
             </View>
           </View>
         )}
 
-        {/* 5. Category Header: Supply Chain / Retail */}
-        {(selectedTemplate.category === 'supply_chain' || selectedTemplate.category === 'retail') && (
+        {/* Category Header: Retail / Trade */}
+        {selectedTemplate.category === 'retail' && (
           <View style={styles.supplyHeader}>
             <View style={styles.supplyTopRow}>
               <Text style={styles.docBrandName}>{orgName}</Text>
-              <Text style={styles.docTitleMain}>{activeConfig.shortName.toUpperCase()}</Text>
+              <Text style={styles.docTitleMain}>{activeConfig.shortName}</Text>
             </View>
             <View style={styles.supplyTransportStrip}>
               <View style={styles.transportCol}>
-                <Text style={styles.transportLabel}>VEHICLE NO.</Text>
+                <Text style={styles.transportLabel}>VEHICLE</Text>
                 <Text style={styles.transportVal}>MH-04-AB-2041</Text>
               </View>
               <View style={styles.transportCol}>
-                <Text style={styles.transportLabel}>TRANSPORTER</Text>
+                <Text style={styles.transportLabel}>CARRIER</Text>
                 <Text style={styles.transportVal}>BlueDart Express</Text>
               </View>
               <View style={[styles.transportCol, { borderRightWidth: 0 }]}>
-                <Text style={styles.transportLabel}>LR / DOCKET</Text>
+                <Text style={styles.transportLabel}>DOCKET</Text>
                 <Text style={styles.transportVal}>BD-902184</Text>
               </View>
             </View>
           </View>
         )}
 
-        {/* Composition Mandatory Banner */}
+        {/* Composition Statutory Banner */}
         {isComposition && (
-          <View style={styles.compDeclarationBanner}>
-            <Text style={styles.compDeclarationText}>
-              COMPOSITION TAXABLE PERSON — NOT ELIGIBLE TO COLLECT TAX ON SUPPLIES
+          <View style={styles.compBanner}>
+            <Text style={styles.compBannerText}>
+              Composition Taxable Person — Not eligible to collect tax on supplies
             </Text>
           </View>
         )}
 
-        {/* Credit Note Cross-Reference Box */}
+        {/* Credit Note Reference */}
         {isCreditNote && (
-          <View style={styles.crossRefBox}>
-            <Text style={styles.crossRefLabel}>ORIGINAL INVOICE REFERENCE:</Text>
-            <Text style={styles.crossRefText}>INV-2026-084 dated 28-Sep-2026 · Reason: Rate Adjustment / Goods Return</Text>
+          <View style={styles.crossRefStrip}>
+            <Text style={styles.crossRefText}>Ref Invoice: INV-2026-084 dated 28-Sep-2026 · Goods Return</Text>
           </View>
         )}
 
-        {/* Party Box (Spacious & Clean, when not dual corporate panel) */}
+        {/* Billed To (Clean, generous spacing) */}
         {selectedTemplate.category !== 'corporate' && (
           <View style={styles.partyBox}>
-            <Text style={styles.partyBoxLabel}>BILLED TO:</Text>
+            <Text style={styles.partyLabel}>BILLED TO</Text>
             <Text style={styles.partyName}>Reliance Retail Limited</Text>
-            <Text style={styles.partyMeta}>GSTIN: 27AABCR1234F1Z8 · Nariman Point, Mumbai, Maharashtra 400021</Text>
+            <Text style={styles.partyMeta}>GSTIN: 27AABCR1234F1Z8 · Nariman Point, Mumbai</Text>
           </View>
         )}
 
-        {/* High-Visibility Item Table */}
-        <View style={styles.tableBlock}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableTh, { flex: 3 }]}>DESCRIPTION</Text>
-            <Text style={[styles.tableTh, { width: 44, textAlign: 'center' }]}>QTY</Text>
-            <Text style={[styles.tableTh, { width: 80, textAlign: 'right' }]}>RATE</Text>
-            <Text style={[styles.tableTh, { width: 90, textAlign: 'right' }]}>AMOUNT</Text>
+        {/* Clean Line Items Table with Airy Padding */}
+        <View style={styles.tableWrap}>
+          <View style={styles.tableHead}>
+            <Text style={[styles.thCell, { flex: 3 }]}>DESCRIPTION</Text>
+            <Text style={[styles.thCell, { width: 50, textAlign: 'center' }]}>QTY</Text>
+            <Text style={[styles.thCell, { width: 90, textAlign: 'right' }]}>RATE</Text>
+            <Text style={[styles.thCell, { width: 100, textAlign: 'right' }]}>AMOUNT</Text>
           </View>
 
           <View style={styles.tableRow}>
-            <Text style={[styles.tableTd, { flex: 3, fontWeight: '700' }]}>
-              Enterprise Cloud Architecture
-            </Text>
-            <Text style={[styles.tableTd, { width: 44, textAlign: 'center' }]}>1</Text>
-            <Text style={[styles.tableTd, { width: 80, textAlign: 'right' }]}>₹45,000</Text>
-            <Text style={[styles.tableTd, { width: 90, textAlign: 'right', fontWeight: '800' }]}>
-              ₹45,000
-            </Text>
+            <Text style={[styles.tdDesc, { flex: 3 }]}>Enterprise Cloud Architecture</Text>
+            <Text style={[styles.tdMeta, { width: 50, textAlign: 'center' }]}>1</Text>
+            <Text style={[styles.tdMeta, { width: 90, textAlign: 'right' }]}>₹45,000</Text>
+            <Text style={[styles.tdAmount, { width: 100, textAlign: 'right' }]}>₹45,000</Text>
           </View>
 
           <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
-            <Text style={[styles.tableTd, { flex: 3, fontWeight: '700' }]}>
-              Security & Compliance Audit
-            </Text>
-            <Text style={[styles.tableTd, { width: 44, textAlign: 'center' }]}>1</Text>
-            <Text style={[styles.tableTd, { width: 80, textAlign: 'right' }]}>₹15,000</Text>
-            <Text style={[styles.tableTd, { width: 90, textAlign: 'right', fontWeight: '800' }]}>
-              ₹15,000
-            </Text>
+            <Text style={[styles.tdDesc, { flex: 3 }]}>Security & Compliance Audit</Text>
+            <Text style={[styles.tdMeta, { width: 50, textAlign: 'center' }]}>1</Text>
+            <Text style={[styles.tdMeta, { width: 90, textAlign: 'right' }]}>₹15,000</Text>
+            <Text style={[styles.tdAmount, { width: 100, textAlign: 'right' }]}>₹15,000</Text>
           </View>
         </View>
 
-        {/* High-Visibility Totals & Authorized Signatory */}
-        <View style={styles.bottomSummaryRow}>
-          <View style={styles.signatorySide}>
-            <View style={styles.signLine} />
-            <Text style={styles.signatoryLabel}>Authorized Signatory</Text>
-            <Text style={styles.signatoryOrg}>{orgName}</Text>
+        {/* Totals & Signature with Airy Whitespace */}
+        <View style={styles.summaryWrap}>
+          <View style={styles.signatureBox}>
+            <View style={styles.sigLine} />
+            <Text style={styles.sigLabel}>Authorized Signatory</Text>
+            <Text style={styles.sigOrg}>{orgName}</Text>
           </View>
 
-          <View style={styles.totalsSide}>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Subtotal</Text>
-              <Text style={styles.totalVal}>₹60,000.00</Text>
+          <View style={styles.totalsBox}>
+            <View style={styles.totalsRow}>
+              <Text style={styles.subtotalLabel}>Subtotal</Text>
+              <Text style={styles.subtotalVal}>₹60,000.00</Text>
             </View>
             {!isComposition && !isReceipt && (
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>GST (18%)</Text>
-                <Text style={styles.totalVal}>₹10,800.00</Text>
+              <View style={styles.totalsRow}>
+                <Text style={styles.subtotalLabel}>GST (18%)</Text>
+                <Text style={styles.subtotalVal}>₹10,800.00</Text>
               </View>
             )}
-            <View style={styles.grandTotalBlock}>
-              <Text style={styles.grandTotalLabel}>TOTAL AMOUNT</Text>
-              <Text style={styles.grandTotalVal}>
+            <View style={styles.grandTotalDivider} />
+            <View style={styles.grandTotalRow}>
+              <Text style={styles.grandTotalTitle}>Total</Text>
+              <Text style={styles.grandTotalAmount}>
                 {isComposition || isReceipt ? '₹60,000.00' : '₹70,800.00'}
               </Text>
             </View>
@@ -916,35 +850,23 @@ export default function DocumentTemplateSelectionScreen() {
   };
 
   /* ───────────────────────────────────────────────────────────────────
-     RENDER TEMPLATE GALLERY & SIMILAR TEMPLATES
+     RENDER TEMPLATE GALLERY (Uncluttered, Spacious Cards)
   ─────────────────────────────────────────────────────────────────── */
   const renderTemplateGallery = () => {
     return (
-      <View style={styles.galleryContainer}>
-        {/* ── Category Filter Tabs ── */}
+      <View style={styles.galleryInner}>
+        {/* Category Filters */}
         <View style={styles.filterBar}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterContent}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
             {filterTabs.map((tab) => {
               const isSelected = selectedCategoryFilter === tab.key;
               return (
                 <Pressable
                   key={tab.key}
-                  style={[
-                    styles.filterPill,
-                    isSelected ? styles.filterPillSelected : styles.filterPillUnselected,
-                  ]}
+                  style={[styles.filterChip, isSelected && styles.filterChipActive]}
                   onPress={() => setSelectedCategoryFilter(tab.key)}
                 >
-                  <Text
-                    style={[
-                      styles.filterPillText,
-                      isSelected ? styles.filterPillTextSelected : styles.filterPillTextUnselected,
-                    ]}
-                  >
+                  <Text style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}>
                     {tab.label}
                   </Text>
                 </Pressable>
@@ -953,87 +875,65 @@ export default function DocumentTemplateSelectionScreen() {
           </ScrollView>
         </View>
 
-        {/* ── Similar Templates Feature (Direct user requirement) ── */}
+        {/* Similar Layouts — Clean Subtle Row */}
         {similarTemplates.length > 0 && (
-          <View style={styles.similarSection}>
-            <View style={styles.similarHeader}>
-              <Sparkles size={14} color="#FFFFFF" strokeWidth={2.5} />
-              <Text style={styles.similarTitle}>SIMILAR LAYOUTS TO {selectedTemplate.code}:</Text>
-            </View>
-            <View style={styles.similarChipsRow}>
-              {similarTemplates.map((simTmpl) => (
+          <View style={styles.similarStrip}>
+            <Sparkles size={13} color="#A1A1AA" strokeWidth={1.75} />
+            <Text style={styles.similarPrompt}>Similar styles:</Text>
+            <View style={styles.similarLinks}>
+              {similarTemplates.map((sim) => (
                 <Pressable
-                  key={simTmpl.id}
-                  style={styles.similarChip}
-                  onPress={() => setSelectedTemplateId(simTmpl.id)}
+                  key={sim.id}
+                  style={styles.similarLinkPill}
+                  onPress={() => setSelectedTemplateId(sim.id)}
                 >
-                  <Text style={styles.similarChipCode}>{simTmpl.code}</Text>
-                  <Text style={styles.similarChipName}>{simTmpl.name}</Text>
-                  <ArrowRight size={12} color="#FFFFFF" strokeWidth={2} />
+                  <Text style={styles.similarLinkText}>{sim.name}</Text>
                 </Pressable>
               ))}
             </View>
           </View>
         )}
 
-        {/* ── Template Cards List ── */}
-        <View style={styles.templatesList}>
+        {/* Template Cards List */}
+        <View style={styles.cardList}>
           {visibleTemplates.map((tmpl) => {
             const isSelected = tmpl.id === selectedTemplateId;
             return (
               <Pressable
                 key={tmpl.id}
                 style={({ pressed }) => [
-                  styles.templateCard,
-                  isSelected ? styles.templateCardSelected : styles.templateCardUnselected,
-                  { opacity: pressed ? 0.85 : 1 },
+                  styles.optionCard,
+                  isSelected ? styles.optionCardSelected : styles.optionCardUnselected,
+                  { opacity: pressed ? 0.9 : 1 },
                 ]}
                 onPress={() => setSelectedTemplateId(tmpl.id)}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: isSelected }}
               >
-                {/* Visual Miniature Wireframe Schematic */}
-                <TemplateWireframeThumbnail
-                  category={tmpl.category}
-                  isSelected={isSelected}
-                />
+                {/* Visual Thumbnail */}
+                <TemplateWireframeThumbnail category={tmpl.category} isSelected={isSelected} />
 
-                {/* Card Main Info */}
-                <View style={styles.cardMain}>
-                  <View style={styles.cardHeader}>
-                    <View style={styles.cardBadge}>
-                      <Text style={styles.cardBadgeText}>{tmpl.code}</Text>
-                    </View>
-                    <View style={styles.categoryBadge}>
-                      <Text style={styles.categoryBadgeText}>{tmpl.categoryLabel}</Text>
-                    </View>
+                {/* Information */}
+                <View style={styles.cardInfo}>
+                  <View style={styles.cardTitleRow}>
+                    <Text style={styles.cardCode}>{tmpl.code}</Text>
                     <Text style={styles.cardTitle} numberOfLines={1}>
                       {tmpl.name}
                     </Text>
                   </View>
-
                   <Text style={styles.cardTagline} numberOfLines={2}>
                     {tmpl.tagline}
                   </Text>
-
-                  {/* Highlights tags */}
-                  <View style={styles.highlightsRow}>
-                    {tmpl.highlights.slice(0, 2).map((hl, idx) => (
-                      <View key={idx} style={styles.highlightPill}>
-                        <Text style={styles.highlightText}>✓ {hl}</Text>
-                      </View>
-                    ))}
-                  </View>
                 </View>
 
-                {/* Radio Selector */}
-                <View style={styles.radioArea}>
+                {/* Selection Indicator */}
+                <View style={styles.radioSlot}>
                   {isSelected ? (
-                    <View style={styles.radioSelected}>
-                      <Check size={14} color="#000000" strokeWidth={3} />
+                    <View style={styles.radioActive}>
+                      <Check size={13} color="#000000" strokeWidth={2.75} />
                     </View>
                   ) : (
-                    <View style={styles.radioUnselected} />
+                    <View style={styles.radioIdle} />
                   )}
                 </View>
               </Pressable>
@@ -1045,11 +945,11 @@ export default function DocumentTemplateSelectionScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: '#000000' }]} edges={['top', 'left', 'right']}>
-      {/* ── Top Header Navigation (Clean, No Redundant Options Everywhere) ── */}
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safeRoot} edges={['top', 'left', 'right']}>
+      {/* ── Top Header Navigation ── */}
+      <View style={styles.topHeader}>
         <Pressable
-          style={styles.backButton}
+          style={styles.backTouch}
           onPress={() => {
             if (router.canGoBack()) {
               router.back();
@@ -1059,152 +959,96 @@ export default function DocumentTemplateSelectionScreen() {
           }}
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          hitSlop={8}
+          hitSlop={12}
         >
-          <ArrowLeft size={22} color="#FFFFFF" strokeWidth={2.5} />
+          <ArrowLeft size={20} color="#FFFFFF" strokeWidth={2} />
         </Pressable>
 
-        <View style={styles.headerTitleWrap}>
-          <View style={styles.headerTitleRow}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {activeConfig.title}
-            </Text>
-            <View style={styles.headerCountBadge}>
-              <Text style={styles.headerCountText}>
-                {activeConfig.templates.length} Verified Layouts
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {activeConfig.subtitle}
-          </Text>
+        <View style={styles.headerTitleArea}>
+          <Text style={styles.screenHeaderTitle}>{activeConfig.title}</Text>
+          <Text style={styles.screenHeaderSub}>{activeConfig.templates.length} curated layouts</Text>
         </View>
 
         {isDesktop && (
-          <Pressable
-            style={styles.headerActionBtn}
-            onPress={handleCreateDocument}
-          >
-            <Text style={styles.headerActionBtnText}>Draft Document</Text>
-            <ArrowRight size={15} color="#000000" strokeWidth={2.5} />
+          <Pressable style={styles.headerDraftBtn} onPress={handleCreateDocument}>
+            <Text style={styles.headerDraftBtnText}>Draft Document</Text>
+            <ArrowRight size={14} color="#000000" strokeWidth={2.5} />
           </Pressable>
         )}
       </View>
 
-      {/* ── Main Viewport Layout (Desktop Split-Studio vs Mobile Stack) ── */}
+      {/* ── Main Viewport ── */}
       {isDesktop ? (
         /* DESKTOP SPLIT STUDIO */
-        <View style={styles.desktopStudioContainer}>
-          {/* Left Panel: Sticky Live Canvas Preview */}
-          <View style={styles.desktopPreviewPanel}>
-            <View style={styles.previewTopBar}>
-              <View style={styles.previewBadge}>
-                <ShieldCheck size={14} color="#FFFFFF" strokeWidth={2.5} />
-                <Text style={styles.previewBadgeText}>{selectedTemplate.code}</Text>
-              </View>
-              <Text style={styles.previewCategoryLabel}>
-                {selectedTemplate.name.toUpperCase()}
-              </Text>
-              <View style={styles.previewSpacer} />
-              <View style={styles.previewFormatTag}>
-                <Layers size={12} color="#94A3B8" />
-                <Text style={styles.previewFormatText}>A4 Master Layout</Text>
+        <View style={styles.desktopSplitWrap}>
+          {/* Left Canvas Preview */}
+          <View style={styles.desktopCanvasSide}>
+            <View style={styles.canvasSubHeader}>
+              <Text style={styles.canvasDocTag}>{selectedTemplate.code} · {selectedTemplate.name}</Text>
+              <View style={styles.canvasFormatTag}>
+                <Layers size={12} color="#71717A" />
+                <Text style={styles.canvasFormatText}>A4 Sheet</Text>
               </View>
             </View>
 
             <ScrollView
-              style={styles.desktopCanvasScroll}
-              contentContainerStyle={styles.desktopCanvasContent}
+              style={styles.desktopScroll}
+              contentContainerStyle={styles.desktopScrollInner}
               showsVerticalScrollIndicator={false}
             >
               {renderDocumentCanvas()}
             </ScrollView>
           </View>
 
-          {/* Right Panel: Template Picker & Similar Layouts */}
-          <View style={styles.desktopGalleryPanel}>
-            <View style={styles.galleryHeaderBar}>
-              <Text style={styles.galleryHeading}>
-                CHOOSE TEMPLATE LAYOUT
-              </Text>
-              <Text style={styles.gallerySubheading}>
-                Select layout to update preview instantly
-              </Text>
+          {/* Right Template Picker */}
+          <View style={styles.desktopPickerSide}>
+            <View style={styles.pickerTitleRow}>
+              <Text style={styles.pickerHeading}>Layout Designs</Text>
             </View>
 
             <ScrollView
-              style={styles.desktopGalleryScroll}
-              contentContainerStyle={[
-                styles.desktopGalleryContent,
-                { paddingBottom: insets.bottom + 90 },
-              ]}
+              style={styles.pickerScroll}
+              contentContainerStyle={[styles.pickerScrollInner, { paddingBottom: insets.bottom + 100 }]}
               showsVerticalScrollIndicator={false}
             >
               {renderTemplateGallery()}
             </ScrollView>
 
-            {/* Pinned Desktop Bottom Drawer Action */}
-            <View style={[styles.desktopBottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-              <View style={styles.desktopBottomInfo}>
-                <View style={styles.bottomBadgeRow}>
-                  <View style={styles.bottomPill}>
-                    <Text style={styles.bottomPillText}>{selectedTemplate.code}</Text>
-                  </View>
-                  <Text style={styles.bottomTemplateName} numberOfLines={1}>
-                    {selectedTemplate.name}
-                  </Text>
-                </View>
-                <Text style={styles.bottomStatusText}>
-                  Rule 46 Verified • Ready to draft
+            {/* Pinned Bottom Action Box */}
+            <View style={[styles.pinnedActionBox, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+              <View style={styles.pinnedInfo}>
+                <Text style={styles.pinnedName} numberOfLines={1}>
+                  {selectedTemplate.code} · {selectedTemplate.name}
                 </Text>
+                <Text style={styles.pinnedStatus}>Rule 46 verified</Text>
               </View>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.createButton,
-                  { opacity: pressed ? 0.85 : 1 },
-                ]}
-                onPress={handleCreateDocument}
-              >
-                <Text style={styles.createButtonText}>Create Document</Text>
-                <ArrowRight size={17} color="#000000" strokeWidth={2.5} />
+              <Pressable style={styles.primaryActionBtn} onPress={handleCreateDocument}>
+                <Text style={styles.primaryActionBtnText}>Create Document</Text>
+                <ArrowRight size={15} color="#000000" strokeWidth={2.5} />
               </Pressable>
             </View>
           </View>
         </View>
       ) : (
-        /* MOBILE STACK STUDIO */
+        /* MOBILE STACK */
         <ScrollView
-          style={styles.mobileScrollArea}
-          contentContainerStyle={[
-            styles.mobileScrollContent,
-            { paddingBottom: insets.bottom + 100 },
-          ]}
+          style={styles.mobileScroll}
+          contentContainerStyle={[styles.mobileScrollInner, { paddingBottom: insets.bottom + 110 }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Top Preview Bar */}
-          <View style={styles.previewTopBar}>
-            <View style={styles.previewBadge}>
-              <ShieldCheck size={14} color="#FFFFFF" strokeWidth={2.5} />
-              <Text style={styles.previewBadgeText}>{selectedTemplate.code}</Text>
-            </View>
-            <Text style={styles.previewCategoryLabel}>
-              {selectedTemplate.name.toUpperCase()}
-            </Text>
-            <View style={styles.previewSpacer} />
-            <Text style={styles.previewStatusHint}>
-              Live Preview
-            </Text>
+          {/* Canvas Subtitle */}
+          <View style={styles.mobileCanvasMeta}>
+            <Text style={styles.mobileCanvasTitle}>{selectedTemplate.name}</Text>
+            <Text style={styles.mobileCanvasBadge}>{selectedTemplate.code}</Text>
           </View>
 
-          {/* Document Sheet Canvas */}
+          {/* Document Sheet */}
           {renderDocumentCanvas()}
 
-          {/* Section Divider */}
-          <View style={styles.mobileSectionDivider}>
-            <Text style={styles.mobileSectionTitle}>
-              AVAILABLE TEMPLATES · {activeConfig.templates.length} DESIGNS
-            </Text>
+          {/* Gallery Header */}
+          <View style={styles.mobileGalleryHeadingRow}>
+            <Text style={styles.mobileGalleryHeading}>Choose Layout</Text>
           </View>
 
           {/* Template Gallery */}
@@ -1212,42 +1056,19 @@ export default function DocumentTemplateSelectionScreen() {
         </ScrollView>
       )}
 
-      {/* ── Fixed Floating Bottom Bar (Mobile Only) ── */}
+      {/* Mobile Floating Bottom Bar */}
       {!isDesktop && (
-        <View
-          style={[
-            styles.bottomBar,
-            { paddingBottom: Math.max(insets.bottom, 16) },
-          ]}
-        >
-          <View style={styles.bottomBarContent}>
-            <View style={styles.bottomBarInfo}>
-              <View style={styles.bottomBadgeRow}>
-                <View style={styles.bottomPill}>
-                  <Text style={styles.bottomPillText}>{selectedTemplate.code}</Text>
-                </View>
-                <Text style={styles.bottomTemplateName} numberOfLines={1}>
-                  {selectedTemplate.name}
-                </Text>
-              </View>
-              <Text style={styles.bottomStatusText}>
-                Rule 46 Verified · Ready to draft
-              </Text>
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.createButton,
-                { opacity: pressed ? 0.85 : 1 },
-              ]}
-              onPress={handleCreateDocument}
-              accessibilityRole="button"
-              accessibilityLabel={`Create ${activeConfig.title} with ${selectedTemplate.name}`}
-            >
-              <Text style={styles.createButtonText}>Create Document</Text>
-              <ArrowRight size={17} color="#000000" strokeWidth={2.5} />
-            </Pressable>
+        <View style={[styles.mobileFloatingBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.mobileBarInfo}>
+            <Text style={styles.mobileBarTitle} numberOfLines={1}>
+              {selectedTemplate.code} · {selectedTemplate.name}
+            </Text>
           </View>
+
+          <Pressable style={styles.primaryActionBtn} onPress={handleCreateDocument}>
+            <Text style={styles.primaryActionBtnText}>Create Document</Text>
+            <ArrowRight size={15} color="#000000" strokeWidth={2.5} />
+          </Pressable>
         </View>
       )}
     </SafeAreaView>
@@ -1255,963 +1076,808 @@ export default function DocumentTemplateSelectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  safeRoot: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#090A0F',
   },
-  header: {
+
+  /* Top Header */
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: '#000000',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#090A0F',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.sm,
+  backTouch: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm,
+    borderRadius: radii.sm,
+    marginRight: 12,
   },
-  headerTitleWrap: {
+  headerTitleArea: {
     flex: 1,
   },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+  screenHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -0.3,
   },
-  headerCountBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  headerCountText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#CBD5E1',
-  },
-  headerSubtitle: {
+  screenHeaderSub: {
     fontSize: 12,
-    color: '#94A3B8',
+    fontWeight: '400',
+    color: '#71717A',
     marginTop: 2,
   },
-  headerActionBtn: {
+  headerDraftBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: radii.button,
+    paddingVertical: 8,
+    borderRadius: 9999,
   },
-  headerActionBtnText: {
+  headerDraftBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#000000',
   },
 
-  /* Desktop Studio Layout */
-  desktopStudioContainer: {
+  /* Desktop Split Layout */
+  desktopSplitWrap: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#000000',
   },
-  desktopPreviewPanel: {
+  desktopCanvasSide: {
     flex: 1.25,
+    backgroundColor: '#050608',
     borderRightWidth: 1,
-    borderRightColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: '#08090D',
-    paddingHorizontal: 28,
-    paddingTop: 18,
+    borderRightColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 36,
+    paddingTop: 24,
   },
-  desktopCanvasScroll: {
-    flex: 1,
-  },
-  desktopCanvasContent: {
+  canvasSubHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: 40,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
-  desktopGalleryPanel: {
+  canvasDocTag: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#A1A1AA',
+    letterSpacing: 0.2,
+  },
+  canvasFormatTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  canvasFormatText: {
+    fontSize: 11,
+    color: '#71717A',
+  },
+  desktopScroll: {
     flex: 1,
-    backgroundColor: '#000000',
+  },
+  desktopScrollInner: {
+    alignItems: 'center',
+    paddingBottom: 48,
+  },
+  desktopPickerSide: {
+    flex: 1,
+    backgroundColor: '#090A0F',
     position: 'relative',
   },
-  galleryHeaderBar: {
-    paddingHorizontal: 24,
-    paddingTop: 18,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  pickerTitleRow: {
+    paddingHorizontal: 28,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
-  galleryHeading: {
-    fontSize: 12,
-    fontWeight: '800',
+  pickerHeading: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#FFFFFF',
-    letterSpacing: 1.2,
+    letterSpacing: -0.2,
   },
-  gallerySubheading: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 3,
-  },
-  desktopGalleryScroll: {
+  pickerScroll: {
     flex: 1,
   },
-  desktopGalleryContent: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
+  pickerScrollInner: {
+    paddingHorizontal: 28,
   },
-  desktopBottomBar: {
+  pinnedActionBox: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#0A0C12',
+    backgroundColor: '#0C0D14',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    paddingTop: 16,
+    paddingHorizontal: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pinnedInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  pinnedName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  pinnedStatus: {
+    fontSize: 11,
+    color: '#71717A',
+    marginTop: 2,
+  },
+
+  /* Mobile Stack Layout */
+  mobileScroll: {
+    flex: 1,
+    backgroundColor: '#090A0F',
+  },
+  mobileScrollInner: {
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  mobileCanvasMeta: {
+    width: '100%',
+    maxWidth: 640,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  mobileCanvasTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#E4E4E7',
+  },
+  mobileCanvasBadge: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#71717A',
+  },
+  mobileGalleryHeadingRow: {
+    width: '100%',
+    maxWidth: 640,
+    paddingTop: 20,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    marginTop: 12,
+  },
+  mobileGalleryHeading: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  mobileFloatingBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#0C0D14',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
     paddingTop: 14,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...Platform.select({
-      web: {
-        boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.7)',
-      },
-      default: {},
-    }),
   },
-  desktopBottomInfo: {
+  mobileBarInfo: {
     flex: 1,
-    marginRight: 16,
+    marginRight: 14,
   },
-
-  /* Mobile Stack Layout */
-  mobileScrollArea: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  mobileScrollContent: {
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  mobileSectionDivider: {
-    width: '100%',
-    maxWidth: 720,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  mobileSectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#94A3B8',
-    letterSpacing: 1.2,
-  },
-
-  /* Preview Header & Canvas */
-  previewTopBar: {
-    width: '100%',
-    maxWidth: 720,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  previewBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#1E2330',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginRight: 10,
-  },
-  previewBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  previewCategoryLabel: {
+  mobileBarTitle: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#E2E8F0',
-    letterSpacing: 0.8,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
-  previewSpacer: {
-    flex: 1,
-  },
-  previewFormatTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  previewFormatText: {
-    fontSize: 11,
-    color: '#94A3B8',
-  },
-  previewStatusHint: {
-    fontSize: 12,
-    color: '#64748B',
-  },
+
+  /* Document Canvas (Paper Sheet) */
   documentCanvas: {
     width: '100%',
-    maxWidth: 680,
+    maxWidth: 640,
     backgroundColor: '#FFFFFF',
-    borderRadius: radii.card,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    padding: 24,
-    marginBottom: 20,
+    borderColor: '#E4E4E7',
+    padding: 36,
+    marginBottom: 16,
     ...Platform.select({
       web: {
-        boxShadow: '0 16px 48px rgba(0, 0, 0, 0.75)',
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.45)',
       },
       default: {
-        elevation: 8,
+        elevation: 6,
       },
     }),
   },
 
-  /* Category Anatomy: Executive */
+  /* Document Header Styles */
   execHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: 16,
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#000000',
-    marginBottom: 16,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E4E4E7',
+    marginBottom: 24,
   },
   execLeft: {
     flex: 1.2,
   },
   execDivider: {
-    width: 1.5,
-    backgroundColor: '#CBD5E1',
-    marginHorizontal: 14,
+    width: 1,
+    backgroundColor: '#E4E4E7',
+    marginHorizontal: 20,
   },
   execRight: {
     flex: 1,
     alignItems: 'flex-end',
   },
   docBrandName: {
-    fontSize: 19,
-    fontWeight: '900',
-    color: '#000000',
-    marginBottom: 3,
-    letterSpacing: -0.3,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#09090B',
+    letterSpacing: -0.4,
+    marginBottom: 4,
   },
   docBrandMeta: {
     fontSize: 11,
-    color: '#475569',
+    color: '#71717A',
     lineHeight: 16,
   },
   docTitleMain: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#09090B',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   docNumberMain: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#000000',
-    marginTop: 2,
+    fontWeight: '500',
+    color: '#27272A',
+    marginTop: 3,
     marginBottom: 3,
   },
   docDateMeta: {
     fontSize: 11,
-    color: '#475569',
-    lineHeight: 15,
+    color: '#71717A',
   },
 
-  /* Category Anatomy: Ledger */
+  /* Ledger Anatomy */
   ledgerHeader: {
-    marginBottom: 16,
+    marginBottom: 22,
   },
   ledgerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 14,
   },
   ledgerBand: {
     flexDirection: 'row',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E4E4E7',
+    backgroundColor: '#FAFAFA',
+    borderRadius: 6,
   },
   ledgerBandCol: {
     flex: 1,
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    borderRightWidth: 1.5,
-    borderRightColor: '#000000',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRightWidth: 1,
+    borderRightColor: '#E4E4E7',
   },
   ledgerBandLabel: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#64748B',
-    letterSpacing: 0.6,
+    fontWeight: '600',
+    color: '#71717A',
+    letterSpacing: 0.5,
     marginBottom: 2,
   },
   ledgerBandVal: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
+    fontWeight: '600',
+    color: '#09090B',
   },
 
-  /* Category Anatomy: Minimal */
+  /* Minimal Anatomy */
   minimalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingBottom: 16,
-    marginBottom: 16,
+    paddingBottom: 22,
+    marginBottom: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#F4F4F5',
   },
   minimalRight: {
     alignItems: 'flex-end',
   },
   minimalNumber: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#000000',
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#09090B',
     letterSpacing: -0.5,
   },
   minimalDate: {
     fontSize: 11,
-    color: '#64748B',
+    color: '#71717A',
     marginTop: 2,
   },
 
-  /* Category Anatomy: Corporate */
+  /* Corporate Anatomy */
   corporateHeader: {
-    marginBottom: 16,
+    marginBottom: 22,
   },
   corpTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 14,
   },
-  corpBadgePill: {
-    backgroundColor: '#000000',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  corpBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+  corpTitleTag: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#71717A',
+    letterSpacing: 1,
   },
   corpDualPanels: {
     flexDirection: 'row',
   },
   corpPanel: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    padding: 10,
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: '#E4E4E7',
+    padding: 12,
     borderRadius: 6,
   },
   corpPanelTag: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#64748B',
-    letterSpacing: 0.6,
+    fontWeight: '600',
+    color: '#71717A',
+    letterSpacing: 0.5,
     marginBottom: 3,
   },
   corpPartyName: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#000000',
+    fontWeight: '600',
+    color: '#09090B',
     marginBottom: 2,
   },
-  corpPartyGstin: {
+  corpPartyMeta: {
     fontSize: 10,
-    color: '#475569',
+    color: '#71717A',
   },
 
-  /* Category Anatomy: Supply Chain */
+  /* Supply Chain Anatomy */
   supplyHeader: {
-    marginBottom: 16,
+    marginBottom: 22,
   },
   supplyTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   supplyTransportStrip: {
     flexDirection: 'row',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: '#000000',
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: '#E4E4E7',
     borderRadius: 6,
   },
   transportCol: {
     flex: 1,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRightWidth: 1.5,
-    borderRightColor: '#000000',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRightWidth: 1,
+    borderRightColor: '#E4E4E7',
   },
   transportLabel: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#64748B',
+    fontWeight: '600',
+    color: '#71717A',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   transportVal: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
+    fontWeight: '600',
+    color: '#09090B',
   },
 
-  /* Specific Banners */
-  compDeclarationBanner: {
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+  /* Banners */
+  compBanner: {
+    backgroundColor: '#F4F4F5',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    marginBottom: 20,
     alignItems: 'center',
-    marginBottom: 14,
   },
-  compDeclarationText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#000000',
-    letterSpacing: 0.5,
+  compBannerText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#52525B',
   },
-  crossRefBox: {
-    backgroundColor: '#F1F5F9',
-    borderLeftWidth: 3,
-    borderLeftColor: '#000000',
-    padding: 8,
-    marginBottom: 14,
-  },
-  crossRefLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#475569',
+  crossRefStrip: {
+    backgroundColor: '#F4F4F5',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    marginBottom: 20,
   },
   crossRefText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#000000',
-    marginTop: 2,
+    fontSize: 10,
+    color: '#52525B',
   },
 
-  /* Party Box */
+  /* Billed To */
   partyBox: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 16,
+    marginBottom: 24,
   },
-  partyBoxLabel: {
+  partyLabel: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#64748B',
-    letterSpacing: 0.5,
-    marginBottom: 2,
+    fontWeight: '600',
+    color: '#71717A',
+    letterSpacing: 0.8,
+    marginBottom: 4,
   },
   partyName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#000000',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#09090B',
     marginBottom: 2,
   },
   partyMeta: {
     fontSize: 11,
-    color: '#475569',
+    color: '#71717A',
   },
 
-  /* Item Table */
-  tableBlock: {
-    marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 6,
-    overflow: 'hidden',
+  /* Line Items Table */
+  tableWrap: {
+    marginBottom: 24,
   },
-  tableHeader: {
+  tableHead: {
     flexDirection: 'row',
-    backgroundColor: '#000000',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E4E4E7',
+    paddingBottom: 8,
+    marginBottom: 4,
   },
-  tableTh: {
+  thCell: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.6,
+    fontWeight: '600',
+    color: '#71717A',
+    letterSpacing: 0.8,
   },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#F4F4F5',
   },
-  tableTd: {
+  tdDesc: {
     fontSize: 12,
-    color: '#000000',
+    fontWeight: '500',
+    color: '#09090B',
+  },
+  tdMeta: {
+    fontSize: 12,
+    color: '#71717A',
+  },
+  tdAmount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#09090B',
   },
 
-  /* Bottom Summary */
-  bottomSummaryRow: {
+  /* Summary & Signatory */
+  summaryWrap: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingTop: 8,
+    paddingTop: 12,
   },
-  signatorySide: {
+  signatureBox: {
     flex: 1,
-    maxWidth: 180,
+    maxWidth: 160,
   },
-  signLine: {
-    height: 1.5,
-    backgroundColor: '#000000',
-    marginBottom: 5,
+  sigLine: {
+    height: 1,
+    backgroundColor: '#D4D4D8',
+    marginBottom: 6,
   },
-  signatoryLabel: {
+  sigLabel: {
     fontSize: 10,
-    color: '#64748B',
-    fontWeight: '600',
+    color: '#71717A',
   },
-  signatoryOrg: {
+  sigOrg: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
+    fontWeight: '600',
+    color: '#09090B',
     marginTop: 2,
   },
-  totalsSide: {
-    width: 175,
+  totalsBox: {
+    width: 160,
   },
-  totalRow: {
+  totalsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  totalLabel: {
+  subtotalLabel: {
     fontSize: 11,
-    color: '#475569',
+    color: '#71717A',
   },
-  totalVal: {
+  subtotalVal: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#000000',
+    color: '#09090B',
+    fontWeight: '500',
   },
-  grandTotalBlock: {
-    backgroundColor: '#000000',
-    borderRadius: 4,
-    paddingVertical: 7,
-    paddingHorizontal: 9,
+  grandTotalDivider: {
+    height: 1,
+    backgroundColor: '#E4E4E7',
+    marginVertical: 6,
+  },
+  grandTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 5,
+    alignItems: 'baseline',
   },
-  grandTotalLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.6,
+  grandTotalTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#09090B',
+    letterSpacing: 0.5,
   },
-  grandTotalVal: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#FFFFFF',
+  grandTotalAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#09090B',
   },
 
-  /* Gallery & Filtering */
-  galleryContainer: {
+  /* Gallery Inner */
+  galleryInner: {
     width: '100%',
   },
   filterBar: {
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  filterContent: {
+  filterScroll: {
     gap: 8,
   },
-  filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: radii.full,
-  },
-  filterPillSelected: {
-    backgroundColor: '#FFFFFF',
-  },
-  filterPillUnselected: {
-    backgroundColor: '#11131A',
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  filterPillText: {
-    fontSize: 12,
+  filterChipActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
   },
-  filterPillTextSelected: {
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#A1A1AA',
+  },
+  filterChipTextActive: {
     color: '#000000',
-    fontWeight: '800',
-  },
-  filterPillTextUnselected: {
-    color: '#94A3B8',
     fontWeight: '600',
   },
 
-  /* Similar Layouts Feature */
-  similarSection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: radii.card,
-    padding: 12,
-    marginBottom: 16,
-  },
-  similarHeader: {
+  /* Similar Layouts Strip */
+  similarStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    gap: 8,
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
-  similarTitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#E2E8F0',
-    letterSpacing: 0.8,
+  similarPrompt: {
+    fontSize: 11,
+    color: '#71717A',
   },
-  similarChipsRow: {
+  similarLinks: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-  },
-  similarChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 6,
-    backgroundColor: '#161922',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
   },
-  similarChipCode: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FFFFFF',
+  similarLinkPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
   },
-  similarChipName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#CBD5E1',
+  similarLinkText: {
+    fontSize: 11,
+    color: '#E4E4E7',
+    fontWeight: '500',
   },
 
   /* Template Cards */
-  templatesList: {
+  cardList: {
     gap: 12,
   },
-  templateCard: {
+  optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: radii.card,
-    borderWidth: 1.5,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  templateCardSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+  optionCardSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderColor: '#FFFFFF',
-    ...Platform.select({
-      web: {
-        boxShadow: '0 0 0 1px #FFFFFF, 0 6px 20px rgba(255, 255, 255, 0.08)',
-      },
-      default: {},
-    }),
   },
-  templateCardUnselected: {
-    backgroundColor: '#0C0D14',
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+  optionCardUnselected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  cardInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+  },
+  cardCode: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#71717A',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 3,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  cardTagline: {
+    fontSize: 11,
+    fontWeight: '400',
+    color: '#71717A',
+    lineHeight: 16,
+  },
+  radioSlot: {
+    marginLeft: 8,
+  },
+  radioActive: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioIdle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
 
-  /* Wireframe Thumbnail */
+  /* Action Buttons */
+  primaryActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 9999,
+  },
+  primaryActionBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000000',
+  },
+
+  /* Wireframe Micro-Render */
   wireframeBox: {
-    width: 48,
-    height: 64,
+    width: 42,
+    height: 56,
     borderRadius: 4,
     borderWidth: 1,
     padding: 3,
-    marginRight: 14,
+    marginRight: 12,
     justifyContent: 'center',
   },
   wfInner: {
     flex: 1,
     justifyContent: 'space-between',
   },
-  wfLine: {
+  wfRowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  wfBar: {
     borderRadius: 1,
   },
   wfDivider: {
     width: 1,
-    height: '100%',
+    height: 8,
   },
-  wfRule: {
+  wfHairline: {
     width: '100%',
     height: 1,
-  },
-  wfExecTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    height: 12,
-    alignItems: 'center',
-  },
-  wfLedgerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 2,
+    opacity: 0.3,
   },
   wfGridBand: {
     flexDirection: 'row',
-    borderWidth: 0.8,
-    height: 8,
+    borderWidth: 0.5,
+    height: 7,
     marginVertical: 2,
+    borderRadius: 1,
   },
-  wfGridCol: {
+  wfGridCell: {
     flex: 1,
-    borderRightWidth: 0.8,
+    borderRightWidth: 0.5,
   },
-  wfTotalBox: {
-    width: 16,
-    height: 8,
-    borderWidth: 0.8,
+  wfBoxOutline: {
+    width: 14,
+    height: 6,
+    borderWidth: 0.5,
+    borderRadius: 1,
   },
-  wfMinTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  wfCorpPanels: {
+  wfRowPanels: {
     flexDirection: 'row',
     gap: 2,
   },
   wfPanel: {
     flex: 1,
-    height: 10,
-    borderWidth: 0.8,
+    height: 8,
+    borderWidth: 0.5,
     borderRadius: 1,
   },
-  wfSupplyTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  wfBadgeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+  wfDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
   },
   wfStrip: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderWidth: 0.8,
+    borderWidth: 0.5,
     paddingHorizontal: 2,
     paddingVertical: 1,
     marginVertical: 2,
-  },
-  wfBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  /* Card Content */
-  cardMain: {
-    flex: 1,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  cardBadge: {
-    backgroundColor: '#1E2330',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  cardBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  categoryBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  categoryBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#CBD5E1',
-    textTransform: 'uppercase',
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    flex: 1,
-  },
-  cardTagline: {
-    fontSize: 12,
-    color: '#94A3B8',
-    lineHeight: 16,
-    marginBottom: 6,
-  },
-  highlightsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  highlightPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  highlightText: {
-    fontSize: 10,
-    color: '#E2E8F0',
-    fontWeight: '600',
-  },
-  radioArea: {
-    marginLeft: 12,
-  },
-  radioSelected: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioUnselected: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#475569',
-  },
-
-  /* Floating Bottom Bar (Mobile) */
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#08090D',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.12)',
-    paddingTop: 14,
-    paddingHorizontal: spacing.lg,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.8)',
-      },
-      default: {
-        elevation: 16,
-      },
-    }),
-  },
-  bottomBarContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    maxWidth: 720,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  bottomBarInfo: {
-    flex: 1,
-    marginRight: 14,
-  },
-  bottomBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 2,
-  },
-  bottomPill: {
-    backgroundColor: '#1E2330',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  bottomPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  bottomTemplateName: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  bottomStatusText: {
-    fontSize: 11,
-    color: '#94A3B8',
-  },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: radii.button,
-  },
-  createButtonText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#000000',
+    borderRadius: 1,
   },
 });
