@@ -101,4 +101,95 @@ describe('Quick Bill Flow Integration', () => {
     const finalDoc = await DocumentRepository.getById(issued.id);
     expect(finalDoc?.balance_minor).toBe(0);
   });
+
+  test('settles Quick Bill with Card payment and terminal metadata', async () => {
+    const cust = await CustomerRepository.create({ name: 'Priya Mehta' });
+    const draft = await DocumentRepository.saveDraft({
+      customerId: cust.id,
+      docType: 'invoice',
+      currency: 'INR',
+      issueDate: Date.now(),
+      items: [{ description: 'Design Consultation', quantityScaled: 10000n, unitName: 'hrs', unitPriceMinor: 120000n }],
+      discountType: 'none',
+      taxType: 'none',
+    });
+
+    const issued = await DocumentRepository.issueDocument(draft.id);
+    const { payment, receipt } = await PaymentRepository.recordPayment({
+      invoiceId: issued.id,
+      amountMinor: 120000n,
+      paymentMethod: 'card',
+      reference: 'TXN-VISA-4242-APPR-998811',
+      notes: 'Card: VISA ending 4242 | Mode: CHIP_PIN | Auth: 998811 | RRN: 409981234567',
+    });
+
+    expect(payment.payment_method).toBe('card');
+    expect(payment.reference).toBe('TXN-VISA-4242-APPR-998811');
+    expect(payment.notes).toContain('CHIP_PIN');
+    expect(receipt.receipt_number).toMatch(/^RCP-/);
+
+    const settled = await DocumentRepository.getById(issued.id);
+    expect(settled?.balance_minor).toBe(0);
+    expect(settled?.payment_status).toBe('paid');
+  });
+
+  test('settles Quick Bill with Bank Transfer and 12-digit UTR', async () => {
+    const cust = await CustomerRepository.create({ name: 'Apex Logistics' });
+    const draft = await DocumentRepository.saveDraft({
+      customerId: cust.id,
+      docType: 'invoice',
+      currency: 'INR',
+      issueDate: Date.now(),
+      items: [{ description: 'Quarterly Retainer', quantityScaled: 10000n, unitName: 'item', unitPriceMinor: 5000000n }],
+      discountType: 'none',
+      taxType: 'none',
+    });
+
+    const issued = await DocumentRepository.issueDocument(draft.id);
+    const { payment, receipt } = await PaymentRepository.recordPayment({
+      invoiceId: issued.id,
+      amountMinor: 5000000n,
+      paymentMethod: 'bank_transfer',
+      reference: 'UTR: 409988776655',
+      notes: 'Bank Transfer (IMPS) | UTR: 409988776655',
+    });
+
+    expect(payment.payment_method).toBe('bank_transfer');
+    expect(payment.reference).toBe('UTR: 409988776655');
+    expect(receipt.id).toBeDefined();
+
+    const settled = await DocumentRepository.getById(issued.id);
+    expect(settled?.balance_minor).toBe(0);
+    expect(settled?.payment_status).toBe('paid');
+  });
+
+  test('settles Quick Bill with Cash payment and change calculation notes', async () => {
+    const cust = await CustomerRepository.create({ name: 'Direct Retail Store' });
+    const draft = await DocumentRepository.saveDraft({
+      customerId: cust.id,
+      docType: 'invoice',
+      currency: 'INR',
+      issueDate: Date.now(),
+      items: [{ description: 'Counter Goods', quantityScaled: 10000n, unitName: 'item', unitPriceMinor: 85000n }], // ₹850.00
+      discountType: 'none',
+      taxType: 'none',
+    });
+
+    const issued = await DocumentRepository.issueDocument(draft.id);
+    const { payment, receipt } = await PaymentRepository.recordPayment({
+      invoiceId: issued.id,
+      amountMinor: 85000n,
+      paymentMethod: 'cash',
+      reference: 'CASH-REC',
+      notes: 'Cash Received: ₹1000.00 | Change Returned: ₹150.00',
+    });
+
+    expect(payment.payment_method).toBe('cash');
+    expect(payment.notes).toBe('Cash Received: ₹1000.00 | Change Returned: ₹150.00');
+    expect(receipt.receipt_number).toMatch(/^RCP-/);
+
+    const settled = await DocumentRepository.getById(issued.id);
+    expect(settled?.balance_minor).toBe(0);
+    expect(settled?.payment_status).toBe('paid');
+  });
 });
