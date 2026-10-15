@@ -105,7 +105,7 @@ const PAYMENT_TERMS_PRESETS: { id: PaymentTermsPreset; label: string }[] = [
 
 export default function DocumentEditScreen() {
   const router = useRouter();
-  const searchParams = useLocalSearchParams<{ type?: string; id?: string; customerId?: string }>();
+  const searchParams = useLocalSearchParams<{ type?: string; id?: string; customerId?: string; templateId?: string }>();
   const { theme } = useTheme();
 
   const docType: DocumentType = searchParams.type === 'estimate' ? 'estimate' : 'invoice';
@@ -167,7 +167,8 @@ export default function DocumentEditScreen() {
   const [editingItem, setEditingItem] = useState<{ item: LineItemInput | null; index: number } | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [selectedGstTemplate, setSelectedGstTemplate] = useState<PdfTemplateType>('gst_executive');
+  const initialGstTemplate = (searchParams.templateId as PdfTemplateType) || 'gst_executive';
+  const [selectedGstTemplate, setSelectedGstTemplate] = useState<PdfTemplateType>(initialGstTemplate);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [showReadinessChecklist, setShowReadinessChecklist] = useState(false);
   const [showQualityRubric, setShowQualityRubric] = useState(false);

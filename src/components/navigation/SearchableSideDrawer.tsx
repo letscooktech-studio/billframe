@@ -91,10 +91,10 @@ export const DRAWER_GROUPS: DrawerGroup[] = [
     id: 'documents',
     title: 'DOCUMENTS',
     items: [
-      { id: 'create_doc', label: 'Create Document', route: '/document/edit', icon: FilePlus, keywords: ['new', 'invoice', 'gst', 'bill', 'order', 'document'] },
+      { id: 'create_doc', label: 'Create Document', route: '/document/templates?type=invoice', icon: FilePlus, keywords: ['new', 'invoice', 'gst', 'bill', 'order', 'document'] },
       { id: 'doc_library', label: 'Document Library', route: '/(tabs)/documents', icon: FolderOpen, keywords: ['all', 'files', 'records', 'history', 'drafts', 'invoices', 'receipts'] },
       { id: 'quick_bill', label: '30s Quick Bill', route: '/quick-bill', icon: Zap, badge: 'FAST', keywords: ['quick', 'counter', 'pos', 'instant', 'upi', 'billing'] },
-      { id: 'template_studio', label: 'Universal Studio', route: '/templates/studio', icon: Palette, badge: '446 DOCS', keywords: ['design', 'brand', 'rule 46', 'layouts', 'templates', 'studio'] },
+      { id: 'template_studio', label: 'Universal Studio', route: '/document/templates?type=invoice', icon: Palette, badge: 'PRO', keywords: ['design', 'brand', 'rule 46', 'layouts', 'templates', 'studio'] },
       { id: 'custom_docs', label: 'Custom Document Builder', route: '/templates/create-type', icon: Sparkles, keywords: ['builder', 'creator', 'custom', 'schema', 'type'] },
     ],
   },

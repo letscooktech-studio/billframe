@@ -40,6 +40,10 @@ import {
   Receipt,
   Briefcase,
   Menu,
+  Truck,
+  RotateCcw,
+  ShoppingBag,
+  ClipboardList,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { useTheme } from '../../design/ThemeContext';
@@ -243,14 +247,12 @@ export default function DocumentsScreen() {
     }
   };
 
-  const handleCreateChoice = (choice: 'invoice' | 'estimate' | 'quick-bill' | 'studio') => {
+  const handleCreateChoice = (choice: string) => {
     setShowCreateSheet(false);
     if (choice === 'quick-bill') {
       router.push('/quick-bill');
-    } else if (choice === 'studio') {
-      router.push('/templates/studio');
     } else {
-      router.push({ pathname: '/document/edit', params: { type: choice } });
+      router.push({ pathname: '/document/templates', params: { type: choice } });
     }
   };
 
@@ -440,79 +442,153 @@ export default function DocumentsScreen() {
               />
             </View>
 
-            <View style={styles.sheetOptions}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.sheetOption,
-                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={() => handleCreateChoice('invoice')}
-              >
-                <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                  <FileText size={20} color={theme.textPrimary} />
-                </View>
-                <View style={styles.optionTextBox}>
-                  <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Tax Invoice</Text>
-                  <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                    Commercial invoice with GST, tax calculation and line items
-                  </Text>
-                </View>
-              </Pressable>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.sheetOptions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sheetOption,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleCreateChoice('invoice')}
+                >
+                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                    <FileText size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.optionTextBox}>
+                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Tax Invoice</Text>
+                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
+                      Commercial invoice with GST, tax calculation and line items
+                    </Text>
+                  </View>
+                </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.sheetOption,
-                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={() => handleCreateChoice('estimate')}
-              >
-                <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                  <Briefcase size={20} color={theme.textPrimary} />
-                </View>
-                <View style={styles.optionTextBox}>
-                  <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Estimate / Quote</Text>
-                  <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                    Cost proposal or quotation with revision tracking
-                  </Text>
-                </View>
-              </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sheetOption,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleCreateChoice('estimate')}
+                >
+                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                    <Briefcase size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.optionTextBox}>
+                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Estimate / Quote</Text>
+                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
+                      Cost proposal or quotation with revision tracking
+                    </Text>
+                  </View>
+                </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.sheetOption,
-                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={() => handleCreateChoice('quick-bill')}
-              >
-                <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                  <Zap size={20} color={theme.textPrimary} />
-                </View>
-                <View style={styles.optionTextBox}>
-                  <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Quick Counter Bill</Text>
-                  <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                    Fast 30-second retail bill with instant thermal / digital receipt
-                  </Text>
-                </View>
-              </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sheetOption,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleCreateChoice('quick-bill')}
+                >
+                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                    <Zap size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.optionTextBox}>
+                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Quick Counter Bill</Text>
+                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
+                      Fast 30-second retail bill with instant thermal / digital receipt
+                    </Text>
+                  </View>
+                </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.sheetOption,
-                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={() => handleCreateChoice('studio')}
-              >
-                <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                  <Layers size={20} color={theme.textPrimary} />
-                </View>
-                <View style={styles.optionTextBox}>
-                  <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Universal Document Studio</Text>
-                  <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
-                    Work Orders, Job Offers, Salary Slips, Fee Receipts & Rent Receipts
-                  </Text>
-                </View>
-              </Pressable>
-            </View>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sheetOption,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleCreateChoice('challan')}
+                >
+                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                    <Truck size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.optionTextBox}>
+                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Delivery Challan</Text>
+                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
+                      Goods dispatch, vehicle transfer note & transit documentation
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sheetOption,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleCreateChoice('credit_note')}
+                >
+                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                    <RotateCcw size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.optionTextBox}>
+                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Credit Note / Debit Note</Text>
+                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
+                      Sales returns, tax adjustments, price variations & customer refunds
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sheetOption,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleCreateChoice('purchase_order')}
+                >
+                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                    <ShoppingBag size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.optionTextBox}>
+                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Purchase Order</Text>
+                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
+                      Official procurement orders sent to vendors & contractors
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sheetOption,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleCreateChoice('work_order')}
+                >
+                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                    <ClipboardList size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.optionTextBox}>
+                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Work Order & Contract</Text>
+                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
+                      Scope of work, milestone deliverables, technical terms & legal signoff
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sheetOption,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleCreateChoice('receipt')}
+                >
+                  <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                    <Receipt size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.optionTextBox}>
+                    <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>Payment Receipt</Text>
+                    <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>
+                      Official payment acknowledgments, rent receipts & settlement vouchers
+                    </Text>
+                  </View>
+                </Pressable>
+              </View>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>

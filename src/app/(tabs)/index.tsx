@@ -32,6 +32,11 @@ import {
   Layers,
   X,
   Menu,
+  Truck,
+  RotateCcw,
+  ShoppingBag,
+  ClipboardList,
+  Receipt,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { useTheme } from '../../design/ThemeContext';
@@ -169,14 +174,12 @@ export default function HomeScreen() {
     }
   };
 
-  const handleSelectDocType = (type: 'invoice' | 'estimate' | 'quick-bill' | 'studio') => {
+  const handleSelectDocType = (typeKey: string) => {
     setShowTypeSelector(false);
-    if (type === 'quick-bill') {
+    if (typeKey === 'quick-bill') {
       router.push('/quick-bill');
-    } else if (type === 'studio') {
-      router.push('/templates/studio');
     } else {
-      router.push({ pathname: '/document/edit', params: { type } });
+      router.push({ pathname: '/document/templates', params: { type: typeKey } });
     }
   };
 
@@ -366,87 +369,169 @@ export default function HomeScreen() {
               />
             </View>
 
-            <View style={styles.typeOptionsList}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.typeOptionRow,
-                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={() => handleSelectDocType('invoice')}
-              >
-                <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
-                  <FileText size={20} color={theme.textPrimary} />
-                </View>
-                <View style={styles.typeOptionText}>
-                  <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
-                    Tax Invoice
-                  </Text>
-                  <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
-                    Standard commercial invoice with GST, tax calculation and payment terms
-                  </Text>
-                </View>
-              </Pressable>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.typeOptionsList}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.typeOptionRow,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleSelectDocType('invoice')}
+                >
+                  <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                    <FileText size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.typeOptionText}>
+                    <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                      Tax Invoice
+                    </Text>
+                    <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                      Standard commercial invoice with GST, tax calculation and payment terms
+                    </Text>
+                  </View>
+                </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.typeOptionRow,
-                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={() => handleSelectDocType('estimate')}
-              >
-                <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
-                  <Briefcase size={20} color={theme.textPrimary} />
-                </View>
-                <View style={styles.typeOptionText}>
-                  <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
-                    Estimate / Quotation
-                  </Text>
-                  <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
-                    Project proposal or quote with expiry dates and revision history
-                  </Text>
-                </View>
-              </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.typeOptionRow,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleSelectDocType('estimate')}
+                >
+                  <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                    <Briefcase size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.typeOptionText}>
+                    <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                      Estimate / Quotation
+                    </Text>
+                    <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                      Project proposal or quote with expiry dates and revision history
+                    </Text>
+                  </View>
+                </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.typeOptionRow,
-                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={() => handleSelectDocType('quick-bill')}
-              >
-                <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
-                  <Zap size={20} color={theme.textPrimary} />
-                </View>
-                <View style={styles.typeOptionText}>
-                  <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
-                    Quick Counter Bill
-                  </Text>
-                  <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
-                    30-second retail point of sale with instant thermal / digital receipt
-                  </Text>
-                </View>
-              </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.typeOptionRow,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleSelectDocType('quick-bill')}
+                >
+                  <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                    <Zap size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.typeOptionText}>
+                    <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                      Quick Counter Bill
+                    </Text>
+                    <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                      30-second retail point of sale with instant thermal / digital receipt
+                    </Text>
+                  </View>
+                </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.typeOptionRow,
-                  { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={() => handleSelectDocType('studio')}
-              >
-                <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
-                  <Layers size={20} color={theme.textPrimary} />
-                </View>
-                <View style={styles.typeOptionText}>
-                  <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
-                    Universal Document Studio
-                  </Text>
-                  <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
-                    Job Offers, Work Orders, Salary Slips, Student Fee Receipts & Contracts
-                  </Text>
-                </View>
-              </Pressable>
-            </View>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.typeOptionRow,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleSelectDocType('challan')}
+                >
+                  <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                    <Truck size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.typeOptionText}>
+                    <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                      Delivery Challan
+                    </Text>
+                    <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                      Goods dispatch, vehicle transfer note & transit documentation
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.typeOptionRow,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleSelectDocType('credit_note')}
+                >
+                  <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                    <RotateCcw size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.typeOptionText}>
+                    <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                      Credit Note / Debit Note
+                    </Text>
+                    <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                      Sales returns, tax adjustments, price variations & customer refunds
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.typeOptionRow,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleSelectDocType('purchase_order')}
+                >
+                  <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                    <ShoppingBag size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.typeOptionText}>
+                    <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                      Purchase Order
+                    </Text>
+                    <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                      Official procurement orders sent to vendors & contractors
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.typeOptionRow,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleSelectDocType('work_order')}
+                >
+                  <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                    <ClipboardList size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.typeOptionText}>
+                    <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                      Work Order & Contract
+                    </Text>
+                    <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                      Scope of work, milestone deliverables, technical terms & legal signoff
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.typeOptionRow,
+                    { backgroundColor: theme.surfaceSecondary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                  onPress={() => handleSelectDocType('receipt')}
+                >
+                  <View style={[styles.typeIconBox, { backgroundColor: theme.surface }]}>
+                    <Receipt size={20} color={theme.textPrimary} />
+                  </View>
+                  <View style={styles.typeOptionText}>
+                    <Text style={[styles.typeOptionName, { color: theme.textPrimary }]}>
+                      Payment Receipt
+                    </Text>
+                    <Text style={[styles.typeOptionDesc, { color: theme.textSecondary }]}>
+                      Official payment acknowledgments, rent receipts & settlement vouchers
+                    </Text>
+                  </View>
+                </Pressable>
+              </View>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
