@@ -31,6 +31,7 @@ import {
   Package,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { useTheme } from '../../design/ThemeContext';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DocumentRepository } from '../../data/repositories/DocumentRepository';
 import { formatMoney, createMoney } from '../../domain/money/Money';
@@ -57,8 +58,7 @@ interface OutstandingInvoiceItem {
 
 export default function MoneyScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
 
   const [currency, setCurrency] = useState('USD');
   const [locale, setLocale] = useState('en-US');

@@ -20,8 +20,11 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Users, ChevronRight } from 'lucide-react-native';
+import { Plus, Users, ChevronRight, Menu } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { useTheme } from '../../design/ThemeContext';
+import { useNavigationDrawer } from '../../components/navigation/NavigationDrawerContext';
+import { FeatureIntroductionSheet } from '../../components/common/FeatureIntroductionSheet';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { formatMoney } from '../../domain/money/Money';
 import { SearchField } from '../../components/common/SearchField';
@@ -41,8 +44,8 @@ interface ContactItem {
 
 export default function ContactsScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
+  const { openDrawer } = useNavigationDrawer();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [contacts, setContacts] = useState<ContactItem[]>([]);
@@ -145,10 +148,19 @@ export default function ContactsScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
+          <Pressable
+            onPress={openDrawer}
+            style={styles.headerMenuBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Open navigation drawer"
+            hitSlop={8}
+          >
+            <Menu size={22} color={theme.textPrimary} strokeWidth={2} />
+          </Pressable>
           <View style={styles.headerTextCol}>
-            <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>People</Text>
+            <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Clients</Text>
             <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-              {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'} in directory
+              Client Relationships & Directory
             </Text>
           </View>
           <IconButton
@@ -190,6 +202,15 @@ export default function ContactsScreen() {
           }
         />
       </View>
+
+      {/* Feature Introduction Sheet */}
+      <FeatureIntroductionSheet
+        featureId="clients"
+        title="Clients"
+        description="Organize your client relationships, track balances, and access all documents — all in one place."
+        primaryActionLabel="Get started"
+        onPrimaryAction={() => router.push('/customer/edit')}
+      />
     </SafeAreaView>
   );
 }
@@ -211,6 +232,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
+  },
+  headerMenuBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
   },
   headerTextCol: {
     flex: 1,

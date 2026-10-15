@@ -40,6 +40,7 @@ import { AgingBucket, AgingReport, InvoiceAgingRecord } from '../../domain/colle
 import { DirectUpiEngine } from '../../domain/payments/upi/DirectUpiEngine';
 import { createMoney, formatMoney } from '../../domain/money/Money';
 import { PaymentRecordModal } from '../../features/payments/PaymentRecordModal';
+import { FeatureIntroductionSheet } from '../../components/common/FeatureIntroductionSheet';
 
 export default function CollectionsScreen() {
   const router = useRouter();
@@ -381,6 +382,15 @@ export default function CollectionsScreen() {
           }}
         />
       )}
+
+      {/* Feature Introduction Sheet */}
+      <FeatureIntroductionSheet
+        featureId="collections"
+        title="Collections"
+        description="Track overdue balances, send reminders, and accelerate cash flow."
+        primaryActionLabel="View Collections"
+        onPrimaryAction={() => {}}
+      />
     </SafeAreaView>
   );
 }

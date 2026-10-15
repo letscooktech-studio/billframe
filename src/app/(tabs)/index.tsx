@@ -31,8 +31,11 @@ import {
   Briefcase,
   Layers,
   X,
+  Menu,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { useTheme } from '../../design/ThemeContext';
+import { useNavigationDrawer } from '../../components/navigation/NavigationDrawerContext';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DocumentRepository } from '../../data/repositories/DocumentRepository';
 import { formatMoney } from '../../domain/money/Money';
@@ -79,8 +82,8 @@ function formatDocTypeName(type: string): string {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
+  const { openDrawer } = useNavigationDrawer();
 
   const [businessName, setBusinessName] = useState<string>('My Organization');
   const [currency, setCurrency] = useState<string>('INR');
@@ -192,6 +195,16 @@ export default function HomeScreen() {
         <View style={styles.container}>
           {/* Top Bar: Current organization & circular search button */}
           <View style={styles.headerRow}>
+            <Pressable
+              onPress={openDrawer}
+              style={styles.headerMenuBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Open navigation drawer"
+              hitSlop={8}
+            >
+              <Menu size={22} color={theme.textPrimary} strokeWidth={2} />
+            </Pressable>
+
             <View style={styles.orgInfoColumn}>
               <Text style={[styles.orgLabel, { color: theme.textSecondary }]}>
                 Current organization
@@ -595,5 +608,12 @@ const styles = StyleSheet.create({
   typeOptionDesc: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  headerMenuBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
   },
 });

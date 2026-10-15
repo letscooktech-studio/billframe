@@ -79,6 +79,8 @@ import {
   RecommendedDocumentItem,
   ALL_ONBOARDING_DOCUMENTS,
 } from '../domain/documents/onboardingRecommendations';
+import { useTheme } from '../design/ThemeContext';
+import { ThemeSelectionStep } from '../components/onboarding/ThemeSelectionStep';
 
 interface OnboardingScreenProps {
   onCompleted?: (targetRoute?: string) => void;
@@ -174,8 +176,7 @@ const BUSINESS_TYPE_OPTIONS: BusinessTypeOption[] = [
 
 export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
   const [isLoadingDraft, setIsLoadingDraft] = useState<boolean>(true);
@@ -361,13 +362,20 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
     setValidationError('');
 
     if (step === 1) {
-      // Persist draft for step 1
+      // Step 1: Theme Selection -> Step 2: Your Work
       WorkspaceRepository.updateOnboardingProgressAsync({
-        primaryIntent,
         onboardingStep: 2,
       }).catch(() => {});
       setStep(2);
     } else if (step === 2) {
+      // Step 2: Your Work -> Step 3: Your Business
+      WorkspaceRepository.updateOnboardingProgressAsync({
+        primaryIntent,
+        onboardingStep: 3,
+      }).catch(() => {});
+      setStep(3);
+    } else if (step === 3) {
+      // Step 3: Your Business -> Step 4: Your Documents
       if (!businessName.trim()) {
         setValidationError('Organization / Business Name is required.');
         return;
@@ -401,14 +409,15 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
 
         await WorkspaceRepository.updateOnboardingProgressAsync({
           businessType,
-          onboardingStep: 3,
+          onboardingStep: 4,
         });
       } catch {
         // Silently continue
       }
 
-      setStep(3);
-    } else if (step === 3) {
+      setStep(4);
+    } else if (step === 4) {
+      // Step 4: Your Documents -> Step 5: Ready to Create
       // Ensure at least one favorite document is picked
       if (selectedDocIds.length === 0) {
         setSelectedDocIds(recommendations.defaultSelectedIds);
@@ -416,10 +425,10 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
 
       WorkspaceRepository.updateOnboardingProgressAsync({
         favoriteDocumentTypes: selectedDocIds.length > 0 ? selectedDocIds : recommendations.defaultSelectedIds,
-        onboardingStep: 4,
+        onboardingStep: 5,
       }).catch(() => {});
 
-      setStep(4);
+      setStep(5);
     }
   };
 
@@ -530,8 +539,16 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
     );
   }
 
+  if (step === 1) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: isDark ? '#0B0B0F' : '#F9FAFB' }]} edges={['top', 'left', 'right', 'bottom']}>
+        <ThemeSelectionStep onContinue={handleNext} />
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0D0E10' }]} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDark ? '#0D0E10' : '#FFFFFF' }]} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -544,13 +561,13 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
             </View>
             <Text style={styles.brandTitle}>BILLFRAME</Text>
             <View style={styles.versionBadge}>
-              <Text style={styles.versionBadgeText}>3.0</Text>
+              <Text style={styles.versionBadgeText}>4.0</Text>
             </View>
           </View>
 
           {/* Stepper bar */}
           <View style={styles.progressRow}>
-            {[1, 2, 3, 4].map((s) => (
+            {[2, 3, 4, 5].map((s) => (
               <View
                 key={s}
                 style={[
@@ -562,12 +579,12 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
           </View>
           <View style={styles.stepCounterRow}>
             <Text style={styles.stepCounterText}>
-              Step {step} of 4 •{' '}
-              {step === 1
+              Step {step - 1} of 4 •{' '}
+              {step === 2
                 ? 'Your Work'
-                : step === 2
-                ? 'Your Business'
                 : step === 3
+                ? 'Your Business'
+                : step === 4
                 ? 'Your Documents'
                 : 'Ready to Create'}
             </Text>
@@ -587,9 +604,9 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
           ) : null}
 
           {/* ══════════════════════════════════════════════════════
-              STEP 1: YOUR WORK (INTENT SELECTION)
+              STEP 2: YOUR WORK (INTENT SELECTION)
              ══════════════════════════════════════════════════════ */}
-          {step === 1 && (
+          {step === 2 && (
             <View style={styles.stepContainer}>
               <Text style={styles.stepHeading}>Welcome to Billframe</Text>
               <Text style={styles.stepSubtitle}>
@@ -633,9 +650,9 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
           )}
 
           {/* ══════════════════════════════════════════════════════
-              STEP 2: YOUR BUSINESS (ORGANIZATION IDENTITY)
+              STEP 3: YOUR BUSINESS (ORGANIZATION IDENTITY)
              ══════════════════════════════════════════════════════ */}
-          {step === 2 && (
+          {step === 3 && (
             <View style={styles.stepContainer}>
               <Text style={styles.stepHeading}>Organization Identity</Text>
               <Text style={styles.stepSubtitle}>
@@ -832,9 +849,9 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
           )}
 
           {/* ══════════════════════════════════════════════════════
-              STEP 3: YOUR DOCUMENTS (CURATED PACKS & FAVORITES)
+              STEP 4: YOUR DOCUMENTS (CURATED PACKS & FAVORITES)
              ══════════════════════════════════════════════════════ */}
-          {step === 3 && (
+          {step === 4 && (
             <View style={styles.stepContainer}>
               <Text style={styles.stepHeading}>Personalize Documents</Text>
               <Text style={styles.stepSubtitle}>
@@ -890,9 +907,9 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
           )}
 
           {/* ══════════════════════════════════════════════════════
-              STEP 4: READY TO CREATE (EXECUTIVE MONOCHROME PREVIEW)
+              STEP 5: READY TO CREATE (EXECUTIVE MONOCHROME PREVIEW)
              ══════════════════════════════════════════════════════ */}
-          {step === 4 && (
+          {step === 5 && (
             <View style={styles.stepContainer}>
               <Text style={styles.stepHeading}>Your Workspace is Ready</Text>
               <Text style={styles.stepSubtitle}>
@@ -1099,7 +1116,7 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
             PINNED BOTTOM ACTION DOCK
            ══════════════════════════════════════════════════════ */}
         <View style={[styles.bottomDock, { paddingBottom: Math.max(insets.bottom, 14) }]}>
-          {step > 1 && step < 4 && (
+          {step > 1 && step < 5 && (
             <Pressable
               style={styles.backButton}
               onPress={handleBack}
@@ -1112,9 +1129,9 @@ export default function OnboardingScreen({ onCompleted }: OnboardingScreenProps)
             </Pressable>
           )}
 
-          {step < 4 ? (
+          {step < 5 ? (
             <Pressable
-              style={[styles.primaryButton, step === 1 && { flex: 1 }]}
+              style={[styles.primaryButton, step === 2 && { flex: 1 }]}
               onPress={handleNext}
               disabled={saving}
               accessibilityRole="button"

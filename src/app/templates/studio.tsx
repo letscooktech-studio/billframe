@@ -8,7 +8,7 @@
  * - Zoom controls, draft persistence, document issuance, and direct PDF export
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -43,6 +43,7 @@ import {
   Check,
 } from 'lucide-react-native';
 import { colors, spacing, radii, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { useTheme } from '../../design/ThemeContext';
 import { AuroraBackground } from '../../components/common/AuroraBackground';
 import { UniversalDocumentRepository } from '../../data/repositories/UniversalDocumentRepository';
 import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
@@ -58,8 +59,7 @@ export default function DocumentStudioScreen() {
   const params = useLocalSearchParams<{ typeId?: string; docType?: string; instanceId?: string; previewOnly?: string }>();
   const initialTypeId = params.typeId || params.docType || 'job_offer_letter';
 
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
 
   const [activeTab, setActiveTab] = useState<'content' | 'preview' | 'settings'>(
     params.previewOnly === 'true' ? 'preview' : 'content'
@@ -251,8 +251,13 @@ export default function DocumentStudioScreen() {
     selectedLayout,
   ]);
 
-  // Live compiled HTML
-  const compiledHtml = useMemo(() => {
+  // Debounced preview scheduling with render-version protection
+  const [compiledHtml, setCompiledHtml] = useState<string>('');
+  const [isRenderingPreview, setIsRenderingPreview] = useState<boolean>(false);
+  const renderVersionRef = useRef<number>(0);
+  const needsRenderRef = useRef<boolean>(true);
+
+  const generatePreview = useCallback((version: number) => {
     const dummyBiz: BusinessProfile = businessProfile || {
       id: 'biz_default',
       name: 'Apex Solutions',
@@ -274,8 +279,49 @@ export default function DocumentStudioScreen() {
       updated_at: Date.now(),
     };
 
-    return UniversalDocumentRenderer.renderHtml(currentInstance, schema, dummyBiz);
+    try {
+      const html = UniversalDocumentRenderer.renderHtml(currentInstance, schema, dummyBiz);
+      if (renderVersionRef.current === version) {
+        setCompiledHtml(html);
+        needsRenderRef.current = false;
+      }
+    } catch (err) {
+      console.warn('[DocumentStudio] Preview render error:', err);
+    } finally {
+      if (renderVersionRef.current === version) {
+        setIsRenderingPreview(false);
+      }
+    }
   }, [currentInstance, schema, businessProfile]);
+
+  useEffect(() => {
+    renderVersionRef.current += 1;
+    const currentVersion = renderVersionRef.current;
+    needsRenderRef.current = true;
+
+    if (activeTab !== 'preview') {
+      // While user is actively typing in form, decouple preview completely
+      return;
+    }
+
+    setIsRenderingPreview(true);
+    const timer = setTimeout(() => {
+      generatePreview(currentVersion);
+    }, 280);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [currentInstance, schema, businessProfile, activeTab, generatePreview]);
+
+  // When switching to preview tab, immediately generate if outdated
+  useEffect(() => {
+    if (activeTab === 'preview' && (needsRenderRef.current || !compiledHtml)) {
+      renderVersionRef.current += 1;
+      setIsRenderingPreview(true);
+      generatePreview(renderVersionRef.current);
+    }
+  }, [activeTab, compiledHtml, generatePreview]);
 
   // Actions
   const handleSaveDraft = async () => {

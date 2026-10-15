@@ -28,10 +28,15 @@ import {
   Package,
   Receipt,
   FileSpreadsheet,
+  Moon,
   Users,
+  Search,
+  Menu,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { AuroraBackground } from '../../components/common/AuroraBackground';
+import { useTheme } from '../../design/ThemeContext';
+import { useNavigationDrawer } from '../../components/navigation/NavigationDrawerContext';
 
 interface SettingItemProps {
   icon: React.ReactNode;
@@ -44,8 +49,30 @@ interface SettingItemProps {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme, themePreference, setThemePreference, activeTheme } = useTheme();
+  const { openDrawer } = useNavigationDrawer();
+
+  const handleAppearance = () => {
+    Alert.alert(
+      'Appearance & Theme',
+      'Choose your preferred visual theme. All actions and surfaces adapt seamlessly.',
+      [
+        {
+          text: `Dark Mode ${themePreference === 'dark' ? '✓' : ''}`,
+          onPress: () => setThemePreference('dark'),
+        },
+        {
+          text: `Light Mode ${themePreference === 'light' ? '✓' : ''}`,
+          onPress: () => setThemePreference('light'),
+        },
+        {
+          text: `Follow System ${themePreference === 'system' ? '✓' : ''}`,
+          onPress: () => setThemePreference('system'),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
 
   const handleAbout = () => {
     Alert.alert(
@@ -107,6 +134,36 @@ export default function SettingsScreen() {
                 Complete Workspace Directory & Settings
               </Text>
             </View>
+
+            {/* Search & Discover Drawer Action Hero */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.drawerHeroBtn,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.borderDefault,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+              onPress={openDrawer}
+              accessibilityRole="button"
+              accessibilityLabel="Open all features navigation drawer"
+            >
+              <View style={styles.drawerHeroLeft}>
+                <View style={[styles.drawerHeroIconBox, { backgroundColor: theme.surfaceSecondary }]}>
+                  <Search color={theme.textPrimary} size={18} strokeWidth={2} />
+                </View>
+                <View style={styles.drawerHeroTextWrap}>
+                  <Text style={[styles.drawerHeroTitle, { color: theme.textPrimary }]}>
+                    Search All Features & Documents
+                  </Text>
+                  <Text style={[styles.drawerHeroSub, { color: theme.textSecondary }]}>
+                    Open navigation drawer to discover every tool and record
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight color={theme.textSecondary} size={18} strokeWidth={2} />
+            </Pressable>
 
             {/* Section 1: Sales & Documents */}
             <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>SALES & DOCUMENTS</Text>
@@ -217,10 +274,17 @@ export default function SettingsScreen() {
                 onPress: handlePrivacy,
               })}
               {renderItem({
+                icon: <Moon color={theme.brandAnchor} size={20} />,
+                title: 'Appearance & Theme',
+                subtitle: `Current: ${themePreference.charAt(0).toUpperCase() + themePreference.slice(1)} (Active: ${activeTheme})`,
+                badge: themePreference.toUpperCase(),
+                onPress: handleAppearance,
+              })}
+              {renderItem({
                 icon: <Info color={theme.brandAnchor} size={20} />,
                 title: 'About Billframe',
-                subtitle: 'Version 2.0.0 (Android Native Build)',
-                badge: 'v2.0',
+                subtitle: 'Version 4.0.0 (Android Native Build)',
+                badge: 'v4.0',
                 onPress: handleAbout,
                 isLast: true,
               })}
@@ -314,5 +378,41 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  drawerHeroBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+    minHeight: MIN_TOUCH_TARGET,
+  },
+  drawerHeroLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  drawerHeroIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  drawerHeroTextWrap: {
+    flex: 1,
+  },
+  drawerHeroTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  drawerHeroSub: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
   },
 });

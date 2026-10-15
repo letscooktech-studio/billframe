@@ -39,8 +39,12 @@ import {
   Layers,
   Receipt,
   Briefcase,
+  Menu,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { useTheme } from '../../design/ThemeContext';
+import { useNavigationDrawer } from '../../components/navigation/NavigationDrawerContext';
+import { FeatureIntroductionSheet } from '../../components/common/FeatureIntroductionSheet';
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
 import { BusinessProfile } from '../../domain/profile/types';
@@ -85,8 +89,8 @@ function formatDocTypeName(type: string): string {
 
 export default function DocumentsScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
+  const { openDrawer } = useNavigationDrawer();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<DocCategoryFilter>('all');
@@ -288,10 +292,19 @@ export default function DocumentsScreen() {
       <View style={styles.container}>
         {/* Header Row */}
         <View style={styles.header}>
+          <Pressable
+            onPress={openDrawer}
+            style={styles.headerMenuBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Open navigation drawer"
+            hitSlop={8}
+          >
+            <Menu size={22} color={theme.textPrimary} strokeWidth={2} />
+          </Pressable>
           <View style={styles.headerTextCol}>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>Documents</Text>
             <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-              Unified Document & Billing Hub
+              Create, manage, and keep all your business documents in one place.
             </Text>
           </View>
           <View style={styles.headerActions}>
@@ -535,6 +548,15 @@ export default function DocumentsScreen() {
           onClose={() => setRecordPaymentDoc(null)}
         />
       )}
+
+      {/* Feature Introduction Sheet */}
+      <FeatureIntroductionSheet
+        featureId="documents"
+        title="Documents"
+        description="Create professional invoices, quotes, receipts and more — all in one place."
+        primaryActionLabel="Get started"
+        onPrimaryAction={() => setShowCreateSheet(true)}
+      />
     </SafeAreaView>
   );
 }
@@ -556,6 +578,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
+  },
+  headerMenuBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
   },
   headerTextCol: {
     flex: 1,

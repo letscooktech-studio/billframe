@@ -17,6 +17,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { colors, radii, MIN_TOUCH_TARGET } from '../../design/tokens';
+import { useTheme } from '../../design/ThemeContext';
 
 export interface SecondaryButtonProps {
   label: string;
@@ -45,8 +46,7 @@ export function SecondaryButton({
   accessibilityLabel,
   fullWidth = false,
 }: SecondaryButtonProps) {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
 
   return (
     <Pressable

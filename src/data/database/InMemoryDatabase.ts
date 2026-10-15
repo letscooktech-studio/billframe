@@ -39,6 +39,7 @@ export interface InMemoryDbState {
   custom_block_definitions: any[];
   custom_document_types: any[];
   document_instances: any[];
+  settings: any[];
 }
 
 export class InMemorySQLiteDatabase {
@@ -77,6 +78,7 @@ export class InMemorySQLiteDatabase {
     custom_block_definitions: [],
     custom_document_types: [],
     document_instances: [],
+    settings: [],
   };
 
   reset() {
@@ -115,6 +117,7 @@ export class InMemorySQLiteDatabase {
       custom_block_definitions: [],
       custom_document_types: [],
       document_instances: [],
+      settings: [],
     };
   }
 
@@ -136,6 +139,26 @@ export class InMemorySQLiteDatabase {
 
   async runAsync(sql: string, params: any[] = []): Promise<{ lastInsertRowId: number; changes: number }> {
     const s = sql.trim();
+
+    // Settings Insert / Replace
+    if (s.includes('INSERT INTO settings') || s.includes('INSERT OR REPLACE INTO settings')) {
+      const [key, value, updated_at] = params;
+      const idx = this.state.settings.findIndex((row) => row.key === key);
+      if (idx >= 0) {
+        this.state.settings[idx] = { key, value, updated_at };
+      } else {
+        this.state.settings.push({ key, value, updated_at });
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // Settings Delete
+    if (s.includes('DELETE FROM settings WHERE key = ?')) {
+      const [key] = params;
+      const initialLen = this.state.settings.length;
+      this.state.settings = this.state.settings.filter((row) => row.key !== key);
+      return { lastInsertRowId: 0, changes: initialLen - this.state.settings.length };
+    }
 
     // 1. Business Profiles Insert
     if (s.startsWith('INSERT INTO business_profiles')) {
@@ -1125,6 +1148,12 @@ export class InMemorySQLiteDatabase {
       ) as T) || null;
     }
 
+    // Settings
+    if (s.includes('FROM settings WHERE key = ?')) {
+      const [key] = params;
+      return (this.state.settings.find((row) => row.key === key) as T) || null;
+    }
+
     // Business Profile
     if (s.includes('FROM business_profiles')) {
       if (params.length > 0) {
@@ -1340,6 +1369,11 @@ export class InMemorySQLiteDatabase {
     // PRAGMA table_info check
     if (s.startsWith('PRAGMA table_info')) {
       return [] as T[];
+    }
+
+    // Settings
+    if (s.includes('FROM settings')) {
+      return [...this.state.settings] as T[];
     }
 
     // Migration history

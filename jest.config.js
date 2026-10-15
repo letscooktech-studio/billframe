@@ -22,5 +22,6 @@ module.exports = {
     '^lucide-react-native$': '<rootDir>/tests/mocks/lucide-react-native.ts',
     '^expo-router$': '<rootDir>/tests/mocks/expo-router.ts',
     '^react-native-safe-area-context$': '<rootDir>/tests/mocks/react-native-safe-area-context.ts',
+    '^react-native-svg$': '<rootDir>/tests/mocks/react-native-svg.ts',
   },
 };

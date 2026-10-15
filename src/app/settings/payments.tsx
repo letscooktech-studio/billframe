@@ -42,6 +42,7 @@ import { BusinessProfileRepository } from '../../data/repositories/BusinessProfi
 import { PaymentConnectionRepository } from '../../data/repositories/PaymentConnectionRepository';
 import { DirectUpiEngine } from '../../domain/payments/upi/DirectUpiEngine';
 import { UpiQrCode } from '../../components/common/UpiQrCode';
+import { FeatureIntroductionSheet } from '../../components/common/FeatureIntroductionSheet';
 
 export default function PaymentSettingsScreen() {
   const router = useRouter();
@@ -483,6 +484,15 @@ export default function PaymentSettingsScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* Feature Introduction Sheet */}
+      <FeatureIntroductionSheet
+        featureId="payments"
+        title="Payments & UPI"
+        description="Accept payments with UPI, cards, wallets and more — all in one place."
+        primaryActionLabel="Set up UPI"
+        onPrimaryAction={() => {}}
+      />
     </SafeAreaView>
   );
 }

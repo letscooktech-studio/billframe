@@ -22,10 +22,12 @@ import { ExchangeRateEngine } from '../domain/money/ExchangeRateEngine';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import OnboardingScreen from './onboarding';
 import { colors } from '../design/tokens';
+import { ThemeProvider, useTheme } from '../design/ThemeContext';
+import { NavigationDrawerProvider } from '../components/navigation/NavigationDrawerContext';
+import { SearchableSideDrawer } from '../components/navigation/SearchableSideDrawer';
 
 function RootLayoutInner() {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
   const security = useSecurity();
 
   const [dbReady, setDbReady] = useState(false);
@@ -135,20 +137,30 @@ function RootLayoutInner() {
   );
 }
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+function RootContainer() {
+  const { theme, isDark } = useTheme();
 
   return (
-    <SafeAreaProvider>
-      <GestureHandlerRootView style={[styles.flex, { backgroundColor: theme.background }]}>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        <ErrorBoundary>
-          <SecurityProvider>
+    <GestureHandlerRootView style={[styles.flex, { backgroundColor: theme.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <ErrorBoundary>
+        <SecurityProvider>
+          <NavigationDrawerProvider>
             <RootLayoutInner />
-          </SecurityProvider>
-        </ErrorBoundary>
-      </GestureHandlerRootView>
+            <SearchableSideDrawer />
+          </NavigationDrawerProvider>
+        </SecurityProvider>
+      </ErrorBoundary>
+    </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <RootContainer />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

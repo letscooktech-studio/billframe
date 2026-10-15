@@ -44,6 +44,7 @@ import {
   Save,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
+import { useTheme } from '../../design/ThemeContext';
 import { CustomerRepository, CustomerRecord } from '../../data/repositories/CustomerRepository';
 import { DocumentRepository } from '../../data/repositories/DocumentRepository';
 import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
@@ -99,8 +100,7 @@ const PAYMENT_TERMS_PRESETS: { id: PaymentTermsPreset; label: string }[] = [
 export default function DocumentEditScreen() {
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ type?: string; id?: string; customerId?: string }>();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
 
   const docType: DocumentType = searchParams.type === 'estimate' ? 'estimate' : 'invoice';
   const existingId = searchParams.id;

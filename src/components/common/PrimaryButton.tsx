@@ -1,22 +1,23 @@
 /**
  * PRIMARY BUTTON COMPONENT
- * Android Design System: Off-white rounded-rectangle action button.
- * Enforces >= 48dp touch target, 14dp radius, bold monochrome contrast.
+ * Android Design System: Off-white rounded-rectangle action button with spring micro-interactions.
+ * Enforces >= 48dp touch target, 14dp radius, bold monochrome contrast & smooth loading transitions.
  */
 
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   StyleSheet,
   Text,
   Pressable,
-  ActivityIndicator,
   View,
   StyleProp,
   ViewStyle,
   TextStyle,
-  useColorScheme,
+  Animated,
 } from 'react-native';
-import { colors, radii, typography, MIN_TOUCH_TARGET } from '../../design/tokens';
+import { radii, MIN_TOUCH_TARGET } from '../../design/tokens';
+import { useTheme } from '../../design/ThemeContext';
+import { AnimatedProcessingIcon } from '../animations/AnimatedProcessingIcon';
 
 export interface PrimaryButtonProps {
   label: string;
@@ -45,47 +46,96 @@ export function PrimaryButton({
   accessibilityLabel,
   fullWidth = true,
 }: PrimaryButtonProps) {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
+
+  // Spring scale micro-interaction
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    if (disabled || loading) return;
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 100,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 80,
+    }).start();
+  };
 
   return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || label}
-      accessibilityState={{ disabled: disabled || loading, busy: loading }}
-      disabled={disabled || loading}
-      onPress={onPress}
-      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-      style={({ pressed }) => [
-        styles.base,
+    <Animated.View
+      style={[
         {
-          backgroundColor: theme.primaryActionBg,
-          opacity: disabled ? 0.45 : pressed ? 0.85 : 1,
+          transform: [{ scale: scaleAnim }],
           alignSelf: fullWidth ? 'stretch' : 'flex-start',
         },
-        style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={theme.primaryActionText} size="small" />
-      ) : (
-        <View style={styles.contentRow}>
-          {icon && <View style={styles.leftIconWrapper}>{icon}</View>}
-          <Text
-            style={[
-              styles.label,
-              { color: theme.primaryActionText },
-              textStyle,
-            ]}
-            numberOfLines={1}
-          >
-            {label}
-          </Text>
-          {rightIcon && <View style={styles.rightIconWrapper}>{rightIcon}</View>}
-        </View>
-      )}
-    </Pressable>
+      <Pressable
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel || label}
+        accessibilityState={{ disabled: disabled || loading, busy: loading }}
+        disabled={disabled || loading}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        style={({ pressed }) => [
+          styles.base,
+          {
+            backgroundColor: theme.primaryActionBg,
+            opacity: disabled ? 0.45 : pressed ? 0.9 : 1,
+            alignSelf: fullWidth ? 'stretch' : 'flex-start',
+          },
+          style,
+        ]}
+      >
+        {loading ? (
+          <View style={styles.loadingRow}>
+            <AnimatedProcessingIcon
+              state="loading"
+              size={20}
+              color={theme.primaryActionText}
+              glowColor="#93C5FD"
+            />
+            <Text
+              style={[
+                styles.label,
+                { color: theme.primaryActionText, marginLeft: 10 },
+                textStyle,
+              ]}
+              numberOfLines={1}
+            >
+              Processing...
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.contentRow}>
+            {icon && <View style={styles.leftIconWrapper}>{icon}</View>}
+            <Text
+              style={[
+                styles.label,
+                { color: theme.primaryActionText },
+                textStyle,
+              ]}
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+            {rightIcon && <View style={styles.rightIconWrapper}>{rightIcon}</View>}
+          </View>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -99,6 +149,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -35,6 +35,7 @@ import {
 } from 'lucide-react-native';
 import { colors, spacing, radii, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { AuroraBackground } from '../../components/common/AuroraBackground';
+import { FeatureIntroductionSheet } from '../../components/common/FeatureIntroductionSheet';
 import { UniversalDocumentRepository } from '../../data/repositories/UniversalDocumentRepository';
 import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
 import { UniversalDocumentSchema } from '../../domain/documents/universal/types';
@@ -735,6 +736,15 @@ export default function ChooseDocumentScreen() {
             ))}
           </View>
         </ScrollView>
+
+        {/* Feature Introduction Sheet */}
+        <FeatureIntroductionSheet
+          featureId="template_studio"
+          title="Template Studio"
+          description="Create stunning invoices, quotes, receipts and more — tailored to your brand."
+          primaryActionLabel="Explore Templates"
+          onPrimaryAction={() => router.push('/templates/studio')}
+        />
       </SafeAreaView>
     </AuroraBackground>
   );

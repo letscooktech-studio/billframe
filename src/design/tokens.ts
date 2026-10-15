@@ -98,6 +98,8 @@ export interface ThemeColors {
   surface: string;
   surfaceSecondary: string;
   surfaceElevated: string;
+  cardBg: string;
+  cardBorder: string;
   borderSubtle: string;
   borderFocused: string;
   borderDefault: string;
@@ -166,6 +168,8 @@ export const colors: { light: ThemeColors; dark: ThemeColors } = {
     surface: '#FFFFFF',
     surfaceSecondary: '#EFEFED',
     surfaceElevated: '#E5E5E3',
+    cardBg: '#FFFFFF',
+    cardBorder: '#E5E5E3',
     borderSubtle: '#E5E5E3',
     borderFocused: '#171717',
     borderDefault: '#D4D4D2',
@@ -190,6 +194,8 @@ export const colors: { light: ThemeColors; dark: ThemeColors } = {
     surface: '#18191D',
     surfaceSecondary: '#222326',
     surfaceElevated: '#282A30',
+    cardBg: '#18191D',
+    cardBorder: '#35363B',
     borderSubtle: '#26272B',
     borderFocused: '#F5F5F6',
     borderDefault: '#35363B',

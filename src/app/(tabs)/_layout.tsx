@@ -15,13 +15,13 @@
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { useColorScheme, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { Home, FileText, Users, Briefcase, LayoutGrid } from 'lucide-react-native';
 import { colors } from '../../design/tokens';
+import { useTheme } from '../../design/ThemeContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? colors.dark : colors.light;
+  const { theme } = useTheme();
 
   return (
     <Tabs
