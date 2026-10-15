@@ -5,6 +5,7 @@ import { renderLetterDocumentHtml } from '../../src/services/pdf/templates/Lette
 import { renderWorkOrderHtml } from '../../src/services/pdf/templates/WorkOrderRenderer';
 import { renderPurchaseOrderHtml } from '../../src/services/pdf/templates/PurchaseOrderRenderer';
 import { renderUniversalCustomHtml } from '../../src/services/pdf/templates/UniversalCustomRenderer';
+import { renderGstTaxInvoiceHtml } from '../../src/services/pdf/templates/gst';
 import { FullDocument } from '../../src/data/repositories/DocumentRepository';
 import { BusinessProfile } from '../../src/domain/profile/types';
 import { UniversalDocumentInstance, UniversalDocumentSchema } from '../../src/domain/documents/universal/types';
@@ -473,5 +474,90 @@ describe('Generate HTML Proofs for Visual Verification', () => {
     const html = renderUniversalCustomHtml(instance, schema, mockBusiness);
     fs.writeFileSync(path.join(artifactDir, 'proof_equipment_responsibility.html'), html, 'utf-8');
     expect(html).toContain('Equipment Responsibility Undertaking');
+  });
+
+  const gstProofDoc: any = {
+    id: 'doc_tax_gst_001',
+    doc_type: 'invoice',
+    document_number: 'INV/2026/089',
+    customer_id: 'cust_01',
+    job_id: null,
+    issue_date: 1735689600000,
+    due_date: 1738368000000,
+    subtotal_minor: 15000000, // ₹1,50,000.00
+    tax_minor: 2700000,      // ₹27,000.00 (18% GST: 9% CGST + 9% SGST)
+    total_minor: 17700000,    // ₹1,77,000.00
+    currency: 'INR',
+    notes: 'Subject to Bengaluru jurisdiction. Thank you for your business.',
+    terms: 'Payment due within 30 days of invoice receipt.',
+    lifecycle_status: 'issued',
+    customer_name: 'Alpha Enterprises',
+    customer_business_name: 'Alpha Enterprises Pvt Ltd',
+    customer_email: 'accounts@alphaent.com',
+    customer_phone: '+91 91234 56789',
+    customer_billing_address: 'Plot 45, Phase II, Electronic City, Bengaluru - 560100',
+    customer_tax_id: '29ABCDE1234F1Z5',
+    place_of_supply: 'Karnataka (State Code 29)',
+    reverse_charge: false,
+    po_number: 'PO-ALPHA-2026-90',
+    items: [
+      {
+        id: 'item_1',
+        description: 'Enterprise Cloud Architecture & High-Security Infrastructure Audit',
+        item_notes: 'HSN/SAC: 998313',
+        category: 'service',
+        quantity_scaled: 10000,
+        unit_name: 'Month',
+        unit_price_minor: 10000000,
+        line_total_minor: 10000000,
+        sort_order: 1,
+      },
+      {
+        id: 'item_2',
+        description: 'Automated CI/CD Delivery Pipeline & Production Observability Stack',
+        item_notes: 'HSN/SAC: 998314',
+        category: 'service',
+        quantity_scaled: 10000,
+        unit_name: 'Month',
+        unit_price_minor: 5000000,
+        line_total_minor: 5000000,
+        sort_order: 2,
+      },
+    ],
+  };
+
+  it('12. Generates GST-01 Executive Letterhead HTML proof', () => {
+    const html = renderGstTaxInvoiceHtml(gstProofDoc, mockBusiness, 'gst_executive');
+    fs.writeFileSync(path.join(artifactDir, 'proof_gst_01_executive_letterhead.html'), html, 'utf-8');
+    expect(html).toContain('TAX INVOICE');
+    expect(html).toContain('INV/2026/089');
+  });
+
+  it('13. Generates GST-02 Structured Ledger HTML proof', () => {
+    const html = renderGstTaxInvoiceHtml(gstProofDoc, mockBusiness, 'gst_ledger');
+    fs.writeFileSync(path.join(artifactDir, 'proof_gst_02_structured_ledger.html'), html, 'utf-8');
+    expect(html).toContain('TAX INVOICE');
+    expect(html).toContain('INV/2026/089');
+  });
+
+  it('14. Generates GST-03 Minimal Professional HTML proof', () => {
+    const html = renderGstTaxInvoiceHtml(gstProofDoc, mockBusiness, 'gst_minimal');
+    fs.writeFileSync(path.join(artifactDir, 'proof_gst_03_minimal_professional.html'), html, 'utf-8');
+    expect(html).toContain('TAX INVOICE');
+    expect(html).toContain('INV/2026/089');
+  });
+
+  it('15. Generates GST-04 Corporate B2B HTML proof', () => {
+    const html = renderGstTaxInvoiceHtml(gstProofDoc, mockBusiness, 'gst_corporate');
+    fs.writeFileSync(path.join(artifactDir, 'proof_gst_04_corporate_b2b.html'), html, 'utf-8');
+    expect(html).toContain('TAX INVOICE');
+    expect(html).toContain('inverted-grand-total');
+  });
+
+  it('16. Generates GST-05 Trade Supply Chain HTML proof', () => {
+    const html = renderGstTaxInvoiceHtml(gstProofDoc, mockBusiness, 'gst_supply_chain');
+    fs.writeFileSync(path.join(artifactDir, 'proof_gst_05_trade_supply_chain.html'), html, 'utf-8');
+    expect(html).toContain('TAX INVOICE');
+    expect(html).toContain('running-banner');
   });
 });

@@ -42,6 +42,7 @@ import {
   Trash2,
   Users,
   Save,
+  Share2,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { useTheme } from '../../design/ThemeContext';
@@ -75,6 +76,11 @@ import { BusinessProfile } from '../../domain/profile/types';
 import { LogoUploader } from '../../components/common/LogoUploader';
 import { PrimaryButton } from '../../components/common/PrimaryButton';
 import { SecondaryButton } from '../../components/common/SecondaryButton';
+import { PdfService } from '../../services/pdf/PdfService';
+import { PdfTemplateType } from '../../services/pdf/types';
+import { DocumentReadinessValidator } from '../../domain/documents/universal/DocumentReadinessValidator';
+import { TemplateQualityScoreEngine } from '../../domain/documents/universal/TemplateQualityScore';
+import { GST_LAYOUT_DEFINITIONS } from '../../services/pdf/templates/gst';
 
 const COMMON_CURRENCIES = [
   { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
@@ -107,6 +113,7 @@ export default function DocumentEditScreen() {
 
   // Form State
   const [docId, setDocId] = useState<string>(existingId || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+  const [docNumber, setDocNumber] = useState<string>(docType === 'invoice' ? 'INV-2026-001' : 'EST-2026-001');
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [businessProfileId, setBusinessProfileId] = useState<string>('default_business_profile');
   const [currency, setCurrency] = useState<string>('USD');
@@ -160,6 +167,10 @@ export default function DocumentEditScreen() {
   const [editingItem, setEditingItem] = useState<{ item: LineItemInput | null; index: number } | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [selectedGstTemplate, setSelectedGstTemplate] = useState<PdfTemplateType>('gst_executive');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [showReadinessChecklist, setShowReadinessChecklist] = useState(false);
+  const [showQualityRubric, setShowQualityRubric] = useState(false);
   const [showTaxModal, setShowTaxModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [serverErrorMessage, setServerErrorMessage] = useState<string | null>(null);
@@ -183,6 +194,7 @@ export default function DocumentEditScreen() {
         const existing = await DocumentRepository.getById(existingId);
         if (existing) {
           setDocId(existing.id);
+          if (existing.document_number) setDocNumber(existing.document_number);
           setBusinessProfileId(existing.business_profile_id);
           setCurrency(existing.currency);
           setIssueDate(existing.issue_date);
@@ -360,6 +372,106 @@ export default function DocumentEditScreen() {
       tax_minor: Number(calculation.tax.amountMinor),
     });
   }, [currency, customer, taxLabel, taxRateBp, calculation.tax.amountMinor]);
+
+  const fullDocForPreview = React.useMemo(() => {
+    const subtotalMinor = Number(calculation.subtotal.amountMinor);
+    const discountMinor = Number(calculation.discount.amountMinor);
+    const taxMinor = Number(calculation.tax.amountMinor);
+    const totalMinor = Number(calculation.grandTotal.amountMinor);
+
+    const doc: any = {
+      id: docId,
+      business_profile_id: businessProfileId,
+      job_id: null,
+      doc_type: docType,
+      sequence_number: 1,
+      document_number: docNumber || 'INV-2026-001',
+      customer_id: customer?.id || null,
+      lifecycle_status: 'draft',
+      issue_date: issueDate,
+      due_date: docType === 'invoice' ? dueDate : null,
+      currency,
+      subtotal_minor: subtotalMinor,
+      discount_minor: discountMinor,
+      discount_type: discountType,
+      discount_value: calculatedDiscountValue,
+      tax_minor: taxMinor,
+      tax_type: taxType,
+      tax_rate_bp: Number(taxRateBp),
+      tax_label: taxLabel,
+      total_minor: totalMinor,
+      deposit_minor: Number(calculatedDepositMinor),
+      po_number: poNumber || null,
+      payment_terms_preset: paymentTermsPreset,
+      shipping_address: shippingAddress || null,
+      payment_instructions: paymentInstructions || null,
+      notes: notes || null,
+      terms: terms || null,
+      internal_notes: internalNotes || null,
+      signature_uri: null,
+      signature_date: null,
+      place_of_supply: customer?.country === 'India' ? (businessProfile?.state || 'Maharashtra') : (businessProfile?.state || 'Maharashtra'),
+      supply_type: 'services',
+      reverse_charge: false,
+      parent_document_id: null,
+      is_archived: 0,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      customer_name: customer?.name || inlineCustomerName || 'Acme Enterprises',
+      customer_business_name: customer?.business_name || null,
+      customer_email: customer?.email || inlineCustomerEmail || null,
+      customer_phone: customer?.phone || inlineCustomerPhone || null,
+      customer_billing_address: customer?.billing_address || inlineCustomerAddress || null,
+      customer_tax_id: customer?.tax_id || inlineCustomerTaxId || null,
+      items: items.map((it, idx) => ({
+        id: it.id || `item_${idx}`,
+        document_id: docId,
+        catalog_item_id: it.catalogItemId || null,
+        description: it.description,
+        item_notes: it.itemNotes || null,
+        quantity_scaled: Number(it.quantityScaled),
+        unit_name: it.unitName || 'item',
+        unit_price_minor: Number(it.unitPriceMinor),
+        line_total_minor: Number(it.unitPriceMinor * (it.quantityScaled / 10000n)),
+        sort_order: idx,
+        hsn_sac_code: (it as any).hsn_sac_code || (it as any).hsn || (it as any).sac || '998314',
+      })),
+      total_paid_minor: 0,
+      balance_minor: totalMinor,
+      payments: [],
+    };
+    return doc;
+  }, [
+    docId, businessProfileId, docType, docNumber, customer, issueDate, dueDate, currency,
+    calculation, discountType, calculatedDiscountValue, taxType, taxRateBp, taxLabel,
+    calculatedDepositMinor, poNumber, paymentTermsPreset, shippingAddress, paymentInstructions,
+    notes, terms, internalNotes, businessProfile, inlineCustomerName, inlineCustomerEmail,
+    inlineCustomerPhone, inlineCustomerAddress, inlineCustomerTaxId, items
+  ]);
+
+  const readinessResult = React.useMemo(() => {
+    if (!businessProfile) return null;
+    return DocumentReadinessValidator.validateTaxInvoice(fullDocForPreview, businessProfile);
+  }, [fullDocForPreview, businessProfile]);
+
+  const qualityResult = React.useMemo(() => {
+    return TemplateQualityScoreEngine.evaluate(selectedGstTemplate);
+  }, [selectedGstTemplate]);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!businessProfile) {
+      Alert.alert('Organization Required', 'Please configure your organization profile before exporting.');
+      return;
+    }
+    try {
+      setIsExportingPdf(true);
+      await PdfService.shareDocumentPdfAsync(fullDocForPreview, businessProfile, selectedGstTemplate);
+    } catch (err: any) {
+      Alert.alert('Export Error', err?.message || 'Could not export document PDF.');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  }, [fullDocForPreview, businessProfile, selectedGstTemplate]);
 
   // Autosave flush
   const flushAutosave = useCallback(async () => {
@@ -1807,6 +1919,122 @@ export default function DocumentEditScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+              {/* 5 GST Layout Switcher Pills */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textSecondary, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
+                  Select Tax Invoice Layout
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  {GST_LAYOUT_DEFINITIONS.map((l) => {
+                    const isSelected = selectedGstTemplate === l.code;
+                    return (
+                      <Pressable
+                        key={l.code}
+                        onPress={() => setSelectedGstTemplate(l.code as PdfTemplateType)}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: radii.full,
+                          backgroundColor: isSelected ? theme.brandAnchor : theme.surfaceSecondary,
+                          borderWidth: 1,
+                          borderColor: isSelected ? theme.brandAnchor : theme.borderSubtle,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '700',
+                            color: isSelected ? theme.brandAnchorText : theme.textPrimary,
+                          }}
+                        >
+                          {l.referenceId} {l.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Dual-Gate Status Cards */}
+              <View style={{ marginBottom: 14, gap: 8 }}>
+                {/* 1. Document Readiness Hard Gate (Rule 46) */}
+                <Pressable
+                  onPress={() => setShowReadinessChecklist(!showReadinessChecklist)}
+                  style={{
+                    padding: 12,
+                    borderRadius: radii.md,
+                    backgroundColor: readinessResult?.hardGatePassed ? '#052e16' : '#451a03',
+                    borderWidth: 1,
+                    borderColor: readinessResult?.hardGatePassed ? '#166534' : '#b45309',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Shield size={16} color={readinessResult?.hardGatePassed ? '#4ade80' : '#f59e0b'} />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: readinessResult?.hardGatePassed ? '#4ade80' : '#f59e0b' }}>
+                        {readinessResult?.hardGatePassed
+                          ? 'Rule 46 Compliant (100% Passed)'
+                          : `Statutory Gate Incomplete (${readinessResult?.violations.length || 0} issues)`}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#94a3b8' }}>
+                      {showReadinessChecklist ? 'Hide' : 'Checklist'}
+                    </Text>
+                  </View>
+                  {showReadinessChecklist && readinessResult && (
+                    <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.12)', paddingTop: 8 }}>
+                      {readinessResult.checklist.map((c, i) => (
+                        <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 5 }}>
+                          <Text style={{ fontSize: 11, color: c.passed ? '#4ade80' : '#ef4444', fontWeight: '800' }}>
+                            {c.passed ? '✓' : '✗'}
+                          </Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11, color: '#f8fafc', fontWeight: '600' }}>{c.item}</Text>
+                            <Text style={{ fontSize: 10, color: '#94a3b8' }}>{c.statutoryRef} • {c.details}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </Pressable>
+
+                {/* 2. Design Quality Score (100-Point Rubric) */}
+                <Pressable
+                  onPress={() => setShowQualityRubric(!showQualityRubric)}
+                  style={{
+                    padding: 12,
+                    borderRadius: radii.md,
+                    backgroundColor: theme.surfaceSecondary,
+                    borderWidth: 1,
+                    borderColor: theme.borderSubtle,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <FileCheck size={16} color="#38bdf8" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
+                        Quality Score: {qualityResult.totalScore}/100 • {qualityResult.tier}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: theme.textMuted }}>
+                      {showQualityRubric ? 'Hide' : 'Rubric'}
+                    </Text>
+                  </View>
+                  {showQualityRubric && (
+                    <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingTop: 8 }}>
+                      {qualityResult.categories.map((cat, i) => (
+                        <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <Text style={{ fontSize: 11, color: theme.textSecondary }}>{cat.category}</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textPrimary }}>
+                            {cat.awardedPoints}/{cat.maxPoints}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </Pressable>
+              </View>
+
               <View style={[styles.previewSheet, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
                 {/* Header */}
                 <View style={styles.previewHeaderRow}>
@@ -2005,14 +2233,28 @@ export default function DocumentEditScreen() {
                 ) : null}
               </View>
 
-              <Pressable
-                style={[styles.closePreviewBtn, { backgroundColor: theme.brandAnchor }]}
-                onPress={() => setShowPreviewModal(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Close preview"
-              >
-                <Text style={[styles.closePreviewBtnText, { color: theme.brandAnchorText }]}>Close Preview</Text>
-              </Pressable>
+              {/* Preview Action Buttons */}
+              <View style={{ marginTop: spacing.lg, marginBottom: spacing.xxl, gap: 10 }}>
+                <PrimaryButton
+                  label={
+                    isExportingPdf
+                      ? 'Generating Official PDF...'
+                      : `Export PDF (${GST_LAYOUT_DEFINITIONS.find((l) => l.code === selectedGstTemplate)?.referenceId || 'GST'})`
+                  }
+                  icon={<Share2 color={theme.primaryActionText} size={18} />}
+                  onPress={handleExportPdf}
+                  loading={isExportingPdf}
+                  disabled={isExportingPdf}
+                  accessibilityLabel="Export official PDF document"
+                  fullWidth
+                />
+                <SecondaryButton
+                  label="Close Preview"
+                  onPress={() => setShowPreviewModal(false)}
+                  accessibilityLabel="Close preview modal"
+                  fullWidth
+                />
+              </View>
             </ScrollView>
           </SafeAreaView>
         </Modal>

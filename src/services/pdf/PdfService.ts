@@ -19,6 +19,7 @@ import { renderExecutiveTemplate } from './templates/executiveTemplate';
 import { renderMinimalTemplate } from './templates/minimalTemplate';
 import { renderReceiptTemplate } from './templates/receiptTemplate';
 import { renderTaxInvoiceGoldStandardHtml } from './templates/TaxInvoiceGoldStandardTemplate';
+import { renderGstTaxInvoiceHtml } from './templates/gst';
 
 export class PdfService {
   /**
@@ -32,9 +33,20 @@ export class PdfService {
     customization?: TemplateCustomization
   ): string {
     switch (template) {
+      case 'gst_executive':
+      case 'gst_01':
+      case 'gst_ledger':
+      case 'gst_02':
+      case 'gst_minimal':
+      case 'gst_03':
+      case 'gst_corporate':
+      case 'gst_04':
+      case 'gst_supply_chain':
+      case 'gst_05':
+        return renderGstTaxInvoiceHtml(doc, business, template, customization);
       case 'tax_invoice' as any:
       case 'gold_standard' as any:
-        return renderTaxInvoiceGoldStandardHtml(doc, business, paperSize, customization);
+        return renderGstTaxInvoiceHtml(doc, business, 'gst_executive', customization);
       case 'compact':
       case 'commerce_compact':
         return renderCompactTemplate(doc, business, paperSize, customization);

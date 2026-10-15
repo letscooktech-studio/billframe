@@ -20,7 +20,19 @@ export type PdfTemplateType =
   | 'modern_editorial'
   | 'commerce_compact'
   | 'service_record'
-  | 'monochrome_minimal';
+  | 'monochrome_minimal'
+  | 'tax_invoice'
+  | 'gold_standard'
+  | 'gst_executive'
+  | 'gst_ledger'
+  | 'gst_minimal'
+  | 'gst_corporate'
+  | 'gst_supply_chain'
+  | 'gst_01'
+  | 'gst_02'
+  | 'gst_03'
+  | 'gst_04'
+  | 'gst_05';
 
 export type PdfPaperSize = 'a4' | 'letter';
 
