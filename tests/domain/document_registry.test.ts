@@ -11,9 +11,9 @@ import { FullDocument } from '../../src/data/repositories/DocumentRepository';
 import { BusinessProfile } from '../../src/domain/profile/types';
 
 describe('Document Type Registry', () => {
-  it('registers all 12 professional document types with metadata', () => {
+  it('registers all 25 professional enterprise document types with metadata', () => {
     const allTypes = DocumentTypeRegistry.getAll();
-    expect(allTypes.length).toBe(12);
+    expect(allTypes.length).toBe(25);
 
     const typeCodes = allTypes.map((t) => t.type);
     expect(typeCodes).toContain('tax_invoice');
@@ -28,6 +28,19 @@ describe('Document Type Registry', () => {
     expect(typeCodes).toContain('receipt');
     expect(typeCodes).toContain('payment_voucher');
     expect(typeCodes).toContain('work_order');
+    expect(typeCodes).toContain('sales_order');
+    expect(typeCodes).toContain('goods_received_note');
+    expect(typeCodes).toContain('packing_list');
+    expect(typeCodes).toContain('customer_account_statement');
+    expect(typeCodes).toContain('salary_slip');
+    expect(typeCodes).toContain('job_offer_letter');
+    expect(typeCodes).toContain('experience_certificate');
+    expect(typeCodes).toContain('rent_receipt');
+    expect(typeCodes).toContain('student_fee_receipt');
+    expect(typeCodes).toContain('equipment_responsibility_letter');
+    expect(typeCodes).toContain('meeting_minutes');
+    expect(typeCodes).toContain('site_inspection_report');
+    expect(typeCodes).toContain('nda_agreement');
   });
 
   it('correctly classifies statutory vs commercial vs internal documents', () => {

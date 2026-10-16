@@ -34,7 +34,20 @@ export type DocumentType =
   | 'purchase_order'
   | 'delivery_challan'
   | 'debit_note'
-  | 'payment_voucher';
+  | 'payment_voucher'
+  | 'sales_order'
+  | 'goods_received_note'
+  | 'packing_list'
+  | 'customer_account_statement'
+  | 'salary_slip'
+  | 'job_offer_letter'
+  | 'experience_certificate'
+  | 'rent_receipt'
+  | 'student_fee_receipt'
+  | 'equipment_responsibility_letter'
+  | 'meeting_minutes'
+  | 'site_inspection_report'
+  | 'nda_agreement';
 
 /**
  * Orthogonal document lifecycle statuses

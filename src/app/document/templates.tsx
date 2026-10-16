@@ -44,6 +44,19 @@ import {
   Building2,
   Landmark,
   Globe,
+  Truck,
+  Package,
+  PackageCheck,
+  ScrollText,
+  FileCheck,
+  GraduationCap,
+  Laptop,
+  Users,
+  Building,
+  Scale,
+  Shield,
+  FileClock,
+  Send,
 } from 'lucide-react-native';
 import { radii } from '../../design/tokens';
 import { useTheme } from '../../design/ThemeContext';
@@ -707,6 +720,276 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
       },
     ],
   },
+  proforma: {
+    id: 'proforma',
+    title: 'Proforma Commercial Invoice',
+    shortName: 'Proforma Invoice',
+    subtitle: 'Advance commercial wire billing and import customs declaration',
+    icon: FileClock,
+    defaultTemplateId: 'pi_executive',
+    templates: [
+      { id: 'pi_executive', code: 'PI-01', name: 'Executive Proforma', tagline: 'Classic brand masthead with advance wire coordinates and validity period', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['pi_minimal', 'pi_corporate'] },
+      { id: 'pi_ledger', code: 'PI-02', name: 'Structured Milestone Proforma', tagline: 'High-density schedule of estimated deliverables and stage-gate payments', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['pi_corporate', 'pi_retail'] },
+      { id: 'pi_minimal', code: 'PI-03', name: 'Modern Minimal Proforma', tagline: 'Clean borderless layout with quiet typography and advance settlement terms', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['pi_executive', 'pi_ledger'] },
+      { id: 'pi_corporate', code: 'PI-04', name: 'Corporate Global Trade', tagline: 'Dual entity billing boxes with international commercial terms (Incoterms)', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['pi_executive', 'pi_retail'] },
+      { id: 'pi_retail', code: 'PI-05', name: 'Advance Booking Slip', tagline: 'Compact over-the-counter booking slip with deposit acknowledgment', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['pi_minimal', 'pi_ledger'] },
+    ],
+  },
+  export_invoice: {
+    id: 'export_invoice',
+    title: 'Export Commercial Invoice',
+    shortName: 'Export Invoice',
+    subtitle: 'International cross-border supply under LUT/Bond with foreign currency',
+    icon: Globe,
+    defaultTemplateId: 'exp_executive',
+    templates: [
+      { id: 'exp_executive', code: 'EXP-01', name: 'Global Trade Executive', tagline: 'LUT/Bond reference, port of discharge, and foreign currency bank wire', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['exp_corporate', 'exp_minimal'] },
+      { id: 'exp_ledger', code: 'EXP-02', name: 'Customs Tariff Ledger', tagline: 'Itemized 8-digit HS/HTS tariff codes with net/gross weight and container tally', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['exp_corporate', 'exp_executive'] },
+      { id: 'exp_minimal', code: 'EXP-03', name: 'Modern Export Minimal', tagline: 'Clean international invoice format with dual currency conversion tally', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['exp_executive', 'exp_ledger'] },
+      { id: 'exp_corporate', code: 'EXP-04', name: 'Multinational Consignment', tagline: 'Port of loading, carrier flight/vessel, and destination customs clearance', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['exp_executive', 'exp_ledger'] },
+      { id: 'exp_retail', code: 'EXP-05', name: 'Cross-Border Courier Bill', tagline: 'International express parcel shipping invoice with air waybill tracker', category: 'retail', categoryLabel: 'Trade', similarTemplateIds: ['exp_ledger', 'exp_minimal'] },
+    ],
+  },
+  sales_order: {
+    id: 'sales_order',
+    title: 'Sales Order Confirmation',
+    shortName: 'Sales Order',
+    subtitle: 'Formal vendor acceptance of customer purchase order & delivery terms',
+    icon: Send,
+    defaultTemplateId: 'so_executive',
+    templates: [
+      { id: 'so_executive', code: 'SO-01', name: 'Executive Order Confirmation', tagline: 'Customer PO cross-reference with delivery schedule and commercial terms', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['so_corporate', 'so_minimal'] },
+      { id: 'so_ledger', code: 'SO-02', name: 'Production Dispatch Schedule', tagline: 'Itemized batch manufacturing schedule with fulfillment milestones', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['so_executive', 'so_corporate'] },
+      { id: 'so_minimal', code: 'SO-03', name: 'Modern Sales Confirmation', tagline: 'Clean borderless layout with committed dispatch dates and warranty terms', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['so_executive', 'so_ledger'] },
+      { id: 'so_corporate', code: 'SO-04', name: 'Enterprise Contract Order', tagline: 'Dual entity billing and delivery panels with stage-gate delivery terms', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['so_executive', 'so_ledger'] },
+      { id: 'so_retail', code: 'SO-05', name: 'Counter Order Slip', tagline: 'Fast customer order acknowledgment with pickup verification code', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['so_minimal', 'so_ledger'] },
+    ],
+  },
+  debit_note: {
+    id: 'debit_note',
+    title: 'Debit Note / Debit Memo',
+    shortName: 'Debit Note',
+    subtitle: 'Statutory upward rate revision & supplementary invoice claims',
+    icon: RotateCcw,
+    defaultTemplateId: 'dn_executive',
+    templates: [
+      { id: 'dn_executive', code: 'DN-01', name: 'Executive Debit Memo', tagline: 'Formal supplementary claim with original invoice cross-reference', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['dn_corporate', 'dn_minimal'] },
+      { id: 'dn_ledger', code: 'DN-02', name: 'Tax Revision Ledger', tagline: 'Rule 53 statutory supplementary tax claim and differential item rates', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['dn_executive', 'dn_corporate'] },
+      { id: 'dn_minimal', code: 'DN-03', name: 'Modern Minimal Debit', tagline: 'Quiet typography with clean additional balance due and justification notes', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['dn_executive', 'dn_ledger'] },
+      { id: 'dn_corporate', code: 'DN-04', name: 'Corporate Contract Surcharge', tagline: 'Enterprise rate revision claim and revised payable balance breakdown', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['dn_executive', 'dn_ledger'] },
+      { id: 'dn_retail', code: 'DN-05', name: 'Counter Surcharge Slip', tagline: 'Fast point-of-sale customer debit slip with supplemental charge tally', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['dn_minimal', 'dn_ledger'] },
+    ],
+  },
+  payment_voucher: {
+    id: 'payment_voucher',
+    title: 'Payment Voucher',
+    shortName: 'Payment Voucher',
+    subtitle: 'Rule 52 disbursement voucher & treasury cash/bank payout record',
+    icon: Landmark,
+    defaultTemplateId: 'pv_executive',
+    templates: [
+      { id: 'pv_executive', code: 'PV-01', name: 'Executive Disbursement Voucher', tagline: 'Treasury payment authorization with bank reference and payee signoff', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['pv_corporate', 'pv_minimal'] },
+      { id: 'pv_ledger', code: 'PV-02', name: 'Expense Allocation Ledger', tagline: 'Itemized general ledger expense heads with cost center distribution', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['pv_executive', 'pv_corporate'] },
+      { id: 'pv_minimal', code: 'PV-03', name: 'Modern Payout Voucher', tagline: 'Clean cash/bank payout memo with prominent settlement amount', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['pv_executive', 'pv_ledger'] },
+      { id: 'pv_corporate', code: 'PV-04', name: 'Corporate Reverse Charge (RCM)', tagline: 'Section 31(3)(g) payment voucher for supplies taxable under reverse charge', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['pv_executive', 'pv_ledger'] },
+      { id: 'pv_retail', code: 'PV-05', name: 'Petty Cash Voucher', tagline: 'Quick daily cash disbursement slip with recipient acknowledgment stamp', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['pv_minimal', 'pv_ledger'] },
+    ],
+  },
+  customer_statement: {
+    id: 'customer_statement',
+    title: 'Customer Account Statement',
+    shortName: 'Customer Statement',
+    subtitle: 'Periodic billing, payments, credit adjustments & aging analysis',
+    icon: ScrollText,
+    defaultTemplateId: 'stmt_ledger',
+    templates: [
+      { id: 'stmt_executive', code: 'STMT-01', name: 'Executive Account Summary', tagline: 'Clean periodic statement masthead with opening/closing balance summary', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['stmt_ledger', 'stmt_corporate'] },
+      { id: 'stmt_ledger', code: 'STMT-02', name: 'Comprehensive Running Ledger', tagline: 'Running transaction tally with chronological debits, credits, and balance', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['stmt_executive', 'stmt_corporate'] },
+      { id: 'stmt_minimal', code: 'STMT-03', name: 'Modern Balance Statement', tagline: 'Quiet typography with prominent net amount due and remittance advice', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['stmt_executive', 'stmt_ledger'] },
+      { id: 'stmt_corporate', code: 'STMT-04', name: 'Enterprise Aging Statement', tagline: '30-60-90+ days aging breakdown band with dual entity account reconciliation', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['stmt_ledger', 'stmt_executive'] },
+      { id: 'stmt_retail', code: 'STMT-05', name: 'Customer Monthly Bill Summary', tagline: 'Compact account overview for retail charge accounts and subscriptions', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['stmt_minimal', 'stmt_ledger'] },
+    ],
+  },
+  goods_received_note: {
+    id: 'goods_received_note',
+    title: 'Goods Received Note (GRN)',
+    shortName: 'Goods Receipt',
+    subtitle: 'Warehouse inward inventory intake & QA inspection signoff',
+    icon: PackageCheck,
+    defaultTemplateId: 'grn_ledger',
+    templates: [
+      { id: 'grn_executive', code: 'GRN-01', name: 'Executive Receiving Memo', tagline: 'Formal warehouse intake sheet with PO cross-reference and transporter details', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['grn_ledger', 'grn_corporate'] },
+      { id: 'grn_ledger', code: 'GRN-02', name: 'Quality Inspection Ledger', tagline: 'Detailed ordered vs received vs accepted vs rejected item tally with QC notes', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['grn_executive', 'grn_corporate'] },
+      { id: 'grn_minimal', code: 'GRN-03', name: 'Modern Inward Receipt', tagline: 'Clean inventory receiving document with prominent gate-in stamp', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['grn_executive', 'grn_ledger'] },
+      { id: 'grn_corporate', code: 'GRN-04', name: 'Multi-Depot Receiving Tally', tagline: 'Warehouse bay coordinates, container seal verification, and QC signoff', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['grn_ledger', 'grn_executive'] },
+      { id: 'grn_retail', code: 'GRN-05', name: 'Store Receiving Slip', tagline: 'Fast retail stock intake slip with discrepancy checklist and clerk signoff', category: 'retail', categoryLabel: 'Trade', similarTemplateIds: ['grn_minimal', 'grn_ledger'] },
+    ],
+  },
+  packing_list: {
+    id: 'packing_list',
+    title: 'Packing List & Manifest',
+    shortName: 'Packing List',
+    subtitle: 'Shipment cargo carton count, net/gross weights & dimensions',
+    icon: Package,
+    defaultTemplateId: 'pl_ledger',
+    templates: [
+      { id: 'pl_executive', code: 'PL-01', name: 'Executive Freight Manifest', tagline: 'Formal shipment manifest with invoice reference, AWB number, and seal ID', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['pl_ledger', 'pl_corporate'] },
+      { id: 'pl_ledger', code: 'PL-02', name: 'Carton Breakdown Ledger', tagline: 'Itemized box-by-box breakdown with net weight, gross weight, and CBM volume', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['pl_executive', 'pl_corporate'] },
+      { id: 'pl_minimal', code: 'PL-03', name: 'Modern Shipping Slip', tagline: 'Clean borderless layout with total carton count and consignment tracker', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['pl_executive', 'pl_ledger'] },
+      { id: 'pl_corporate', code: 'PL-04', name: 'Export Container Tally', tagline: 'Pallet dimensions, shipping marks, hazardous classification, and handling notes', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['pl_ledger', 'pl_executive'] },
+      { id: 'pl_retail', code: 'PL-05', name: 'Courier Dispatch Slip', tagline: 'Fast parcel delivery slip with recipient address and tracking barcode', category: 'retail', categoryLabel: 'Trade', similarTemplateIds: ['pl_minimal', 'pl_ledger'] },
+    ],
+  },
+  delivery_challan: {
+    id: 'delivery_challan',
+    title: 'Delivery Challan',
+    shortName: 'Delivery Challan',
+    subtitle: 'Rule 55 statutory movement of goods for job work, approval & transfer',
+    icon: Truck,
+    defaultTemplateId: 'dc_ledger',
+    templates: [
+      { id: 'dc_executive', code: 'DC-01', name: 'Statutory Executive Challan', tagline: 'Formal Rule 55 transport memo with vehicle registration and purpose of movement', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['dc_ledger', 'dc_corporate'] },
+      { id: 'dc_ledger', code: 'DC-02', name: 'Job Work Dispatch Ledger', tagline: 'HSN code itemization with taxable values and consignee acceptance block', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['dc_executive', 'dc_corporate'] },
+      { id: 'dc_minimal', code: 'DC-03', name: 'Modern Transport Memo', tagline: 'Clean logistics dispatch document with quiet typography and receiver signoff', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['dc_executive', 'dc_ledger'] },
+      { id: 'dc_corporate', code: 'DC-04', name: 'Inter-Branch Stock Transfer', tagline: 'Origin and destination warehouse codes with transporter consignment note', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['dc_ledger', 'dc_executive'] },
+      { id: 'dc_retail', code: 'DC-05', name: 'Local Delivery Slip', tagline: 'Rapid same-day goods dispatch memo with customer gate-in acknowledgment', category: 'retail', categoryLabel: 'Trade', similarTemplateIds: ['dc_minimal', 'dc_ledger'] },
+    ],
+  },
+  salary_slip: {
+    id: 'salary_slip',
+    title: 'Salary Slip / Payslip',
+    shortName: 'Salary Slip',
+    subtitle: 'Monthly employee wage statement with earnings & statutory deductions',
+    icon: Building2,
+    defaultTemplateId: 'pay_executive',
+    templates: [
+      { id: 'pay_executive', code: 'PAY-01', name: 'Corporate Executive Payslip', tagline: 'Formal brand masthead with employee ID, UAN/PF, and net pay hero figure', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['pay_ledger', 'pay_corporate'] },
+      { id: 'pay_ledger', code: 'PAY-02', name: 'Two-Column Component Ledger', tagline: 'Balanced earnings (Basic, HRA, Allowances) vs statutory deductions (PF, ESI, TDS)', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['pay_executive', 'pay_corporate'] },
+      { id: 'pay_minimal', code: 'PAY-03', name: 'Modern Minimal Payslip', tagline: 'Crisp borderless typography with net pay in words and bank deposit record', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['pay_executive', 'pay_ledger'] },
+      { id: 'pay_corporate', code: 'PAY-04', name: 'Enterprise Multi-Component', tagline: 'Detailed tax exemptions, leave balance tracker, and employer contribution tally', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['pay_executive', 'pay_ledger'] },
+      { id: 'pay_retail', code: 'PAY-05', name: 'Hourly / Contractor Wage Slip', tagline: 'Shift hours worked, overtime rate, and hourly wage disbursement summary', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['pay_minimal', 'pay_ledger'] },
+    ],
+  },
+  job_offer: {
+    id: 'job_offer',
+    title: 'Job Offer Letter',
+    shortName: 'Job Offer',
+    subtitle: 'Corporate employment agreement with designation & CTC breakdown',
+    icon: Briefcase,
+    defaultTemplateId: 'ofr_executive',
+    templates: [
+      { id: 'ofr_executive', code: 'OFR-01', name: 'Executive Appointment Offer', tagline: 'Formal corporate letterhead with designation, reporting line, and CTC breakdown', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['ofr_corporate', 'ofr_minimal'] },
+      { id: 'ofr_ledger', code: 'OFR-02', name: 'Structured CTC Annexure', tagline: 'Itemized compensation breakdown with monthly vs annual fixed/variable components', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['ofr_executive', 'ofr_corporate'] },
+      { id: 'ofr_minimal', code: 'OFR-03', name: 'Modern Offer Agreement', tagline: 'Clean agile offer format with acceptance deadline and joining terms', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['ofr_executive', 'ofr_ledger'] },
+      { id: 'ofr_corporate', code: 'OFR-04', name: 'Enterprise Governance Offer', tagline: 'Confidentiality covenants, IP assignment clause, and dual acceptance signatures', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['ofr_executive', 'ofr_ledger'] },
+      { id: 'ofr_retail', code: 'OFR-05', name: 'Contract / Associate Letter', tagline: 'Compact employment engagement letter for retail, branch, or seasonal staff', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['ofr_minimal', 'ofr_ledger'] },
+    ],
+  },
+  experience_cert: {
+    id: 'experience_cert',
+    title: 'Experience & Relieving Certificate',
+    shortName: 'Experience Certificate',
+    subtitle: 'Formal corporate service certification & employee release memo',
+    icon: FileCheck,
+    defaultTemplateId: 'expcert_executive',
+    templates: [
+      { id: 'expcert_executive', code: 'EXC-01', name: 'Executive Service Certificate', tagline: 'Prestigious brand letterhead with service tenure, designation, and conduct endorsement', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['expcert_corporate', 'expcert_minimal'] },
+      { id: 'expcert_ledger', code: 'EXC-02', name: 'Role & Responsibilities Schedule', tagline: 'Itemized key achievements, projects led, and technical contributions', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['expcert_executive', 'expcert_corporate'] },
+      { id: 'expcert_minimal', code: 'EXC-03', name: 'Modern Relieving Letter', tagline: 'Clean, dignified certification with official release statement and seal', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['expcert_executive', 'expcert_ledger'] },
+      { id: 'expcert_corporate', code: 'EXC-04', name: 'Enterprise Dual Clearance', tagline: 'Full and final settlement confirmation with no-dues certificate cross-reference', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['expcert_executive', 'expcert_ledger'] },
+      { id: 'expcert_retail', code: 'EXC-05', name: 'Branch Service Memo', tagline: 'Compact certificate of employment for branch, store, and operational staff', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['expcert_minimal', 'expcert_ledger'] },
+    ],
+  },
+  rent_receipt: {
+    id: 'rent_receipt',
+    title: 'House Rent Receipt',
+    shortName: 'Rent Receipt',
+    subtitle: 'Section 10(13A) HRA tax exemption receipt with landlord PAN & stamp',
+    icon: Building,
+    defaultTemplateId: 'rr_minimal',
+    templates: [
+      { id: 'rr_executive', code: 'RR-01', name: 'Executive Lease Receipt', tagline: 'Formal property masthead with tenancy agreement reference and landlord PAN', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['rr_minimal', 'rr_corporate'] },
+      { id: 'rr_ledger', code: 'RR-02', name: 'Rental Schedule Ledger', tagline: 'Monthly rent, maintenance charges, utility dues, and payment transaction ref', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['rr_executive', 'rr_corporate'] },
+      { id: 'rr_minimal', code: 'RR-03', name: 'Statutory Revenue Stamp Slip', tagline: 'Official Section 10(13A) HRA format with designated revenue stamp box', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['rr_executive', 'rr_retail'] },
+      { id: 'rr_corporate', code: 'RR-04', name: 'Commercial Tenancy Invoice', tagline: 'Commercial office lease receipt with GST compliance and TDS deduction tally', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['rr_executive', 'rr_ledger'] },
+      { id: 'rr_retail', code: 'RR-05', name: 'Residential Rent Slip', tagline: 'Quick monthly receipt slip with landlord phone, UPI ID, and tenant signoff', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['rr_minimal', 'rr_ledger'] },
+    ],
+  },
+  student_fee_receipt: {
+    id: 'student_fee_receipt',
+    title: 'Student Tuition Fee Receipt',
+    shortName: 'Tuition Receipt',
+    subtitle: 'Academic institutional fee tally with semester breakdown & zero balance',
+    icon: GraduationCap,
+    defaultTemplateId: 'sfr_ledger',
+    templates: [
+      { id: 'sfr_executive', code: 'SFR-01', name: 'Institutional Masthead', tagline: 'Formal university/academy crest with enrollment ID, course, and semester', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['sfr_ledger', 'sfr_corporate'] },
+      { id: 'sfr_ledger', code: 'SFR-02', name: 'Tuition Component Ledger', tagline: 'Itemized tuition, laboratory, library, examination, and campus facility fees', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['sfr_executive', 'sfr_corporate'] },
+      { id: 'sfr_minimal', code: 'SFR-03', name: 'Modern Academic Receipt', tagline: 'Clean borderless layout with total fee paid in words and bank transaction ID', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['sfr_executive', 'sfr_ledger'] },
+      { id: 'sfr_corporate', code: 'SFR-04', name: 'Sponsored / Scholarship Grant', tagline: 'Corporate education grant reconciliation with scholarship adjustments', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['sfr_executive', 'sfr_ledger'] },
+      { id: 'sfr_retail', code: 'SFR-05', name: 'Campus Counter Slip', tagline: 'Instant fee payment acknowledgment with registrar stamp and barcode', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['sfr_minimal', 'sfr_ledger'] },
+    ],
+  },
+  equipment_handover: {
+    id: 'equipment_handover',
+    title: 'Equipment Handover Memo',
+    shortName: 'Asset Handover',
+    subtitle: 'Corporate hardware custody agreement with serial tags & policy terms',
+    icon: Laptop,
+    defaultTemplateId: 'eq_compact',
+    templates: [
+      { id: 'eq_executive', code: 'EQ-01', name: 'Corporate Asset Agreement', tagline: 'Formal IT hardware allocation with asset tags, serial numbers, and custody policy', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['eq_compact', 'eq_corporate'] },
+      { id: 'eq_compact', code: 'EQ-02', name: 'Hardware Schedule Ledger', tagline: 'Detailed device specs, condition assessment, accessories list, and employee signoff', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['eq_executive', 'eq_corporate'] },
+      { id: 'eq_minimal', code: 'EQ-03', name: 'Modern Asset Handover', tagline: 'Clean borderless memo with serial number hero text and security covenants', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['eq_executive', 'eq_compact'] },
+      { id: 'eq_corporate', code: 'EQ-04', name: 'Enterprise IT Governance', tagline: 'Data security compliance, remote work terms, and dual authorized IT signatures', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['eq_executive', 'eq_compact'] },
+      { id: 'eq_retail', code: 'EQ-05', name: 'Tool & Equipment Pass', tagline: 'Field technician tool checkout memo with return inspection checklist', category: 'retail', categoryLabel: 'Trade', similarTemplateIds: ['eq_minimal', 'eq_compact'] },
+    ],
+  },
+  meeting_minutes: {
+    id: 'meeting_minutes',
+    title: 'Corporate Meeting Minutes',
+    shortName: 'Meeting Minutes',
+    subtitle: 'Executive board & committee minutes with quorum, decisions & tasks',
+    icon: Users,
+    defaultTemplateId: 'mom_executive',
+    templates: [
+      { id: 'mom_executive', code: 'MOM-01', name: 'Executive Board Minutes', tagline: 'Formal governance masthead with meeting chairperson, attendees, and quorum verification', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['mom_ledger', 'mom_corporate'] },
+      { id: 'mom_ledger', code: 'MOM-02', name: 'Action Items & Task Matrix', tagline: 'Structured matrix of resolutions adopted, task assignees, and target deadlines', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['mom_executive', 'mom_corporate'] },
+      { id: 'mom_minimal', code: 'MOM-03', name: 'Modern Project Standup Minutes', tagline: 'Concise summary of key decisions, milestone progress, and immediate blockers', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['mom_executive', 'mom_ledger'] },
+      { id: 'mom_corporate', code: 'MOM-04', name: 'Secretarial Governance Record', tagline: 'Companies Act secretarial standard format with formal voting outcomes and seals', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['mom_executive', 'mom_ledger'] },
+      { id: 'mom_retail', code: 'MOM-05', name: 'Operations Huddle Memo', tagline: 'Quick daily operations shift review with safety notices and shift handover signoff', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['mom_minimal', 'mom_ledger'] },
+    ],
+  },
+  site_inspection: {
+    id: 'site_inspection',
+    title: 'Site Inspection & Safety Report',
+    shortName: 'Safety Audit',
+    subtitle: 'Field engineering HSE checklist with hazard levels & auditor signoff',
+    icon: ShieldCheck,
+    defaultTemplateId: 'sir_ledger',
+    templates: [
+      { id: 'sir_executive', code: 'SIR-01', name: 'Executive Audit Certification', tagline: 'Formal site engineering inspection with project lead, date, and overall score', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['sir_ledger', 'sir_corporate'] },
+      { id: 'sir_ledger', code: 'SIR-02', name: 'Checklist Compliance Ledger', tagline: 'Item-by-item safety audit (Structural, Electrical, PPE) with priority levels', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['sir_executive', 'sir_corporate'] },
+      { id: 'sir_minimal', code: 'SIR-03', name: 'Modern Quality Signoff', tagline: 'Clean field report format with pass/fail badges and corrective action notes', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['sir_executive', 'sir_ledger'] },
+      { id: 'sir_corporate', code: 'SIR-04', name: 'ISO / OSHA Compliance Report', tagline: 'Statutory environmental, health, and hazard classification documentation', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['sir_ledger', 'sir_executive'] },
+      { id: 'sir_retail', code: 'SIR-05', name: 'Store Readiness Checklist', tagline: 'Fast daily facility opening checklist with maintenance tickets and clerk signoff', category: 'retail', categoryLabel: 'Trade', similarTemplateIds: ['sir_minimal', 'sir_ledger'] },
+    ],
+  },
+  nda_agreement: {
+    id: 'nda_agreement',
+    title: 'Non-Disclosure Agreement (NDA)',
+    shortName: 'Mutual NDA',
+    subtitle: 'Legally binding mutual confidentiality agreement & trade secrecy covenant',
+    icon: Scale,
+    defaultTemplateId: 'nda_executive',
+    templates: [
+      { id: 'nda_executive', code: 'NDA-01', name: 'Mutual Executive NDA', tagline: 'Formal bilateral confidentiality deed with definitions, exclusions, and jurisdiction', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['nda_corporate', 'nda_minimal'] },
+      { id: 'nda_ledger', code: 'NDA-02', name: 'Proprietary Schedule Deed', tagline: 'Itemized schedule of protected trade secrets, patent pending tech, and codebases', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['nda_executive', 'nda_corporate'] },
+      { id: 'nda_minimal', code: 'NDA-03', name: 'Modern Fast-Track NDA', tagline: 'Clean bilateral non-disclosure agreement for tech discovery calls and contractor scoping', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['nda_executive', 'nda_ledger'] },
+      { id: 'nda_corporate', code: 'NDA-04', name: 'Enterprise Commercial Contract', tagline: 'Dual entity indemnification, injunctive relief covenants, and governing court jurisdiction', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['nda_executive', 'nda_ledger'] },
+      { id: 'nda_retail', code: 'NDA-05', name: 'Employee Confidentiality Memo', tagline: 'Standard employee onboarding secrecy pledge with trade secret return policy', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['nda_minimal', 'nda_ledger'] },
+    ],
+  },
 };
 
 /**
@@ -877,13 +1160,27 @@ export default function DocumentTemplateSelectionScreen() {
   // Normalized document type lookup
   const activeDocType = useMemo<string>(() => {
     const rawType = (searchParams.type || 'invoice').toLowerCase().replace('-', '_');
-    if (rawType === 'challan' || rawType === 'delivery_challan') return 'invoice';
+    if (rawType === 'challan' || rawType === 'delivery_challan') return 'delivery_challan';
     if (rawType === 'tax_invoice') return 'invoice';
     if (rawType === 'quote' || rawType === 'quotation') return 'estimate';
     if (rawType === 'bos') return 'bill_of_supply';
     if (rawType === 'po') return 'purchase_order';
     if (rawType === 'sow') return 'work_order';
-    if (rawType === 'debit_note' || rawType === 'credit') return 'credit_note';
+    if (rawType === 'credit') return 'credit_note';
+    if (rawType === 'debit' || rawType === 'dn') return 'debit_note';
+    if (rawType === 'grn') return 'goods_received_note';
+    if (rawType === 'pack' || rawType === 'packing') return 'packing_list';
+    if (rawType === 'so') return 'sales_order';
+    if (rawType === 'statement' || rawType === 'customer_account_statement') return 'customer_statement';
+    if (rawType === 'salary' || rawType === 'payslip') return 'salary_slip';
+    if (rawType === 'offer' || rawType === 'offer_letter' || rawType === 'job_offer_letter') return 'job_offer';
+    if (rawType === 'experience' || rawType === 'experience_certificate') return 'experience_cert';
+    if (rawType === 'rent') return 'rent_receipt';
+    if (rawType === 'fee' || rawType === 'tuition' || rawType === 'student_fee' || rawType === 'student_fee_receipt') return 'student_fee_receipt';
+    if (rawType === 'equipment' || rawType === 'asset_handover' || rawType === 'equipment_responsibility_letter') return 'equipment_handover';
+    if (rawType === 'minutes' || rawType === 'mom') return 'meeting_minutes';
+    if (rawType === 'inspection' || rawType === 'audit_report' || rawType === 'site_inspection_report') return 'site_inspection';
+    if (rawType === 'nda' || rawType === 'confidentiality') return 'nda_agreement';
     return DOCUMENT_TYPE_CONFIGS[rawType] ? rawType : 'invoice';
   }, [searchParams.type]);
 
@@ -1007,10 +1304,33 @@ export default function DocumentTemplateSelectionScreen() {
   const handleCreateDocument = () => {
     if (activeDocType === 'quick-bill') {
       router.push('/quick-bill');
-    } else if (activeDocType === 'work_order') {
+    } else if (
+      activeDocType === 'work_order' ||
+      activeDocType === 'salary_slip' ||
+      activeDocType === 'job_offer' ||
+      activeDocType === 'experience_cert' ||
+      activeDocType === 'rent_receipt' ||
+      activeDocType === 'student_fee_receipt' ||
+      activeDocType === 'equipment_handover' ||
+      activeDocType === 'meeting_minutes' ||
+      activeDocType === 'site_inspection' ||
+      activeDocType === 'nda_agreement'
+    ) {
+      const schemaMap: Record<string, string> = {
+        work_order: 'work_order',
+        salary_slip: 'salary_slip',
+        job_offer: 'job_offer_letter',
+        experience_cert: 'experience_certificate',
+        rent_receipt: 'rent_receipt',
+        student_fee_receipt: 'student_fee_receipt',
+        equipment_handover: 'equipment_responsibility_letter',
+        meeting_minutes: 'meeting_minutes',
+        site_inspection: 'site_inspection_report',
+        nda_agreement: 'nda_agreement',
+      };
       router.push({
         pathname: '/templates/studio',
-        params: { typeId: 'work_order', layout: selectedTemplate.id },
+        params: { typeId: schemaMap[activeDocType] || activeDocType, layout: selectedTemplate.id },
       });
     } else {
       router.push({
@@ -1935,6 +2255,1387 @@ export default function DocumentTemplateSelectionScreen() {
           legalDeclaration,
           legalStandardBadge,
           showBankDetails: true,
+        };
+      }
+
+      case 'proforma': {
+        const subtotalVal = isIndia ? '₹4,00,000.00' : isGermany ? '4.000,00 €' : `${sym}4,800.00`;
+        const totalVal = isIndia ? '₹4,72,000.00' : isGermany ? '4.760,00 €' : `${sym}5,226.00`;
+        const wordsVal = isIndia
+          ? 'INR Four Lakh Seventy-Two Thousand Only'
+          : isGermany
+          ? 'EUR Viertausendsiebenhundertsechzig Euro'
+          : `${countryCfg.currencyCode} Five Thousand Two Hundred Twenty-Six Only`;
+
+        let taxRows = [
+          { label: 'Est. CGST (9.0%)', val: '₹36,000.00' },
+          { label: 'Est. SGST (9.0%)', val: '₹36,000.00' },
+        ];
+        if (isUS) {
+          taxRows = [{ label: 'Est. Sales Tax (8.875%)', val: '$426.00' }];
+        } else if (isUK) {
+          taxRows = [{ label: 'Est. Standard VAT (20%)', val: '£960.00' }];
+        } else if (isGermany) {
+          taxRows = [{ label: 'Voraussichtliche MwSt (19%)', val: '760,00 €' }];
+        }
+
+        return {
+          docTypeTag: 'COMMERCIAL PROFORMA · ADVANCE WIRE',
+          docTitle: isGermany ? 'PROFORMA-RECHNUNG' : 'PROFORMA INVOICE',
+          docNumber: 'PI-2026-0814',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: `Valid: 30 Days · Supply: ${countryCfg.sampleSubdivision} · Terms: 100% Advance Wire`,
+          statutoryBanner: {
+            text: 'PRELIMINARY PROFORMA INVOICE — FOR ADVANCE WIRE PAYMENT & IMPORT PERMIT PURPOSES ONLY',
+            subtext: 'This is not a demand for tax payment. A statutory tax invoice will be issued upon clearance of funds and dispatch.',
+          },
+          ledgerBand: [
+            { label: 'Proforma Ref', val: 'PI-2026-0814' },
+            { label: 'Issue Date', val: '16 Oct 2026' },
+            { label: 'Validity Period', val: '15 Nov 2026 (30 Days)' },
+            { label: 'Payment Terms', val: 'Advance Bank Wire / SWIFT' },
+          ],
+          partyTitle: 'PROFORMA RECIPIENT (BUYER)',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Validity', val: '30 Days' },
+            { label: 'Wire Mode', val: 'Advance SWIFT' },
+            { label: 'Lead Time', val: '5 Business Days' },
+          ],
+          tableHeaders: [
+            { title: 'ITEM & DESCRIPTION', flex: 3, align: 'left' },
+            { title: itemCodeHdr, width: 80, align: 'left' },
+            { title: 'QTY', width: 50, align: 'center' },
+            { title: 'UNIT PRICE', width: 80, align: 'right' },
+            { title: 'EST. AMOUNT', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Enterprise High-Performance Server Cluster', flex: 3, align: 'left', isBold: true },
+                { text: '8471 4900', width: 80, align: 'left' },
+                { text: '1 Unit', width: 50, align: 'center' },
+                { text: isIndia ? '₹3,50,000' : isGermany ? '3.500 €' : `${sym}4,200`, width: 80, align: 'right' },
+                { text: isIndia ? '₹3,50,000' : isGermany ? '3.500 €' : `${sym}4,200`, width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'On-Site Rack Deployment & Architecture Setup', flex: 3, align: 'left' },
+                { text: '9983 13', width: 80, align: 'left' },
+                { text: '1 Job', width: 50, align: 'center' },
+                { text: isIndia ? '₹50,000' : isGermany ? '500 €' : `${sym}600`, width: 80, align: 'right' },
+                { text: isIndia ? '₹50,000' : isGermany ? '500 €' : `${sym}600`, width: 85, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Estimated Subtotal',
+          subtotalValue: subtotalVal,
+          taxRows,
+          totalLabel: isGermany ? 'Voraussichtlicher Gesamtbetrag' : 'Total Proforma Value',
+          totalAmount: totalVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'This commercial proforma invoice represents a binding price quotation for advance wire remittance. Delivery timeline commences upon receipt of wire transfer confirmation.',
+          legalStandardBadge: 'UCC § 2-205 & Commercial Proforma Standard',
+          showBankDetails: true,
+        };
+      }
+
+      case 'export_invoice': {
+        return {
+          docTypeTag: isIndia ? 'EXPORT UNDER LUT (RULE 96A) · ZERO-RATED' : 'INTERNATIONAL COMMERCIAL EXPORT INVOICE',
+          docTitle: isGermany ? 'AUSFUHR-HANDELSRECHNUNG' : 'EXPORT COMMERCIAL INVOICE',
+          docNumber: 'EXP-2026-0042',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'LUT Ref: AD270426001924M · Incoterms: CIF Rotterdam · Currency: USD ($)',
+          statutoryBanner: {
+            text: isIndia
+              ? 'SUPPLY MEANT FOR EXPORT UNDER BOND OR LETTER OF UNDERTAKING (LUT) WITHOUT PAYMENT OF INTEGRATED TAX'
+              : 'INTERNATIONAL COMMERCIAL EXPORT SHIPMENT — COMPLIANT WITH CUSTOMS & EXPORT CONTROL REGULATIONS',
+            subtext: 'Port of Loading: Nhava Sheva (INNSA) · Port of Discharge: Rotterdam (NLRTM) · Country of Origin: India',
+          },
+          ledgerBand: [
+            { label: 'Export Inv #', val: 'EXP-2026-0042' },
+            { label: 'Shipping Bill #', val: 'SB-8492019 dt. 14-Oct-2026' },
+            { label: 'Country of Destination', val: 'Netherlands (NL)' },
+            { label: 'Incoterms 2020', val: 'CIF Rotterdam Gateway' },
+          ],
+          partyTitle: 'OVERSEAS BUYER / CONSIGNEE',
+          partyName: 'Global Logistics & Trade B.V.',
+          partyMeta: 'VAT/EORI: NL849201842B01 · Chamber of Commerce: 24398102',
+          partySubMeta: 'Maasvlakte 2, Europaweg 900, 3199 LD Rotterdam, Netherlands',
+          retailStrip: [
+            { label: 'Incoterms', val: 'CIF Rotterdam' },
+            { label: 'Vessel', val: 'MSC Gülsün V-241W' },
+            { label: 'BL Number', val: 'MEDU901842019' },
+          ],
+          tableHeaders: [
+            { title: 'COMMODITY DESCRIPTION', flex: 3, align: 'left' },
+            { title: 'HTS / HS CODE', width: 85, align: 'left' },
+            { title: 'PACKAGES', width: 60, align: 'center' },
+            { title: 'FOREIGN RATE ($)', width: 85, align: 'right' },
+            { title: 'TOTAL ($)', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Industrial Embedded IoT Gateway Controllers', flex: 3, align: 'left', isBold: true },
+                { text: '8517.62.00', width: 85, align: 'left' },
+                { text: '10 Cartons (100 Pcs)', width: 60, align: 'center' },
+                { text: '$85.00', width: 85, align: 'right' },
+                { text: '$8,500.00', width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Sensor Node Interface Adapters', flex: 3, align: 'left' },
+                { text: '8536.90.10', width: 85, align: 'left' },
+                { text: '5 Cartons (200 Pcs)', width: 60, align: 'center' },
+                { text: '$12.50', width: 85, align: 'right' },
+                { text: '$2,500.00', width: 85, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'FOB Cargo Value',
+          subtotalValue: '$11,000.00',
+          taxRows: [
+            { label: 'Ocean Freight & Insurance', val: '$1,200.00' },
+            { label: 'Integrated Tax (IGST)', val: 'Zero-Rated (LUT)' },
+          ],
+          totalLabel: 'Total CIF Value (USD)',
+          totalAmount: '$12,200.00',
+          amountInWords: 'USD Twelve Thousand Two Hundred Dollars Only',
+          legalDeclaration: 'We declare that this invoice shows the actual price of the goods described, that no other invoice has been or will be issued, and that all particulars are true and correct.',
+          legalStandardBadge: 'FEMA 1999 & ICC Incoterms® 2020',
+          showBankDetails: true,
+        };
+      }
+
+      case 'sales_order': {
+        const subtotalVal = isIndia ? '₹1,40,000.00' : isGermany ? '1.400,00 €' : `${sym}1,700.00`;
+        const totalVal = isIndia ? '₹1,65,200.00' : isGermany ? '1.666,00 €' : `${sym}1,850.88`;
+        const wordsVal = isIndia ? 'INR One Lakh Sixty-Five Thousand Two Hundred Only' : 'Commercial Sales Value in Full';
+
+        return {
+          docTypeTag: 'COMMERCIAL SALES ORDER · ORDER CONFIRMATION',
+          docTitle: 'SALES ORDER CONFIRMATION',
+          docNumber: 'SO-2026-0412',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Customer PO: PO-88219 · Dispatch Due: 28 Oct 2026 · Payment: Net 30',
+          statutoryBanner: {
+            text: 'VENDOR SALES ORDER ACKNOWLEDGMENT — CUSTOMER PURCHASE ORDER ACCEPTED',
+            subtext: 'Goods scheduled for manufacturing dispatch from central logistics depot subject to agreed commercial terms.',
+          },
+          ledgerBand: [
+            { label: 'Sales Order #', val: 'SO-2026-0412' },
+            { label: 'Customer PO Ref', val: 'PO-88219' },
+            { label: 'Order Date', val: '16 Oct 2026' },
+            { label: 'Committed Dispatch', val: '28 Oct 2026' },
+          ],
+          partyTitle: 'ORDERING CUSTOMER (BILL TO)',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Order Status', val: 'Confirmed' },
+            { label: 'Priority', val: 'Standard' },
+            { label: 'Dispatch Hub', val: 'Central Depot' },
+          ],
+          tableHeaders: [
+            { title: 'ITEM & SPECIFICATION', flex: 3, align: 'left' },
+            { title: itemCodeHdr, width: 75, align: 'left' },
+            { title: 'ORDERED', width: 55, align: 'center' },
+            { title: 'UNIT PRICE', width: 80, align: 'right' },
+            { title: 'COMMITTED TOTAL', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Custom Fabricated Electrical Control Panels', flex: 3, align: 'left', isBold: true },
+                { text: '8537 1000', width: 75, align: 'left' },
+                { text: '2 Units', width: 55, align: 'center' },
+                { text: isIndia ? '₹45,000' : isGermany ? '450 €' : `${sym}550`, width: 80, align: 'right' },
+                { text: isIndia ? '₹90,000' : isGermany ? '900 €' : `${sym}1,100`, width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Digital PLC Modules with Modbus Interface', flex: 3, align: 'left' },
+                { text: '8538 9000', width: 75, align: 'left' },
+                { text: '4 Units', width: 55, align: 'center' },
+                { text: isIndia ? '₹12,500' : isGermany ? '125 €' : `${sym}150`, width: 80, align: 'right' },
+                { text: isIndia ? '₹50,000' : isGermany ? '500 €' : `${sym}600`, width: 85, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Net Order Value',
+          subtotalValue: subtotalVal,
+          taxRows: [{ label: 'Applicable Tax Breakdown', val: isIndia ? '₹25,200.00' : `${sym}150.88` }],
+          totalLabel: 'Committed Total Value',
+          totalAmount: totalVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'We acknowledge receipt and confirm acceptance of your purchase order. Production is scheduled per committed delivery dates.',
+          legalStandardBadge: 'Sale of Goods Act & UCC Order Standard',
+          showBankDetails: true,
+        };
+      }
+
+      case 'debit_note': {
+        const subtotalVal = isIndia ? '₹25,000.00' : isGermany ? '250,00 €' : `${sym}315.00`;
+        const totalVal = isIndia ? '₹29,500.00' : isGermany ? '297,50 €' : `${sym}342.96`;
+        const wordsVal = isIndia ? 'INR Twenty-Nine Thousand Five Hundred Only' : 'Supplementary Amount in Full';
+
+        return {
+          docTypeTag: isIndia ? 'STATUTORY DEBIT NOTE · SECTION 34(3) CGST ACT' : 'COMMERCIAL DEBIT MEMO · RATE REVISION',
+          docTitle: 'DEBIT NOTE / DEBIT MEMO',
+          docNumber: 'DN-2026-0034',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Original Inv: INV-2026-0142 dt. 15-Oct-2026 · Reason: Supplementary Price Claim',
+          statutoryBanner: {
+            text: isIndia ? 'STATUTORY DEBIT NOTE — ISSUED UNDER SECTION 34(3) OF CGST ACT, 2017 & RULE 53' : 'COMMERCIAL DEBIT MEMO — SUPPLEMENTARY CHARGE & UPWARD RATE ADJUSTMENT',
+            subtext: 'Supplementary claim for additional billable hours and escalated freight charges on original invoice.',
+          },
+          ledgerBand: [
+            { label: 'Debit Note #', val: 'DN-2026-0034' },
+            { label: 'Original Invoice #', val: 'INV-2026-0142' },
+            { label: 'Inv Date', val: '15 Oct 2026' },
+            { label: 'Settlement Due', val: 'Immediate / Net 15' },
+          ],
+          partyTitle: 'DEBITED CUSTOMER (RECIPIENT)',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Reason', val: 'Rate Revision' },
+            { label: 'Ref Inv', val: 'INV-0142' },
+            { label: 'Term', val: 'Immediate' },
+          ],
+          tableHeaders: [
+            { title: 'REVISION DESCRIPTION', flex: 3, align: 'left' },
+            { title: 'ORIGINAL BILLED', width: 85, align: 'right' },
+            { title: 'REVISED VALUE', width: 85, align: 'right' },
+            { title: 'DIFFERENTIAL DEBIT', width: 95, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Engineering Consulting (Underbilled 20 hrs on Sprint 4)', flex: 3, align: 'left', isBold: true },
+                { text: isIndia ? '₹1,20,000' : `${sym}1,500`, width: 85, align: 'right' },
+                { text: isIndia ? '₹1,40,000' : `${sym}1,750`, width: 85, align: 'right' },
+                { text: isIndia ? '₹20,000' : `${sym}250`, width: 95, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Dedicated Server Bandwidth Overage Surcharge', flex: 3, align: 'left' },
+                { text: isIndia ? '₹15,000' : `${sym}200`, width: 85, align: 'right' },
+                { text: isIndia ? '₹20,000' : `${sym}265`, width: 85, align: 'right' },
+                { text: isIndia ? '₹5,000' : `${sym}65`, width: 95, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Total Taxable Differential',
+          subtotalValue: subtotalVal,
+          taxRows: [{ label: 'Supplementary Tax Adjustment (18%)', val: isIndia ? '₹4,500.00' : `${sym}27.96` }],
+          totalLabel: 'Net Additional Payable',
+          totalAmount: totalVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'Issued pursuant to Section 34(3) of CGST Act / commercial accounting standards. The taxable value and tax liability stand increased as stated.',
+          legalStandardBadge: isIndia ? 'CBIC GST Rule 53' : 'UCC § 2-714 Debit Standard',
+          showBankDetails: true,
+        };
+      }
+
+      case 'payment_voucher': {
+        const clearedVal = isIndia ? '₹49,000.00' : isGermany ? '490,00 €' : `${sym}588.00`;
+        const wordsVal = isIndia ? 'INR Forty-Nine Thousand Only' : 'Disbursement in Full';
+
+        return {
+          docTypeTag: isIndia ? 'SECTION 31(3)(g) · CGST RULE 52' : 'TREASURY DISBURSEMENT VOUCHER',
+          docTitle: 'PAYMENT VOUCHER',
+          docNumber: 'PV-2026-0195',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Payout Mode: Bank NEFT / RTGS · Treasury Account: ...9103 · Status: Disbursed',
+          statutoryBanner: {
+            text: isIndia ? 'STATUTORY PAYMENT VOUCHER — ISSUED PURSUANT TO SECTION 31(3)(g) & RULE 52 OF CGST RULES, 2017' : 'OFFICIAL CORPORATE TREASURY DISBURSEMENT VOUCHER & EXPENSE RECORD',
+            subtext: 'Bank Transaction Ref (UTR): HDFCN26289014920 · Disbursed from Corporate Operations Account',
+          },
+          ledgerBand: [
+            { label: 'Voucher #', val: 'PV-2026-0195' },
+            { label: 'Payout Date', val: '16 Oct 2026' },
+            { label: 'Payee Category', val: 'Vendor / Supplier Disbursement' },
+            { label: 'Authorization', val: 'Approved & Vouched' },
+          ],
+          partyTitle: 'BENEFICIARY / PAYEE',
+          partyName: 'Zenith Cloud Infrastructure Labs',
+          partyMeta: 'GSTIN: 27AABCT9981K1Z3 · PAN: AABCT9981K',
+          partySubMeta: 'HDFC Bank A/C: 50200019284710 · IFSC: HDFC0000102 · Mumbai, MH',
+          retailStrip: [
+            { label: 'Payout Mode', val: 'Bank RTGS' },
+            { label: 'Auth Status', val: 'Verified' },
+            { label: 'Cost Center', val: 'Engineering' },
+          ],
+          tableHeaders: [
+            { title: 'PURPOSE OF DISBURSEMENT', flex: 3, align: 'left' },
+            { title: 'INVOICE REF', width: 90, align: 'left' },
+            { title: 'GROSS AMOUNT', width: 85, align: 'right' },
+            { title: 'TDS WITHHELD', width: 80, align: 'right' },
+            { title: 'NET DISBURSED', width: 90, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Full Settlement against Invoice ZC-2026-904', flex: 3, align: 'left', isBold: true },
+                { text: 'ZC-2026-904', width: 90, align: 'left' },
+                { text: isIndia ? '₹50,000' : `${sym}600`, width: 85, align: 'right' },
+                { text: isIndia ? '₹1,000' : `${sym}12`, width: 80, align: 'right' },
+                { text: clearedVal, width: 90, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Gross Invoice Clearance',
+          subtotalValue: isIndia ? '₹50,000.00' : `${sym}600.00`,
+          taxRows: [{ label: 'Statutory TDS Deducted (2%)', val: isIndia ? '₹1,000.00' : `${sym}12.00` }],
+          totalLabel: 'Net Payout Disbursed',
+          totalAmount: clearedVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'Certified that the payment specified above was disbursed to the payee towards bona fide commercial obligations and accounted for in the statutory books.',
+          legalStandardBadge: isIndia ? 'CBIC GST Rule 52' : 'Treasury Control Standard',
+          showBankDetails: true,
+          dualSignatures: {
+            primaryRole: 'Prepared by (Accounts Executive)',
+            primaryEntity: orgLegalName,
+            secondaryRole: 'Verified & Approved (CFO / Signatory)',
+            secondaryEntity: orgLegalName,
+          },
+        };
+      }
+
+      case 'customer_statement': {
+        const outstandingVal = isIndia ? '₹49,200.00' : isGermany ? '492,00 €' : `${sym}615.00`;
+        const wordsVal = isIndia ? 'INR Forty-Nine Thousand Two Hundred Only' : 'Outstanding Balance in Full';
+
+        return {
+          docTypeTag: 'ACCOUNT LEDGER · AGING STATEMENT',
+          docTitle: 'CUSTOMER STATEMENT OF ACCOUNT',
+          docNumber: 'STMT-2026-10',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: `Period: 01-Oct-2026 to 16-Oct-2026 · Account: CUST-84920 · Currency: ${countryCfg.currencyCode}`,
+          statutoryBanner: {
+            text: 'OFFICIAL STATEMENT OF ACCOUNT — RUNNING CHRONOLOGICAL TRANSACTION TALLY',
+            subtext: 'Summary of all tax invoices, payment receipts, credit adjustments, and aged outstanding receivables.',
+          },
+          ledgerBand: [
+            { label: 'Statement Period', val: '01 Oct 2026 – 16 Oct 2026' },
+            { label: 'Opening Balance', val: isIndia ? '₹0.00' : `${sym}0.00` },
+            { label: 'Total Invoiced', val: isIndia ? '₹1,20,000.00' : `${sym}1,500.00` },
+            { label: 'Net Outstanding Due', val: outstandingVal },
+          ],
+          partyTitle: 'CUSTOMER ACCOUNT',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Current 0-30d', val: outstandingVal },
+            { label: 'Past 31-60d', val: 'NIL' },
+            { label: 'Past 90d+', val: 'NIL' },
+          ],
+          tableHeaders: [
+            { title: 'DATE', width: 75, align: 'left' },
+            { title: 'DOCUMENT REF', width: 95, align: 'left' },
+            { title: 'TRANSACTION DESCRIPTION', flex: 2, align: 'left' },
+            { title: 'DEBIT (+)', width: 75, align: 'right' },
+            { title: 'CREDIT (-)', width: 75, align: 'right' },
+            { title: 'BALANCE', width: 80, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: '01 Oct 2026', width: 75, align: 'left' },
+                { text: 'INV-2026-0098', width: 95, align: 'left', isBold: true },
+                { text: 'Enterprise Cloud ERP Monthly Platform Subscription', flex: 2, align: 'left' },
+                { text: isIndia ? '₹70,800' : `${sym}885`, width: 75, align: 'right' },
+                { text: '—', width: 75, align: 'right' },
+                { text: isIndia ? '₹70,800' : `${sym}885`, width: 80, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: '08 Oct 2026', width: 75, align: 'left' },
+                { text: 'REC-2026-0142', width: 95, align: 'left' },
+                { text: 'Bank Wire Clearance (Ref: HDFC90281402)', flex: 2, align: 'left' },
+                { text: '—', width: 75, align: 'right' },
+                { text: isIndia ? '₹70,800' : `${sym}885`, width: 75, align: 'right' },
+                { text: isIndia ? '₹0.00' : `${sym}0.00`, width: 80, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: '15 Oct 2026', width: 75, align: 'left' },
+                { text: 'INV-2026-0142', width: 95, align: 'left', isBold: true },
+                { text: 'GST Statutory Compliance & Audit Engine License', flex: 2, align: 'left' },
+                { text: outstandingVal, width: 75, align: 'right' },
+                { text: '—', width: 75, align: 'right' },
+                { text: outstandingVal, width: 80, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Total Payments Received (-)',
+          subtotalValue: isIndia ? '₹70,800.00' : `${sym}885.00`,
+          taxRows: [{ label: 'Aging: 0–30 Days (Current)', val: outstandingVal }],
+          totalLabel: 'Closing Outstanding Balance',
+          totalAmount: outstandingVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'Please examine this statement of account and report any discrepancies within 7 days. Uncontested balances are deemed acknowledged and payable.',
+          legalStandardBadge: 'GAAP & IFRS Statement Standard',
+          showBankDetails: true,
+        };
+      }
+
+      case 'goods_received_note': {
+        return {
+          docTypeTag: 'WAREHOUSE INVENTORY · QUALITY CONTROL',
+          docTitle: 'GOODS RECEIVED NOTE (GRN)',
+          docNumber: 'GRN-2026-0158',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'PO Ref: PO-2026-0089 · Transporter: Blue Dart · Vehicle: MH-04-AZ-9942',
+          statutoryBanner: {
+            text: 'WAREHOUSE INWARD GOODS RECEIPT & QUALITY INSPECTION CLEARANCE MEMO',
+            subtext: 'Physical tally of incoming inventory cartons, batch numbers, and QA acceptance verification.',
+          },
+          ledgerBand: [
+            { label: 'GRN #', val: 'GRN-2026-0158' },
+            { label: 'Receiving Bay', val: 'Bay 04 - Central Hub' },
+            { label: 'Gate Pass #', val: 'GP-90184' },
+            { label: 'Inspection Status', val: 'Passed QA 100%' },
+          ],
+          partyTitle: 'SUPPLIER / VENDOR',
+          partyName: 'Continental Industrial Supply Corp',
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: 'Dispatch Challan: DC-84920 dt. 14-Oct-2026',
+          retailStrip: [
+            { label: 'Gate In Time', val: '09:45 AM' },
+            { label: 'Inspected By', val: 'Er. V. Verma' },
+            { label: 'Seal Verified', val: 'Intact' },
+          ],
+          tableHeaders: [
+            { title: 'ITEM & MATERIAL DESCRIPTION', flex: 3, align: 'left' },
+            { title: 'ORDERED', width: 60, align: 'center' },
+            { title: 'RECEIVED', width: 60, align: 'center' },
+            { title: 'ACCEPTED', width: 60, align: 'center' },
+            { title: 'REJECTED', width: 60, align: 'center' },
+            { title: 'QC REMARK', width: 75, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Industrial Galvanized M12 Fasteners (Grade 8.8)', flex: 3, align: 'left', isBold: true },
+                { text: '5,000 Pcs', width: 60, align: 'center' },
+                { text: '5,000 Pcs', width: 60, align: 'center' },
+                { text: '5,000 Pcs', width: 60, align: 'center' },
+                { text: '0', width: 60, align: 'center' },
+                { text: 'Approved', width: 75, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'High-Temperature Silicone Gaskets (200mm)', flex: 3, align: 'left' },
+                { text: '500 Pcs', width: 60, align: 'center' },
+                { text: '500 Pcs', width: 60, align: 'center' },
+                { text: '495 Pcs', width: 60, align: 'center' },
+                { text: '5 Pcs', width: 60, align: 'center' },
+                { text: '5 Defective', width: 75, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Total Material Units Received',
+          subtotalValue: '5,500 Units',
+          taxRows: [{ label: 'Units Accepted into Stock', val: '5,495 Units (99.9%)' }],
+          totalLabel: 'Inventory Accepted Value',
+          totalAmount: isIndia ? '₹85,000.00' : `${sym}1,050.00`,
+          amountInWords: 'Five Thousand Four Hundred Ninety-Five Units Accepted',
+          legalDeclaration: 'Goods inspected for physical transit damage and accepted into central stock inventory. Rejected units quarantined for vendor return.',
+          legalStandardBadge: 'ISO 9001:2015 Warehouse Standard',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Received by (Store In-Charge)',
+            primaryEntity: orgLegalName,
+            secondaryRole: 'Inspected by (QA Lead)',
+            secondaryEntity: orgLegalName,
+          },
+        };
+      }
+
+      case 'packing_list': {
+        return {
+          docTypeTag: 'FREIGHT & LOGISTICS · PACKING SLIP',
+          docTitle: 'PACKING LIST & DISPATCH MANIFEST',
+          docNumber: 'PL-2026-0082',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Invoice Ref: INV-2026-0142 · Total Packages: 4 Cartons · Total Weight: 142.5 kg',
+          statutoryBanner: {
+            text: 'OFFICIAL FREIGHT PACKING LIST & CONTAINER MANIFEST',
+            subtext: 'Package-by-package inventory manifest with tare, net, and gross weight reconciliation.',
+          },
+          ledgerBand: [
+            { label: 'Packing List #', val: 'PL-2026-0082' },
+            { label: 'AWB / LR #', val: 'BLUEDART-84920194' },
+            { label: 'Gross Weight', val: '142.50 kg' },
+            { label: 'Total Volume', val: '0.48 CBM' },
+          ],
+          partyTitle: 'CONSIGNEE / DELIVERY DESTINATION',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Total Cartons', val: '4 Packages' },
+            { label: 'Carrier', val: 'Blue Dart Air' },
+            { label: 'Dispatch Date', val: '16 Oct 2026' },
+          ],
+          tableHeaders: [
+            { title: 'PACKAGE #', width: 65, align: 'left' },
+            { title: 'CONTENTS DESCRIPTION', flex: 3, align: 'left' },
+            { title: 'DIMENSIONS (CM)', width: 85, align: 'center' },
+            { title: 'NET WT', width: 55, align: 'right' },
+            { title: 'GROSS WT', width: 60, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Carton 1/4', width: 65, align: 'left', isBold: true },
+                { text: 'Rack-Mounted Enterprise Server Chassis + Rails', flex: 3, align: 'left' },
+                { text: '60 x 50 x 25 cm', width: 85, align: 'center' },
+                { text: '32.0 kg', width: 55, align: 'right' },
+                { text: '35.5 kg', width: 60, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Carton 2/4', width: 65, align: 'left', isBold: true },
+                { text: 'Redundant Power Supply Modules (1600W x 4)', flex: 3, align: 'left' },
+                { text: '40 x 30 x 20 cm', width: 85, align: 'center' },
+                { text: '18.5 kg', width: 55, align: 'right' },
+                { text: '20.0 kg', width: 60, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Carton 3/4', width: 65, align: 'left', isBold: true },
+                { text: 'High-Density CAT6A Shielded Patch Cable Bundles', flex: 3, align: 'left' },
+                { text: '50 x 40 x 30 cm', width: 85, align: 'center' },
+                { text: '28.0 kg', width: 55, align: 'right' },
+                { text: '31.0 kg', width: 60, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Carton 4/4', width: 65, align: 'left', isBold: true },
+                { text: 'Fiber Optic Transceivers (100G QSFP28 x 16)', flex: 3, align: 'left' },
+                { text: '30 x 25 x 15 cm', width: 85, align: 'center' },
+                { text: '4.5 kg', width: 55, align: 'right' },
+                { text: '6.0 kg', width: 60, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Net Cargo Weight',
+          subtotalValue: '83.00 kg',
+          taxRows: [{ label: 'Tare Packaging Weight', val: '9.50 kg' }],
+          totalLabel: 'Gross Consignment Weight',
+          totalAmount: '92.50 kg',
+          amountInWords: 'Total Four Commercial Freight Packages',
+          legalDeclaration: 'We certify that the contents of this consignment are fully and accurately described and are packed in all respects in proper condition for transport.',
+          legalStandardBadge: 'IATA & Transport Logistics Standard',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Packed by (Logistics Officer)',
+            primaryEntity: orgLegalName,
+            secondaryRole: 'Verified by (Dispatch Supervisor)',
+            secondaryEntity: orgLegalName,
+          },
+        };
+      }
+
+      case 'delivery_challan': {
+        return {
+          docTypeTag: isIndia ? 'STATUTORY CHALLAN · CBIC RULE 55' : 'DELIVERY CHALLAN & DISPATCH MEMO',
+          docTitle: 'DELIVERY CHALLAN',
+          docNumber: 'DC-2026-0044',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Purpose: Supply on Approval · Transporter: Apex Logistics · Vehicle: MH-04-AZ-9942',
+          statutoryBanner: {
+            text: isIndia ? 'STATUTORY DELIVERY CHALLAN — ISSUED UNDER RULE 55 OF CGST RULES, 2017' : 'DELIVERY CHALLAN & GOODS TRANSPORT DISPATCH MEMORANDUM',
+            subtext: 'Transport of goods without tax invoice for demonstration, approval, or job work.',
+          },
+          ledgerBand: [
+            { label: 'Challan #', val: 'DC-2026-0044' },
+            { label: 'Nature of Transport', val: 'Supply on Approval (Rule 55(1)(c))' },
+            { label: 'Vehicle Reg #', val: 'MH-04-AZ-9942' },
+            { label: 'E-Way Bill #', val: 'EWB-281049201948' },
+          ],
+          partyTitle: 'CONSIGNEE / RECEIVING FACILITY',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Movement', val: 'On Approval' },
+            { label: 'Return Due', val: '30 Days' },
+            { label: 'Driver', val: 'R. K. Yadav' },
+          ],
+          tableHeaders: [
+            { title: 'DESCRIPTION OF GOODS', flex: 3, align: 'left' },
+            { title: itemCodeHdr, width: 75, align: 'left' },
+            { title: 'QUANTITY', width: 60, align: 'center' },
+            { title: 'EST. TAXABLE VAL', width: 85, align: 'right' },
+            { title: 'TAX RATE', width: 65, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Demo Enterprise Server Rack Units (Serial: APX-901)', flex: 3, align: 'left', isBold: true },
+                { text: '8471 4900', width: 75, align: 'left' },
+                { text: '2 Units', width: 60, align: 'center' },
+                { text: isIndia ? '₹1,00,000' : `${sym}1,200`, width: 85, align: 'right' },
+                { text: '18%', width: 65, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Fiber Network Multiplexer Module', flex: 3, align: 'left' },
+                { text: '8517 6290', width: 75, align: 'left' },
+                { text: '1 Unit', width: 60, align: 'center' },
+                { text: isIndia ? '₹25,000' : `${sym}300`, width: 85, align: 'right' },
+                { text: '18%', width: 65, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Total Estimated Value',
+          subtotalValue: isIndia ? '₹1,25,000.00' : `${sym}1,500.00`,
+          taxRows: [{ label: 'Estimated Tax Rate', val: '18.0% (Taxes applicable upon supply)' }],
+          totalLabel: 'Estimated Goods Value',
+          totalAmount: isIndia ? '₹1,25,000.00' : `${sym}1,500.00`,
+          amountInWords: 'INR One Lakh Twenty-Five Thousand Only (Transport Only)',
+          legalDeclaration: 'Issued pursuant to CBIC CGST Rule 55. Goods being transported are not for immediate sale. Tax invoice to follow upon approval or return within 6 months.',
+          legalStandardBadge: isIndia ? 'CBIC GST Rule 55' : 'Commercial Dispatch Standard',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Dispatched by (Warehouse Officer)',
+            primaryEntity: orgLegalName,
+            secondaryRole: 'Received by Consignee (Signature & Stamp)',
+            secondaryEntity: countryCfg.samplePartyName,
+          },
+        };
+      }
+
+      case 'salary_slip': {
+        const netSalaryVal = isIndia ? '₹80,000.00' : isGermany ? '3.200,00 €' : `${sym}4,000.00`;
+        const wordsVal = isIndia ? 'INR Eighty Thousand Only' : 'Net Take-Home Pay in Full';
+
+        return {
+          docTypeTag: 'CONFIDENTIAL PAYSLIP · EMPLOYEE COMPENSATION',
+          docTitle: 'SALARY SLIP / MONTHLY PAYSLIP',
+          docNumber: 'PAY-2026-10',
+          issueDate: '31 Oct 2026',
+          secondaryMeta: 'Pay Period: October 2026 · Days Worked: 31/31 · Status: Deposited',
+          statutoryBanner: {
+            text: 'CONFIDENTIAL SALARY PAYSLIP — ISSUED PURSUANT TO PAYMENT OF WAGES ACT & LABOUR REGULATIONS',
+            subtext: 'Direct deposit to employee bank account · Tax deducted at source remitted to government treasury.',
+          },
+          ledgerBand: [
+            { label: 'Employee ID', val: 'EMP-1042' },
+            { label: 'Designation', val: 'Senior Platform Architect' },
+            { label: 'Department', val: 'Engineering & Infrastructure' },
+            { label: 'Pay Period', val: '01 Oct 2026 – 31 Oct 2026' },
+          ],
+          partyTitle: 'EMPLOYEE DETAILS',
+          partyName: 'Aarav Sharma',
+          partyMeta: 'PAN: ABCPS1234F · UAN / PF: 100984920184',
+          partySubMeta: 'Bank: HDFC Bank A/C ...4820 · IFSC: HDFC0000060',
+          retailStrip: [
+            { label: 'Days in Month', val: '31' },
+            { label: 'Days Worked', val: '31' },
+            { label: 'Leave Balance', val: '14.5 Days' },
+          ],
+          tableHeaders: [
+            { title: 'EARNINGS COMPONENT', flex: 2, align: 'left' },
+            { title: 'AMOUNT', width: 75, align: 'right' },
+            { title: 'DEDUCTIONS COMPONENT', flex: 2, align: 'left' },
+            { title: 'DEDUCTION', width: 75, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Basic Salary', flex: 2, align: 'left', isBold: true },
+                { text: isIndia ? '₹45,000.00' : `${sym}2,200.00`, width: 75, align: 'right' },
+                { text: 'Provident Fund (PF Employee)', flex: 2, align: 'left' },
+                { text: isIndia ? '₹5,400.00' : `${sym}260.00`, width: 75, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'House Rent Allowance (HRA)', flex: 2, align: 'left' },
+                { text: isIndia ? '₹22,500.00' : `${sym}1,100.00`, width: 75, align: 'right' },
+                { text: 'Professional Tax (PT)', flex: 2, align: 'left' },
+                { text: isIndia ? '₹200.00' : `${sym}10.00`, width: 75, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Special Allowance', flex: 2, align: 'left' },
+                { text: isIndia ? '₹17,500.00' : `${sym}850.00`, width: 75, align: 'right' },
+                { text: 'Tax Deducted at Source (TDS)', flex: 2, align: 'left' },
+                { text: isIndia ? '₹4,400.00' : `${sym}220.00`, width: 75, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Conveyance Allowance', flex: 2, align: 'left' },
+                { text: isIndia ? '₹5,000.00' : `${sym}250.00`, width: 75, align: 'right' },
+                { text: 'Voluntary Insurance / Medical', flex: 2, align: 'left' },
+                { text: isIndia ? '₹0.00' : `${sym}0.00`, width: 75, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Gross Monthly Earnings',
+          subtotalValue: isIndia ? '₹90,000.00' : `${sym}4,400.00`,
+          taxRows: [{ label: 'Total Statutory Deductions (-)', val: isIndia ? '₹10,000.00' : `${sym}490.00` }],
+          totalLabel: 'Net Take-Home Salary (Credited)',
+          totalAmount: netSalaryVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'This is a computer-generated salary slip and requires no physical signature. Income tax deducted has been remitted to the credit of the Central Government.',
+          legalStandardBadge: 'Payment of Wages Act 1936',
+          showBankDetails: false,
+        };
+      }
+
+      case 'job_offer': {
+        const ctcVal = isIndia ? '₹24,00,000.00' : isGermany ? '75.000,00 €' : `${sym}120,000.00`;
+        const wordsVal = isIndia ? 'INR Twenty-Four Lakh Only' : 'Annual Cost to Company in Full';
+
+        return {
+          docTypeTag: 'CORPORATE HR · EMPLOYMENT AGREEMENT',
+          docTitle: 'FORMAL OFFER OF EMPLOYMENT',
+          docNumber: 'OFR-2026-0084',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Designation: Lead Platform Architect · Proposed Start: 01 Dec 2026 · Valid: 24 Oct 2026',
+          statutoryBanner: {
+            text: 'PRIVATE & CONFIDENTIAL EMPLOYMENT OFFER — APEX TECHNOLOGIES GROUP',
+            subtext: 'Comprehensive Cost-to-Company (CTC) compensation structure and official appointment terms.',
+          },
+          ledgerBand: [
+            { label: 'Designation', val: 'Lead Platform Architect' },
+            { label: 'Department', val: 'Core Infrastructure' },
+            { label: 'Reporting Manager', val: 'VP of Engineering' },
+            { label: 'Joining Date', val: '01 Dec 2026' },
+          ],
+          partyTitle: 'SELECTED CANDIDATE',
+          partyName: 'Priya Verma',
+          partyMeta: 'Email: priya.verma@example.com · Phone: +91 98200 84920',
+          partySubMeta: 'Flat 402, Green Glen Layout, Bellandur, Bengaluru, Karnataka 560103',
+          retailStrip: [
+            { label: 'Employment', val: 'Permanent' },
+            { label: 'Probation', val: '3 Months' },
+            { label: 'Notice Period', val: '60 Days' },
+          ],
+          tableHeaders: [
+            { title: 'COMPENSATION COMPONENT (CTC)', flex: 3, align: 'left' },
+            { title: 'MONTHLY', width: 90, align: 'right' },
+            { title: 'ANNUAL TOTAL', width: 95, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Basic Salary (Guaranteed)', flex: 3, align: 'left', isBold: true },
+                { text: isIndia ? '₹90,000' : `${sym}4,500`, width: 90, align: 'right' },
+                { text: isIndia ? '₹10,80,000' : `${sym}54,000`, width: 95, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'House Rent Allowance (HRA)', flex: 3, align: 'left' },
+                { text: isIndia ? '₹45,000' : `${sym}2,250`, width: 90, align: 'right' },
+                { text: isIndia ? '₹5,40,000' : `${sym}27,000`, width: 95, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Special & Flexible Allowance', flex: 3, align: 'left' },
+                { text: isIndia ? '₹35,000' : `${sym}1,750`, width: 90, align: 'right' },
+                { text: isIndia ? '₹4,20,000' : `${sym}21,000`, width: 95, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Statutory Employer Retirals (PF & Gratuity)', flex: 3, align: 'left' },
+                { text: isIndia ? '₹15,000' : `${sym}750`, width: 90, align: 'right' },
+                { text: isIndia ? '₹1,80,000' : `${sym}9,000`, width: 95, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Annual Performance Incentive (Target)', flex: 3, align: 'left' },
+                { text: isIndia ? '₹15,000' : `${sym}750`, width: 90, align: 'right' },
+                { text: isIndia ? '₹1,80,000' : `${sym}9,000`, width: 95, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Guaranteed Fixed Base',
+          subtotalValue: isIndia ? '₹22,20,000.00' : `${sym}111,000.00`,
+          taxRows: [{ label: 'Target Variable / Retirals', val: isIndia ? '₹1,80,000.00' : `${sym}9,000.00` }],
+          totalLabel: 'Total Annual Cost to Company (CTC)',
+          totalAmount: ctcVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'This offer is subject to satisfactory verification of professional credentials, reference checks, and medical fitness. Please sign and return acceptance by the stated deadline.',
+          legalStandardBadge: 'Indian Contract Act & Labor Laws',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Authorized Signatory (Head of People)',
+            primaryEntity: orgLegalName,
+            secondaryRole: 'Candidate Acceptance Signoff',
+            secondaryEntity: 'Priya Verma',
+          },
+        };
+      }
+
+      case 'experience_cert': {
+        return {
+          docTypeTag: 'CORPORATE SERVICE · SERVICE CERTIFICATION',
+          docTitle: 'EXPERIENCE & RELIEVING CERTIFICATE',
+          docNumber: 'EXP-2026-0041',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Tenure: 15-Jan-2022 to 30-Sep-2026 · Department: Engineering · Conduct: Exemplary',
+          statutoryBanner: {
+            text: 'TO WHOMSOEVER IT MAY CONCERN — OFFICIAL SERVICE CERTIFICATION & FORMAL RELIEVING MEMO',
+            subtext: 'Full and final corporate clearance confirmed. All organizational liabilities and handovers completed.',
+          },
+          ledgerBand: [
+            { label: 'Certificate #', val: 'EXP-2026-0041' },
+            { label: 'Employee ID', val: 'EMP-0814' },
+            { label: 'Total Service', val: '4 Yrs, 8 Mos, 16 Days' },
+            { label: 'Relieving Date', val: '30 Sep 2026 (COB)' },
+          ],
+          partyTitle: 'CERTIFIED EMPLOYEE',
+          partyName: 'Rohan K. Nambiar',
+          partyMeta: 'Employee ID: EMP-0814 · PAN: ABCPN9821K',
+          partySubMeta: 'Last Held Designation: Senior Fullstack Staff Engineer',
+          retailStrip: [
+            { label: 'Conduct', val: 'Exemplary' },
+            { label: 'No Dues', val: 'Cleared 100%' },
+            { label: 'Eligible Rehire', val: 'Yes' },
+          ],
+          tableHeaders: [
+            { title: 'CAREER MILESTONE / PROGRESSION', flex: 3, align: 'left' },
+            { title: 'SERVICE PERIOD', width: 110, align: 'center' },
+            { title: 'APPRAISAL RATING', width: 90, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Fullstack Software Engineer (Product Core Team)', flex: 3, align: 'left', isBold: true },
+                { text: 'Jan 2022 – Jun 2023', width: 110, align: 'center' },
+                { text: 'Exceeds Expectations', width: 90, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Senior Fullstack Staff Engineer (Cloud Systems Architecture)', flex: 3, align: 'left' },
+                { text: 'Jul 2023 – Sep 2026', width: 110, align: 'center' },
+                { text: 'Outstanding Performance', width: 90, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Tenure Status',
+          subtotalValue: 'Honourably Relieved',
+          taxRows: [{ label: 'Corporate Handover Status', val: 'Fully Completed & Approved' }],
+          totalLabel: 'Service Verification Standing',
+          totalAmount: 'EXEMPLARY STANDING',
+          amountInWords: 'Certified True Service Record',
+          legalDeclaration: 'During his tenure with our organization, we found him hardworking, dedicated, and sincere. He is relieved of all organizational responsibilities and we wish him success in future endeavors.',
+          legalStandardBadge: 'Industrial Disputes & Employment Standard',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Head of Human Resources',
+            primaryEntity: orgLegalName,
+            secondaryRole: 'Managing Director / Partner',
+            secondaryEntity: orgLegalName,
+          },
+        };
+      }
+
+      case 'rent_receipt': {
+        const rentVal = isIndia ? '₹28,000.00' : isGermany ? '1.200,00 €' : `${sym}1,500.00`;
+        const wordsVal = isIndia ? 'INR Twenty-Eight Thousand Only' : 'Monthly Rent in Full';
+
+        return {
+          docTypeTag: 'STATUTORY RECEIPT · HRA TAX EXEMPTION',
+          docTitle: 'HOUSE RENT RECEIPT',
+          docNumber: 'RR-2026-10',
+          issueDate: '31 Oct 2026',
+          secondaryMeta: 'Rent Month: October 2026 · Section 10(13A) IT Act · Revenue Stamp Affixed',
+          statutoryBanner: {
+            text: 'RENT RECEIPT FOR INCOME TAX HRA EXEMPTION CLAIM UNDER SECTION 10(13A) OF INCOME TAX ACT, 1961',
+            subtext: 'Landlord PAN mandatory for annual rent exceeding ₹1,00,000 pursuant to CBDT circulars.',
+          },
+          ledgerBand: [
+            { label: 'Receipt #', val: 'RR-2026-10' },
+            { label: 'Rental Period', val: '01 Oct 2026 – 31 Oct 2026' },
+            { label: 'Payment Mode', val: 'Online UPI / IMPS Ref: 90281402' },
+            { label: 'Monthly Rent', val: rentVal },
+          ],
+          partyTitle: 'TENANT (PAID BY)',
+          partyName: 'Siddharth Sen',
+          partyMeta: 'Tenant PAN: ABCPS9018L · Phone: +91 98400 12901',
+          partySubMeta: 'Premises: Flat 804, Tower B, Prestige Falcon City, Kanakapura Road, Bengaluru 560062',
+          secondaryPartyTitle: 'LANDLORD (PROPERTY OWNER)',
+          secondaryPartyName: 'Col. Harish Chandra (Retd.)',
+          secondaryPartyMeta: 'Landlord PAN: AAAPH8492K · Phone: +91 94480 28190',
+          retailStrip: [
+            { label: 'Rental Month', val: 'October 2026' },
+            { label: 'Payment Mode', val: 'Direct UPI' },
+            { label: 'Exemption Claim', val: 'Section 10(13A)' },
+          ],
+          tableHeaders: [
+            { title: 'RENTAL PERIOD & PREMISES DESCRIPTION', flex: 3, align: 'left' },
+            { title: 'MONTH', width: 75, align: 'center' },
+            { title: 'AMOUNT', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Residential House Rent for Flat 804, Prestige Falcon City', flex: 3, align: 'left', isBold: true },
+                { text: 'Oct 2026', width: 75, align: 'center' },
+                { text: rentVal, width: 85, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Base Rental Amount',
+          subtotalValue: rentVal,
+          taxRows: [{ label: 'Maintenance Dues Outstanding', val: isIndia ? '₹0.00 (NIL)' : `${sym}0.00` }],
+          totalLabel: 'Net Rent Received & Cleared',
+          totalAmount: rentVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'Received with thanks from the tenant the sum stated above towards full rent of the residential premises for the month indicated. Governed by Transfer of Property Act 1882.',
+          legalStandardBadge: 'Section 10(13A) Income Tax Act 1961',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Landlord / Property Owner (Signed across Revenue Stamp)',
+            primaryEntity: 'Col. Harish Chandra (Retd.)',
+            secondaryRole: 'Tenant Acknowledgment',
+            secondaryEntity: 'Siddharth Sen',
+          },
+        };
+      }
+
+      case 'student_fee_receipt': {
+        const feeVal = isIndia ? '₹85,000.00' : isGermany ? '2.500,00 €' : `${sym}4,250.00`;
+        const wordsVal = isIndia ? 'INR Eighty-Five Thousand Only' : 'Tuition & Fees in Full';
+
+        return {
+          docTypeTag: 'ACADEMIC TUITION · INSTITUTIONAL RECEIPT',
+          docTitle: 'STUDENT TUITION FEE RECEIPT',
+          docNumber: 'SFR-2026-0391',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Student ID: STU-2026-4402 · Semester: III · Academic Year: 2026-2027',
+          statutoryBanner: {
+            text: 'OFFICIAL STUDENT ACADEMIC FEE RECEIPT — RECOGNIZED EDUCATIONAL INSTITUTION',
+            subtext: 'Bank Settlement Ref: SBIN00291049281 · Account credited in full · Balance Due: NIL',
+          },
+          ledgerBand: [
+            { label: 'Enrollment #', val: 'STU-2026-4402' },
+            { label: 'Course / Degree', val: 'B.Tech Computer Science & Engg' },
+            { label: 'Semester', val: 'Fall Semester (Term III)' },
+            { label: 'Balance Outstanding', val: 'NIL (₹0.00)' },
+          ],
+          partyTitle: 'STUDENT / SCHOLAR',
+          partyName: 'Ananya Mukherjee',
+          partyMeta: 'Guardian: Dr. Sourav Mukherjee · Category: General Merit',
+          partySubMeta: 'Department of Computer Science & Engineering · Campus Hostel: Block C, Room 214',
+          retailStrip: [
+            { label: 'Receipt Status', val: 'Cleared' },
+            { label: 'Scholarship', val: 'Applied' },
+            { label: 'Academic Year', val: '2026-27' },
+          ],
+          tableHeaders: [
+            { title: 'FEE HEAD & ACADEMIC SERVICE', flex: 3, align: 'left' },
+            { title: 'CATEGORY', width: 80, align: 'left' },
+            { title: 'SCHEDULED', width: 75, align: 'right' },
+            { title: 'PAID AMOUNT', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Academic Tuition & Faculty Instruction Fee', flex: 3, align: 'left', isBold: true },
+                { text: 'Tuition', width: 80, align: 'left' },
+                { text: isIndia ? '₹55,000' : `${sym}2,750`, width: 75, align: 'right' },
+                { text: isIndia ? '₹55,000' : `${sym}2,750`, width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Advanced Computing & AI Laboratory Access', flex: 3, align: 'left' },
+                { text: 'Laboratory', width: 80, align: 'left' },
+                { text: isIndia ? '₹15,000' : `${sym}750`, width: 75, align: 'right' },
+                { text: isIndia ? '₹15,000' : `${sym}750`, width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Digital Library & Research Subscriptions', flex: 3, align: 'left' },
+                { text: 'Library', width: 80, align: 'left' },
+                { text: isIndia ? '₹8,000' : `${sym}400`, width: 75, align: 'right' },
+                { text: isIndia ? '₹8,000' : `${sym}400`, width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Semester University Examination & Evaluation', flex: 3, align: 'left' },
+                { text: 'Exam Fee', width: 80, align: 'left' },
+                { text: isIndia ? '₹7,000' : `${sym}350`, width: 75, align: 'right' },
+                { text: isIndia ? '₹7,000' : `${sym}350`, width: 85, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Gross Scheduled Fees',
+          subtotalValue: feeVal,
+          taxRows: [{ label: 'Institutional Grant / Concession', val: isIndia ? '₹0.00 (NIL)' : `${sym}0.00` }],
+          totalLabel: 'Net Total Fee Received',
+          totalAmount: feeVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'Certified that the fee components enumerated above have been received in full and credited to the university account. Non-transferable.',
+          legalStandardBadge: 'UGC & AICTE Institutional Standard',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Accounts Officer / Registrar',
+            primaryEntity: orgLegalName,
+            secondaryRole: 'Student / Parent Acknowledgment',
+            secondaryEntity: 'Ananya Mukherjee',
+          },
+        };
+      }
+
+      case 'equipment_handover': {
+        return {
+          docTypeTag: 'ASSET CUSTODY · HARDWARE ALLOCATION',
+          docTitle: 'EQUIPMENT RESPONSIBILITY & HANDOVER MEMO',
+          docNumber: 'EQ-2026-0129',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Asset Tag: APX-LAP-0841 · Serial: C02G9014Q8K · Condition: Brand New',
+          statutoryBanner: {
+            text: 'CORPORATE ASSET CUSTODY AGREEMENT & HARDWARE ALLOCATION MEMORANDUM',
+            subtext: 'Hardware issued for official company business under IT Security Policy & Asset Care Agreement.',
+          },
+          ledgerBand: [
+            { label: 'Memo #', val: 'EQ-2026-0129' },
+            { label: 'Device Category', val: 'High-End Developer Laptop' },
+            { label: 'Security Enrolled', val: 'MDM & FileVault Active' },
+            { label: 'Custody Status', val: 'Assigned to Employee' },
+          ],
+          partyTitle: 'EMPLOYEE CUSTODIAN',
+          partyName: 'Vikramaditya Roy',
+          partyMeta: 'Employee ID: EMP-1092 · Department: Cloud Architecture',
+          partySubMeta: 'Workstation B-302, Cyber City Campus, Gurugram, Haryana 122002',
+          retailStrip: [
+            { label: 'Handover Date', val: '16 Oct 2026' },
+            { label: 'IT Ticket', val: 'IT-84920' },
+            { label: 'Warranty Exp', val: 'Oct 2029' },
+          ],
+          tableHeaders: [
+            { title: 'ASSET ITEM & SPECIFICATION', flex: 3, align: 'left' },
+            { title: 'ASSET TAG', width: 85, align: 'left' },
+            { title: 'SERIAL NUMBER', width: 90, align: 'left' },
+            { title: 'CONDITION', width: 75, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Apple MacBook Pro 16" M3 Max (64GB RAM, 1TB NVMe)', flex: 3, align: 'left', isBold: true },
+                { text: 'APX-LAP-0841', width: 85, align: 'left' },
+                { text: 'C02G9014Q8K', width: 90, align: 'left' },
+                { text: 'Brand New', width: 75, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Apple 140W USB-C Power Adapter + 2m MagSafe Cable', flex: 3, align: 'left' },
+                { text: 'APX-ACC-0841', width: 85, align: 'left' },
+                { text: 'W029104812', width: 90, align: 'left' },
+                { text: 'Brand New', width: 75, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Dell 27" 4K USB-C Hub Monitor (P2723QE)', flex: 3, align: 'left' },
+                { text: 'APX-MON-0412', width: 85, align: 'left' },
+                { text: 'CN0842018', width: 90, align: 'left' },
+                { text: 'Excellent', width: 75, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Asset Custody Count',
+          subtotalValue: '3 Items Issued',
+          taxRows: [{ label: 'Estimated Hardware Value', val: isIndia ? '₹3,75,000.00' : `${sym}4,500.00` }],
+          totalLabel: 'Total Custody Status',
+          totalAmount: 'ACTIVE CUSTODY',
+          amountInWords: 'Three Official IT Assets Assigned',
+          legalDeclaration: 'The employee acknowledges receipt of the listed hardware in good working condition, agrees to use it strictly for authorized company business, and undertakes to return it immediately upon separation.',
+          legalStandardBadge: 'IT Asset Governance & Policy',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'IT Operations Lead (Handed Over by)',
+            primaryEntity: orgLegalName,
+            secondaryRole: 'Employee Custodian (Received in Good Condition)',
+            secondaryEntity: 'Vikramaditya Roy',
+          },
+        };
+      }
+
+      case 'meeting_minutes': {
+        return {
+          docTypeTag: 'CORPORATE GOVERNANCE · SECRETARIAL MINUTES',
+          docTitle: 'MINUTES OF EXECUTIVE MANAGEMENT MEETING',
+          docNumber: 'MOM-2026-10',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Time: 10:00 AM IST · Quorum: Valid & Present · Venue: Boardroom & VC',
+          statutoryBanner: {
+            text: 'OFFICIAL CORPORATE MINUTES — GOVERNED BY SECRETARIAL STANDARDS & COMPANIES ACT',
+            subtext: 'Chairperson: Rajesh Mehta (Managing Director) · Secretarial Record of Resolutions & Action Items',
+          },
+          ledgerBand: [
+            { label: 'Meeting ID', val: 'MOM-2026-10' },
+            { label: 'Date & Time', val: '16-Oct-2026 @ 10:00 AM' },
+            { label: 'Meeting Type', val: 'Executive Committee Review' },
+            { label: 'Quorum', val: 'All 6 Members Present' },
+          ],
+          partyTitle: 'ATTENDEES & COMMITTEE MEMBERS',
+          partyName: 'Executive Leadership Team',
+          partyMeta: 'R. Mehta (MD), P. Nair (CTO), V. Singhal (CFO), S. Rao (Head Ops)',
+          partySubMeta: 'Notice circulated on 09-Oct-2026 in compliance with Secretarial Standard SS-1.',
+          retailStrip: [
+            { label: 'Quorum', val: 'Unanimous' },
+            { label: 'Meeting Type', val: 'Executive Board' },
+            { label: 'Duration', val: '90 Minutes' },
+          ],
+          tableHeaders: [
+            { title: 'AGENDA TOPIC / RESOLUTION', flex: 3, align: 'left' },
+            { title: 'STATUS', width: 95, align: 'center' },
+            { title: 'OWNER', width: 75, align: 'left' },
+            { title: 'DUE DATE', width: 75, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Q3 Enterprise Revenue & Financial Audit Review', flex: 3, align: 'left', isBold: true },
+                { text: 'Adopted', width: 95, align: 'center' },
+                { text: 'V. Singhal', width: 75, align: 'left' },
+                { text: '31 Oct 2026', width: 75, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Unified Document Studio & Global Tax Architecture Rollout', flex: 3, align: 'left' },
+                { text: 'Approved', width: 95, align: 'center' },
+                { text: 'P. Nair', width: 75, align: 'left' },
+                { text: '20 Oct 2026', width: 75, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Expansion of Logistics Fulfillment Hub in Bhiwandi', flex: 3, align: 'left' },
+                { text: 'Passed', width: 95, align: 'center' },
+                { text: 'S. Rao', width: 75, align: 'left' },
+                { text: '15 Nov 2026', width: 75, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Resolutions Adopted',
+          subtotalValue: '3 Items Approved',
+          taxRows: [{ label: 'Next Scheduled Meeting', val: '16 Nov 2026 @ 10:00 AM' }],
+          totalLabel: 'Meeting Adjournment',
+          totalAmount: 'CONCLUDED AT 11:30 AM',
+          amountInWords: 'All Resolutions Adopted Unanimously',
+          legalDeclaration: 'These minutes are a true and faithful record of proceedings and resolutions adopted at the meeting. Governed by the Companies Act and applicable corporate governance charters.',
+          legalStandardBadge: 'Secretarial Standard SS-1 & Governance',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Chairperson of the Meeting',
+            primaryEntity: 'Rajesh Mehta (Managing Director)',
+            secondaryRole: 'Company Secretary & Compliance Officer',
+            secondaryEntity: orgLegalName,
+          },
+        };
+      }
+
+      case 'site_inspection': {
+        return {
+          docTypeTag: 'FIELD ENGINEERING · HSE SAFETY AUDIT',
+          docTitle: 'SITE INSPECTION & SAFETY REPORT',
+          docNumber: 'SIR-2026-0048',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Site: Central Logistics Megahub · Score: 96.4% (Grade A) · Lead Auditor: Er. V. Singhal',
+          statutoryBanner: {
+            text: 'FIELD ENGINEERING QUALITY, HEALTH, SAFETY & ENVIRONMENT (HSE) AUDIT REPORT',
+            subtext: 'Comprehensive physical inspection of facility structural integrity, electrical circuits, and fire suppression.',
+          },
+          ledgerBand: [
+            { label: 'Audit Report #', val: 'SIR-2026-0048' },
+            { label: 'Overall Compliance', val: '96.4% (Grade A)' },
+            { label: 'Hazards Identified', val: '0 Critical / 2 Minor' },
+            { label: 'Re-Audit Due', val: '16 Jan 2027 (Quarterly)' },
+          ],
+          partyTitle: 'INSPECTED FACILITY / PROJECT SITE',
+          partyName: 'Apex Bhiwandi Megahub - Phase 2',
+          partyMeta: 'Plot C-14, Logistics Corridor, Thane District, Maharashtra 421302',
+          partySubMeta: 'Facility Area: 120,000 sq ft · Operational Shifts: 24/7',
+          retailStrip: [
+            { label: 'Audit Rating', val: '96.4% (Grade A)' },
+            { label: 'Critical Risks', val: 'Zero' },
+            { label: 'Safety Badge', val: 'Certified' },
+          ],
+          tableHeaders: [
+            { title: 'SAFETY AUDIT PARAMETER', flex: 3, align: 'left' },
+            { title: 'STANDARD', width: 75, align: 'left' },
+            { title: 'FINDING', width: 75, align: 'center' },
+            { title: 'SEVERITY', width: 65, align: 'right' },
+            { title: 'ACTION REQUIRED', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Primary Electrical Switchgear & Earthing Resistance', flex: 3, align: 'left', isBold: true },
+                { text: 'IS 3043', width: 75, align: 'left' },
+                { text: 'Compliant', width: 75, align: 'center' },
+                { text: 'None', width: 65, align: 'right' },
+                { text: 'Routine Check', width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Automated Fire Sprinkler Lines & Pressure Gauges', flex: 3, align: 'left' },
+                { text: 'NFPA 13', width: 75, align: 'left' },
+                { text: 'Compliant', width: 75, align: 'center' },
+                { text: 'None', width: 65, align: 'right' },
+                { text: 'Quarterly Test', width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Personal Protective Equipment (PPE) Compliance in Bay 3', flex: 3, align: 'left' },
+                { text: 'OSHA 1910', width: 75, align: 'left' },
+                { text: 'Observation', width: 75, align: 'center' },
+                { text: 'Low', width: 65, align: 'right' },
+                { text: 'Briefing', width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Emergency Exit Signage Illumination & Battery Backup', flex: 3, align: 'left' },
+                { text: 'NBC 2016', width: 75, align: 'left' },
+                { text: 'Observation', width: 75, align: 'center' },
+                { text: 'Low', width: 65, align: 'right' },
+                { text: 'Battery Replacement', width: 85, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Audit Parameters Checked',
+          subtotalValue: '4 Areas Inspected',
+          taxRows: [{ label: 'Facility Safety Rating', val: '96.4% — GRADE A (CERTIFIED)' }],
+          totalLabel: 'Overall Audit Result',
+          totalAmount: 'PASSED & CERTIFIED',
+          amountInWords: 'Zero Critical Safety Violations Found',
+          legalDeclaration: 'The facility was thoroughly inspected in accordance with statutory occupational health and safety standards. The overall compliance rating certifies operational fitness.',
+          legalStandardBadge: 'ISO 9001 / OSHA 1910 HSE Standard',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Lead Inspecting HSE Auditor',
+            primaryEntity: 'Er. Vikram Singhal (Lead HSE Auditor)',
+            secondaryRole: 'Facility Project Site Manager',
+            secondaryEntity: orgLegalName,
+          },
+        };
+      }
+
+      case 'nda_agreement': {
+        return {
+          docTypeTag: 'LEGAL CONTRACT · MUTUAL CONFIDENTIALITY',
+          docTitle: 'MUTUAL NON-DISCLOSURE AGREEMENT',
+          docNumber: 'NDA-2026-0032',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Term: 3 Years · Governing Law: Competent Courts · Covenants: Bilateral Confidentiality',
+          statutoryBanner: {
+            text: 'LEGALLY BINDING MUTUAL NON-DISCLOSURE & PROPRIETARY RIGHTS AGREEMENT',
+            subtext: 'Bilateral protection of proprietary software architecture, trade secrets, customer data, and commercial models.',
+          },
+          ledgerBand: [
+            { label: 'Agreement Ref', val: 'NDA-2026-0032' },
+            { label: 'Effective Date', val: '16 Oct 2026' },
+            { label: 'Protection Term', val: '3 Years from Disclosure' },
+            { label: 'Governing Law', val: 'Courts of Competent Jurisdiction' },
+          ],
+          partyTitle: 'PARTY 1 (DISCLOSING & RECEIVING)',
+          partyName: orgLegalName,
+          partyMeta: orgResolvedTaxLine,
+          partySubMeta: 'Represented by its Authorized Signatory',
+          secondaryPartyTitle: 'PARTY 2 (DISCLOSING & RECEIVING)',
+          secondaryPartyName: countryCfg.samplePartyName,
+          secondaryPartyMeta: countryCfg.samplePartyTaxId,
+          secondaryPartySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Term', val: '36 Months' },
+            { label: 'Type', val: 'Bilateral Mutual' },
+            { label: 'Remedy', val: 'Injunctive Relief' },
+          ],
+          tableHeaders: [
+            { title: 'CONFIDENTIALITY COVENANT & CONTRACT CLAUSE', flex: 3, align: 'left' },
+            { title: 'SCOPE / RESTRICTION', width: 140, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Section 1: Definition of Proprietary & Confidential Information', flex: 3, align: 'left', isBold: true },
+                { text: 'Source Code, APIs, Financial Models, Customer Data', width: 140, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Section 2: Non-Disclosure & Strict Confidentiality Obligations', flex: 3, align: 'left' },
+                { text: 'Need-to-Know Basis Only; Reasonable Care Standard', width: 140, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Section 3: Standard Exclusions from Confidentiality', flex: 3, align: 'left' },
+                { text: 'Prior Public Knowledge, Independent Development', width: 140, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Section 4: Mandatory Return or Certified Destruction of Materials', flex: 3, align: 'left' },
+                { text: 'Within 10 Days of Written Demand or Expiration', width: 140, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Section 5: Equitable Relief, Specific Performance & Injunction', flex: 3, align: 'left' },
+                { text: 'Right to Seek Injunction Without Requirement of Bond', width: 140, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Bilateral Covenants',
+          subtotalValue: '5 Core Protective Clauses',
+          taxRows: [{ label: 'Confidentiality Validity Duration', val: '36 Months from Effective Date' }],
+          totalLabel: 'Contractual Obligation',
+          totalAmount: 'LEGALLY BINDING',
+          amountInWords: 'Executed in Duplicate by Authorized Officers',
+          legalDeclaration: 'In witness whereof, the parties hereto have executed this Mutual Non-Disclosure Agreement by their duly authorized representatives on the date first above written.',
+          legalStandardBadge: 'Indian Contract Act 1872 & UCC § 2',
+          showBankDetails: false,
+          dualSignatures: {
+            primaryRole: 'Authorized Signatory (Party 1)',
+            primaryEntity: orgLegalName,
+            secondaryRole: 'Authorized Signatory (Party 2)',
+            secondaryEntity: countryCfg.samplePartyName,
+          },
         };
       }
 

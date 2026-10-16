@@ -12,7 +12,7 @@
  * - UPI payment QR and payment recording modals
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -44,6 +44,20 @@ import {
   RotateCcw,
   ShoppingBag,
   ClipboardList,
+  Globe,
+  Package,
+  PackageCheck,
+  ScrollText,
+  Truck,
+  FileCheck,
+  Scale,
+  Users,
+  Send,
+  Building,
+  GraduationCap,
+  Laptop,
+  Shield,
+  FileClock,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { useTheme } from '../../design/ThemeContext';
@@ -91,6 +105,301 @@ function formatDocTypeName(type: string): string {
     .join(' ');
 }
 
+export interface DocumentCreateOption {
+  id: string;
+  name: string;
+  tagline: string;
+  category: 'billing' | 'orders' | 'logistics' | 'finance' | 'hr' | 'legal';
+  categoryLabel: string;
+  badge: string;
+  icon: React.ComponentType<{ size: number; color: string; strokeWidth?: number }>;
+  keywords: string[];
+}
+
+export const CREATE_MODAL_CATEGORIES: { key: string; label: string }[] = [
+  { key: 'all', label: 'All (26)' },
+  { key: 'billing', label: 'Sales & Billing (5)' },
+  { key: 'orders', label: 'Orders & Quotes (3)' },
+  { key: 'logistics', label: 'Logistics (4)' },
+  { key: 'finance', label: 'Finance & Payments (5)' },
+  { key: 'hr', label: 'HR & Payroll (3)' },
+  { key: 'legal', label: 'Institutional & Legal (6)' },
+];
+
+export const DOCUMENT_CREATE_OPTIONS: DocumentCreateOption[] = [
+  // ── SALES & COMMERCIAL BILLING ──
+  {
+    id: 'invoice',
+    name: 'Tax Invoice',
+    tagline: 'CBIC GST Rule 46 commercial sales billing with HSN & itemized taxes',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'RULE 46',
+    icon: FileText,
+    keywords: ['tax', 'invoice', 'gst', 'bill', 'commercial', 'b2b', 'b2c', 'sales', 'rule 46'],
+  },
+  {
+    id: 'bill_of_supply',
+    name: 'Bill of Supply',
+    tagline: 'Section 31(3)(c) for composition dealers & exempt zero-tax supplies',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'RULE 49',
+    icon: FileSpreadsheet,
+    keywords: ['composition', 'exempt', 'supply', 'bill of supply', 'tax-free', 'rule 49'],
+  },
+  {
+    id: 'proforma',
+    name: 'Proforma Invoice',
+    tagline: 'Preliminary quotation for advance bank wire & import customs clearance',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'PROFORMA',
+    icon: FileClock,
+    keywords: ['proforma', 'advance', 'wire', 'import', 'customs', 'preliminary', 'pi'],
+  },
+  {
+    id: 'export_invoice',
+    name: 'Export Invoice',
+    tagline: 'Cross-border supply under LUT with foreign currencies & Incoterms® 2020',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'FEMA / LUT',
+    icon: Globe,
+    keywords: ['export', 'foreign', 'lut', 'cross-border', 'cif', 'fob', 'incoterms', 'usd', 'eur'],
+  },
+  {
+    id: 'quick-bill',
+    name: 'Quick Counter Bill',
+    tagline: 'Rapid 30-second POS checkout with auto-calculated QR & multi-pay card verification',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'RAPID POS',
+    icon: Zap,
+    keywords: ['quick', 'pos', 'counter', 'checkout', 'qr', 'card', 'fast', 'cash'],
+  },
+
+  // ── ORDERS, QUOTES & CONTRACTS ──
+  {
+    id: 'estimate',
+    name: 'Estimate / Quotation',
+    tagline: 'Formal price proposal, itemized scope, rate validity & terms',
+    category: 'orders',
+    categoryLabel: 'Orders & Quotes',
+    badge: 'QUOTATION',
+    icon: Briefcase,
+    keywords: ['quote', 'estimate', 'proposal', 'bid', 'pricing', 'cost proposal'],
+  },
+  {
+    id: 'sales_order',
+    name: 'Sales Order Confirmation',
+    tagline: 'Vendor order acknowledgment committed against customer purchase order',
+    category: 'orders',
+    categoryLabel: 'Orders & Quotes',
+    badge: 'SALES ORDER',
+    icon: PackageCheck,
+    keywords: ['sales order', 'order confirmation', 'so', 'po acceptance', 'booking'],
+  },
+  {
+    id: 'work_order',
+    name: 'Work Order & Contract',
+    tagline: 'Scope of work, milestone delivery schedule, SLA & service deliverables',
+    category: 'orders',
+    categoryLabel: 'Orders & Quotes',
+    badge: 'SOW / SLA',
+    icon: ClipboardList,
+    keywords: ['work order', 'contract', 'sow', 'scope', 'milestone', 'service agreement'],
+  },
+
+  // ── PURCHASING & LOGISTICS ──
+  {
+    id: 'purchase_order',
+    name: 'Purchase Order',
+    tagline: 'Binding procurement contract issued to vendors with delivery specifications',
+    category: 'logistics',
+    categoryLabel: 'Logistics',
+    badge: 'PROCUREMENT',
+    icon: ShoppingBag,
+    keywords: ['purchase order', 'po', 'procurement', 'vendor order', 'supplies'],
+  },
+  {
+    id: 'goods_received_note',
+    name: 'Goods Received Note (GRN)',
+    tagline: 'Inward warehouse gate inspection, tally verification & quality signoff',
+    category: 'logistics',
+    categoryLabel: 'Logistics',
+    badge: 'GATE INWARD',
+    icon: Package,
+    keywords: ['grn', 'goods received', 'inward', 'inspection', 'warehouse', 'receipt note'],
+  },
+  {
+    id: 'packing_list',
+    name: 'Export Packing List',
+    tagline: 'Carton manifest with gross/net weight, package dimensions & dispatch counts',
+    category: 'logistics',
+    categoryLabel: 'Logistics',
+    badge: 'MANIFEST',
+    icon: ScrollText,
+    keywords: ['packing list', 'manifest', 'carton', 'dispatch tally', 'cargo dimensions'],
+  },
+  {
+    id: 'delivery_challan',
+    name: 'Delivery Challan',
+    tagline: 'Rule 55 statutory document for transit movement of goods without immediate sale',
+    category: 'logistics',
+    categoryLabel: 'Logistics',
+    badge: 'RULE 55',
+    icon: Truck,
+    keywords: ['challan', 'delivery', 'transit', 'job work', 'consignment', 'rule 55'],
+  },
+
+  // ── PAYMENTS, ACCOUNTING & ADJUSTMENTS ──
+  {
+    id: 'receipt',
+    name: 'Payment Receipt',
+    tagline: 'Official payment discharge acknowledgment with banking & UTR reference',
+    category: 'finance',
+    categoryLabel: 'Finance & Payments',
+    badge: 'DISCHARGE',
+    icon: Receipt,
+    keywords: ['receipt', 'payment receipt', 'acknowledgment', 'paid', 'cleared', 'settlement'],
+  },
+  {
+    id: 'payment_voucher',
+    name: 'Payment Voucher',
+    tagline: 'Rule 52 treasury disbursement voucher with statutory TDS withholding record',
+    category: 'finance',
+    categoryLabel: 'Finance & Payments',
+    badge: 'RULE 52',
+    icon: FileCheck,
+    keywords: ['voucher', 'payment voucher', 'payout', 'disbursement', 'tds', 'treasury'],
+  },
+  {
+    id: 'credit_note',
+    name: 'Credit Note',
+    tagline: 'Rule 53 statutory adjustment for sales returns, volume rebates, or price corrections',
+    category: 'finance',
+    categoryLabel: 'Finance & Payments',
+    badge: 'RULE 53',
+    icon: RotateCcw,
+    keywords: ['credit note', 'credit', 'sales return', 'rebate', 'adjustment', 'rule 53'],
+  },
+  {
+    id: 'debit_note',
+    name: 'Debit Note',
+    tagline: 'Rule 53 supplementary charge for rate escalation, deficit, or vendor adjustment',
+    category: 'finance',
+    categoryLabel: 'Finance & Payments',
+    badge: 'SUPPLEMENTARY',
+    icon: RotateCcw,
+    keywords: ['debit note', 'debit', 'supplementary', 'rate revision', 'rule 53'],
+  },
+  {
+    id: 'customer_statement',
+    name: 'Customer Account Statement',
+    tagline: 'Chronological running statement of account, ledger tally & aged receivables',
+    category: 'finance',
+    categoryLabel: 'Finance & Payments',
+    badge: 'LEDGER',
+    icon: Scale,
+    keywords: ['statement', 'ledger', 'account statement', 'aging', 'balance due', 'running balance'],
+  },
+
+  // ── HR & PAYROLL ──
+  {
+    id: 'salary_slip',
+    name: 'Salary Slip / Payslip',
+    tagline: 'Monthly employee compensation, basic, HRA, allowance & PF/ESI/TDS deductions',
+    category: 'hr',
+    categoryLabel: 'HR & Payroll',
+    badge: 'PAYROLL',
+    icon: Users,
+    keywords: ['salary', 'payslip', 'payroll', 'wages', 'hra', 'provident fund', 'tds', 'earnings'],
+  },
+  {
+    id: 'job_offer',
+    name: 'Job Offer Letter',
+    tagline: 'Official employment offer with designation, annualized CTC, and joining terms',
+    category: 'hr',
+    categoryLabel: 'HR & Payroll',
+    badge: 'HR OFFER',
+    icon: Send,
+    keywords: ['offer', 'job offer', 'employment', 'ctc', 'joining letter', 'appointment'],
+  },
+  {
+    id: 'experience_cert',
+    name: 'Experience Certificate',
+    tagline: 'Official service verification and relieving clearance certificate for outgoing staff',
+    category: 'hr',
+    categoryLabel: 'HR & Payroll',
+    badge: 'SERVICE CERT',
+    icon: FileText,
+    keywords: ['experience', 'relieving', 'service certificate', 'clearance', 'employment verification'],
+  },
+
+  // ── INSTITUTIONAL & LEGAL ──
+  {
+    id: 'rent_receipt',
+    name: 'Rent Receipt (HRA)',
+    tagline: 'Income Tax Act Section 10(13A) residential rent claim with landlord PAN declaration',
+    category: 'legal',
+    categoryLabel: 'Legal & Institutional',
+    badge: 'SEC 10(13A)',
+    icon: Building,
+    keywords: ['rent', 'hra', 'landlord', 'tenant', 'rent receipt', 'section 10(13a)', 'pan'],
+  },
+  {
+    id: 'student_fee_receipt',
+    name: 'Student Fee Receipt',
+    tagline: 'Institutional tuition, laboratory, and library fee collection voucher for academies',
+    category: 'legal',
+    categoryLabel: 'Legal & Institutional',
+    badge: 'ACADEMIC',
+    icon: GraduationCap,
+    keywords: ['fee', 'tuition', 'school', 'college', 'student', 'education', 'receipt'],
+  },
+  {
+    id: 'equipment_handover',
+    name: 'Equipment Responsibility Memo',
+    tagline: 'Corporate IT hardware asset allocation, serial tracking & custody agreement',
+    category: 'legal',
+    categoryLabel: 'Legal & Institutional',
+    badge: 'ASSET CUSTODY',
+    icon: Laptop,
+    keywords: ['equipment', 'asset handover', 'laptop', 'hardware', 'custody', 'it asset'],
+  },
+  {
+    id: 'meeting_minutes',
+    name: 'Meeting Minutes (MoM)',
+    tagline: 'ICSI Secretarial Standard-1 formal board/executive proceedings & action resolutions',
+    category: 'legal',
+    categoryLabel: 'Legal & Institutional',
+    badge: 'SS-1 MINUTES',
+    icon: FileText,
+    keywords: ['minutes', 'mom', 'meeting', 'resolutions', 'board', 'action items'],
+  },
+  {
+    id: 'site_inspection',
+    name: 'Site Inspection Report',
+    tagline: 'ISO 9001 / OSHA 1910 workplace safety compliance inspection and hazard audit',
+    category: 'legal',
+    categoryLabel: 'Legal & Institutional',
+    badge: 'OSHA / HSE',
+    icon: Shield,
+    keywords: ['inspection', 'safety', 'audit', 'site report', 'osha', 'hse', 'hazard'],
+  },
+  {
+    id: 'nda_agreement',
+    name: 'Mutual Non-Disclosure Agreement',
+    tagline: 'Bilateral confidentiality contract safeguarding proprietary data & intellectual property',
+    category: 'legal',
+    categoryLabel: 'Legal & Institutional',
+    badge: 'LEGAL NDA',
+    icon: Scale,
+    keywords: ['nda', 'confidentiality', 'non-disclosure', 'trade secret', 'legal contract', 'agreement'],
+  },
+];
+
 export default function DocumentsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
@@ -105,6 +414,25 @@ export default function DocumentsScreen() {
   const [upiDoc, setUpiDoc] = useState<DocumentListItem | null>(null);
   const [recordPaymentDoc, setRecordPaymentDoc] = useState<DocumentListItem | null>(null);
   const [showCreateSheet, setShowCreateSheet] = useState(false);
+  const [createModalSearch, setCreateModalSearch] = useState('');
+  const [createModalCategory, setCreateModalCategory] = useState('all');
+
+  const filteredCreateOptions = useMemo(() => {
+    return DOCUMENT_CREATE_OPTIONS.filter((opt) => {
+      if (createModalCategory !== 'all' && opt.category !== createModalCategory) {
+        return false;
+      }
+      if (createModalSearch.trim()) {
+        const query = createModalSearch.trim().toLowerCase();
+        const matchesName = opt.name.toLowerCase().includes(query);
+        const matchesTagline = opt.tagline.toLowerCase().includes(query);
+        const matchesBadge = opt.badge.toLowerCase().includes(query);
+        const matchesKeywords = opt.keywords.some((k) => k.toLowerCase().includes(query));
+        return matchesName || matchesTagline || matchesBadge || matchesKeywords;
+      }
+      return true;
+    });
+  }, [createModalCategory, createModalSearch]);
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -249,6 +577,8 @@ export default function DocumentsScreen() {
 
   const handleCreateChoice = (choice: string) => {
     setShowCreateSheet(false);
+    setCreateModalSearch('');
+    setCreateModalCategory('all');
     if (choice === 'quick-bill') {
       router.push('/quick-bill');
     } else {
@@ -423,68 +753,199 @@ export default function DocumentsScreen() {
         visible={showCreateSheet}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowCreateSheet(false)}
+        onRequestClose={() => {
+          setShowCreateSheet(false);
+          setCreateModalSearch('');
+          setCreateModalCategory('all');
+        }}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowCreateSheet(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => {
+            setShowCreateSheet(false);
+            setCreateModalSearch('');
+            setCreateModalCategory('all');
+          }}
+        >
           <Pressable
-            style={[styles.sheetContainer, { backgroundColor: theme.surface, borderColor: theme.borderDefault }]}
+            style={[
+              styles.sheetContainer,
+              { backgroundColor: theme.surface, borderColor: theme.borderDefault },
+            ]}
             onPress={(e) => e.stopPropagation()}
           >
+            {/* Header */}
             <View style={styles.sheetHeader}>
-              <View>
+              <View style={{ flex: 1, paddingRight: 12 }}>
                 <Text style={[styles.sheetTitle, { color: theme.textPrimary }]}>
                   New Document
                 </Text>
                 <Text style={[styles.sheetSubtitle, { color: theme.textSecondary }]}>
-                  Select document type to begin
+                  Choose from 26 statutory and enterprise business document templates
                 </Text>
               </View>
               <IconButton
                 icon={<X size={18} color={theme.textPrimary} />}
-                onPress={() => setShowCreateSheet(false)}
+                onPress={() => {
+                  setShowCreateSheet(false);
+                  setCreateModalSearch('');
+                  setCreateModalCategory('all');
+                }}
                 accessibilityLabel="Close"
                 size={36}
               />
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.sheetOptions}>
-                {[
-                  { id: 'invoice', name: 'Tax Invoice', tagline: 'GST commercial billing', icon: FileText },
-                  { id: 'bill_of_supply', name: 'Bill of Supply', tagline: 'Composition & tax-exempt bill', icon: FileSpreadsheet },
-                  { id: 'estimate', name: 'Estimate / Quotation', tagline: 'Cost proposal & quotes', icon: Briefcase },
-                  { id: 'quick-bill', name: 'Quick Counter Bill', tagline: '30-second POS checkout', icon: Zap },
-                  { id: 'credit_note', name: 'Credit Note / Debit Note', tagline: 'Returns & tax adjustments', icon: RotateCcw },
-                  { id: 'purchase_order', name: 'Purchase Order', tagline: 'Vendor procurement', icon: ShoppingBag },
-                  { id: 'work_order', name: 'Work Order & Contract', tagline: 'Scope & deliverables', icon: ClipboardList },
-                  { id: 'receipt', name: 'Payment Receipt', tagline: 'Payment acknowledgment', icon: Receipt },
-                ].map((opt) => {
-                  const IconComp = opt.icon;
-                  return (
-                    <Pressable
-                      key={opt.id}
-                      style={({ pressed }) => [
-                        styles.sheetOption,
-                        {
-                          backgroundColor: theme.surfaceSecondary,
-                          borderColor: 'rgba(255, 255, 255, 0.06)',
-                          opacity: pressed ? 0.8 : 1,
-                        },
+            {/* Modal Search Field */}
+            <View style={styles.modalSearchRow}>
+              <SearchField
+                value={createModalSearch}
+                onChangeText={setCreateModalSearch}
+                placeholder="Search by name, rule (e.g. 46, 55), or keyword..."
+                onClear={() => setCreateModalSearch('')}
+              />
+            </View>
+
+            {/* Modal Category Filter Chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.modalCategoryContent}
+              style={styles.modalCategoryScroll}
+            >
+              {CREATE_MODAL_CATEGORIES.map((cat) => {
+                const isSelected = createModalCategory === cat.key;
+                return (
+                  <Pressable
+                    key={cat.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Filter by ${cat.label}`}
+                    onPress={() => setCreateModalCategory(cat.key)}
+                    style={[
+                      styles.modalCategoryChip,
+                      {
+                        backgroundColor: isSelected ? theme.primaryActionBg : theme.surfaceSecondary,
+                        borderColor: isSelected ? theme.borderFocused : theme.borderDefault,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modalCategoryText,
+                        { color: isSelected ? theme.primaryActionText : theme.textSecondary },
                       ]}
-                      onPress={() => handleCreateChoice(opt.id)}
                     >
-                      <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
-                        <IconComp size={18} color={theme.textPrimary} strokeWidth={2} />
-                      </View>
-                      <View style={styles.optionTextBox}>
-                        <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>{opt.name}</Text>
-                        <Text style={[styles.optionDesc, { color: theme.textSecondary }]}>{opt.tagline}</Text>
-                      </View>
-                      <ChevronRight size={16} color={theme.textMuted} />
-                    </Pressable>
-                  );
-                })}
-              </View>
+                      {cat.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {/* Counter bar */}
+            <View style={styles.modalMetaRow}>
+              <Text style={[styles.modalMetaText, { color: theme.textMuted }]}>
+                {filteredCreateOptions.length === 1
+                  ? '1 document available'
+                  : `${filteredCreateOptions.length} documents available`}
+              </Text>
+              {createModalSearch.trim() || createModalCategory !== 'all' ? (
+                <Pressable
+                  onPress={() => {
+                    setCreateModalSearch('');
+                    setCreateModalCategory('all');
+                  }}
+                  hitSlop={6}
+                >
+                  <Text style={[styles.modalResetText, { color: theme.textSecondary }]}>
+                    Reset Filters
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {/* Options List */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContent}
+            >
+              {filteredCreateOptions.length === 0 ? (
+                <View style={styles.modalEmptyBox}>
+                  <Text style={[styles.modalEmptyTitle, { color: theme.textPrimary }]}>
+                    No documents found
+                  </Text>
+                  <Text style={[styles.modalEmptyDesc, { color: theme.textSecondary }]}>
+                    No document matches "{createModalSearch}". Try searching for invoice, salary, offer, rent, po, or clear the search.
+                  </Text>
+                  <Pressable
+                    style={[
+                      styles.modalEmptyBtn,
+                      { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderDefault },
+                    ]}
+                    onPress={() => {
+                      setCreateModalSearch('');
+                      setCreateModalCategory('all');
+                    }}
+                  >
+                    <Text style={[styles.modalEmptyBtnText, { color: theme.textPrimary }]}>
+                      Clear Search Filters
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.sheetOptions}>
+                  {filteredCreateOptions.map((opt) => {
+                    const IconComp = opt.icon;
+                    return (
+                      <Pressable
+                        key={opt.id}
+                        style={({ pressed }) => [
+                          styles.sheetOption,
+                          {
+                            backgroundColor: theme.surfaceSecondary,
+                            borderColor: 'rgba(255, 255, 255, 0.06)',
+                            opacity: pressed ? 0.82 : 1,
+                          },
+                        ]}
+                        onPress={() => handleCreateChoice(opt.id)}
+                      >
+                        <View style={[styles.optionIconBox, { backgroundColor: theme.surface }]}>
+                          <IconComp size={18} color={theme.textPrimary} strokeWidth={2} />
+                        </View>
+                        <View style={styles.optionTextBox}>
+                          <View style={styles.optionTitleRow}>
+                            <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>
+                              {opt.name}
+                            </Text>
+                            <View
+                              style={[
+                                styles.optionBadge,
+                                {
+                                  backgroundColor: theme.surface,
+                                  borderColor: theme.borderDefault,
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={[styles.optionBadgeText, { color: theme.textSecondary }]}
+                              >
+                                {opt.badge}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text
+                            style={[styles.optionDesc, { color: theme.textSecondary }]}
+                            numberOfLines={2}
+                          >
+                            {opt.tagline}
+                          </Text>
+                        </View>
+                        <ChevronRight size={16} color={theme.textMuted} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -628,13 +1089,16 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     borderWidth: 1,
     padding: spacing.xl,
-    maxHeight: '85%',
+    maxHeight: '90%',
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
   },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
   },
   sheetTitle: {
     fontSize: 20,
@@ -644,6 +1108,51 @@ const styles = StyleSheet.create({
   sheetSubtitle: {
     fontSize: 13,
     marginTop: 2,
+    lineHeight: 18,
+  },
+  modalSearchRow: {
+    marginBottom: spacing.sm,
+  },
+  modalCategoryScroll: {
+    maxHeight: 38,
+    marginBottom: spacing.sm,
+  },
+  modalCategoryContent: {
+    gap: 6,
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  modalCategoryChip: {
+    minHeight: 30,
+    paddingHorizontal: 12,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCategoryText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modalMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    paddingHorizontal: 2,
+  },
+  modalMetaText: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+  },
+  modalResetText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  modalScrollContent: {
+    paddingBottom: spacing.lg,
   },
   sheetOptions: {
     gap: 10,
@@ -651,7 +1160,7 @@ const styles = StyleSheet.create({
   sheetOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: radii.card,
     borderWidth: 1,
@@ -669,13 +1178,59 @@ const styles = StyleSheet.create({
   },
   optionTextBox: {
     flex: 1,
+    paddingRight: 8,
   },
-  optionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+  optionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
     marginBottom: 2,
   },
+  optionTitle: {
+    fontSize: 14.5,
+    fontWeight: '600',
+  },
+  optionBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  optionBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
   optionDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  modalEmptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: spacing.lg,
+  },
+  modalEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  modalEmptyDesc: {
     fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  modalEmptyBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  modalEmptyBtnText: {
+    fontSize: 12.5,
+    fontWeight: '600',
   },
 });
