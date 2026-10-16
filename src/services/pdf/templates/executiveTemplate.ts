@@ -13,6 +13,7 @@ import { escapeHtml, formatDate, getBaseCss } from './commonStyles';
 import { DirectUpiEngine } from '../../../domain/payments/upi/DirectUpiEngine';
 import { QrCodeGenerator } from '../../../domain/payments/upi/QrCodeGenerator';
 import { TemplateCustomization } from '../types';
+import { DocumentTypeRegistry } from '../../../domain/documents/DocumentTypeRegistry';
 
 export function renderExecutiveTemplate(
   doc: FullDocument,
@@ -22,8 +23,10 @@ export function renderExecutiveTemplate(
 ): string {
   const currency = doc.currency || 'USD';
 
+  const docDef = DocumentTypeRegistry.get(doc.doc_type);
   const docTitle =
-    doc.doc_type === 'estimate'
+    docDef?.name?.toUpperCase() ||
+    (doc.doc_type === 'estimate'
       ? 'ESTIMATE'
       : doc.doc_type === 'receipt'
       ? 'RECEIPT'
@@ -39,7 +42,7 @@ export function renderExecutiveTemplate(
       ? 'STATEMENT OF WORK'
       : doc.doc_type === 'proposal'
       ? 'PROPOSAL'
-      : 'INVOICE';
+      : 'INVOICE');
 
   const itemsHtml = (doc.items || [])
     .map((item, idx) => {

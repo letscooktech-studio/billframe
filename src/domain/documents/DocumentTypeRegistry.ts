@@ -67,7 +67,7 @@ export const DOCUMENT_TYPES: readonly DocumentTypeDefinition[] = [
     id: 'tax_invoice',
     type: 'tax_invoice',
     name: 'GST Tax Invoice',
-    aliases: ['gst_tax_invoice', 'Tax Invoice', 'GST Bill', 'Commercial Tax Invoice'],
+    aliases: ['invoice', 'gst_tax_invoice', 'Tax Invoice', 'GST Bill', 'Commercial Tax Invoice'],
     category: 'sales_billing',
     classification: 'statutory_rule',
     legalClassification: 'statutory_rule',

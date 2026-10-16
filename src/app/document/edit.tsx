@@ -82,6 +82,8 @@ import { DocumentReadinessValidator } from '../../domain/documents/universal/Doc
 import { TemplateQualityScoreEngine } from '../../domain/documents/universal/TemplateQualityScore';
 import { GST_LAYOUT_DEFINITIONS } from '../../services/pdf/templates/gst';
 import { COUNTRIES } from '../../data/geography/countries';
+import { DocumentTypeRegistry } from '../../domain/documents/DocumentTypeRegistry';
+import { DOCUMENT_TYPE_CONFIGS } from './templates';
 
 const COMMON_CURRENCIES = [
   { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
@@ -109,12 +111,103 @@ export default function DocumentEditScreen() {
   const searchParams = useLocalSearchParams<{ type?: string; id?: string; customerId?: string; templateId?: string }>();
   const { theme } = useTheme();
 
-  const docType: DocumentType = searchParams.type === 'estimate' ? 'estimate' : 'invoice';
+  // Dynamic Document Type & Provenance Resolution
+  const requestedTypeRaw = (searchParams.type || 'invoice').toLowerCase().replace(/-/g, '_');
+  const initialDocDef = DocumentTypeRegistry.get(requestedTypeRaw);
+  const initialDocType = (initialDocDef?.defaultDocType || (requestedTypeRaw in DOCUMENT_TYPE_CONFIGS ? requestedTypeRaw : 'invoice')) as DocumentType;
+
+  const [docType, setDocType] = useState<DocumentType>(initialDocType);
   const existingId = searchParams.id;
+
+  const docDef = DocumentTypeRegistry.get(docType) || initialDocDef;
+  const activeConfig = React.useMemo(() => {
+    return (
+      DOCUMENT_TYPE_CONFIGS[docType] ||
+      (docDef?.id && DOCUMENT_TYPE_CONFIGS[docDef.id]) ||
+      DOCUMENT_TYPE_CONFIGS[requestedTypeRaw] ||
+      DOCUMENT_TYPE_CONFIGS.invoice
+    );
+  }, [docType, docDef, requestedTypeRaw]);
+
+  const docTitle = docDef?.name || activeConfig?.title || 'Document';
+  const docShortTitle = activeConfig?.shortName || docDef?.name || 'Document';
+  const provenanceRule = docDef?.provenanceRule || 'Statutory Verified';
+  const defaultPrefix = docDef?.defaultPrefix || (docType === 'invoice' ? 'INV-' : docType === 'estimate' ? 'EST-' : 'DOC-');
+
+  // Party Role & Classification
+  const isPurchasing = docDef?.category === 'orders_purchasing' || docType === 'purchase_order' || docType === 'goods_received_note';
+  const isLogistics = docDef?.category === 'inventory_logistics' || docType === 'delivery_challan' || docType === 'packing_list';
+  const isHR = docDef?.category === 'hr_payroll' || docType === 'salary_slip' || docType === 'job_offer_letter' || (docType as string) === 'job_offer';
+  const isInstitutional = docDef?.category === 'institutional_legal' || docType === 'student_fee_receipt' || docType === 'rent_receipt';
+
+  const partySectionTitle = isPurchasing
+    ? 'Vendor / Supplier Details *'
+    : isLogistics
+    ? 'Consignee / Destination Details *'
+    : isHR
+    ? 'Employee / Candidate Details *'
+    : docType === 'rent_receipt'
+    ? 'Tenant / Occupant Details *'
+    : docType === 'student_fee_receipt'
+    ? 'Student / Guardian Details *'
+    : 'Client / Customer Details *';
+
+  const partyNameLabel = isPurchasing
+    ? 'Vendor / Supplier Name *'
+    : isLogistics
+    ? 'Consignee / Destination Name *'
+    : isHR
+    ? 'Employee / Candidate Name *'
+    : docType === 'rent_receipt'
+    ? 'Tenant Name *'
+    : docType === 'student_fee_receipt'
+    ? 'Student Name *'
+    : 'Client / Business Name *';
+
+  const partyPlaceholder = isPurchasing
+    ? 'e.g. Acme Supplies Corp or Vendor Legal Name'
+    : isLogistics
+    ? 'e.g. Central Logistics Hub or Destination Depo'
+    : isHR
+    ? 'e.g. John Doe (EMP-0142)'
+    : docType === 'rent_receipt'
+    ? 'e.g. Resident Name / Tenant'
+    : docType === 'student_fee_receipt'
+    ? 'e.g. Student Name / Roll No.'
+    : 'e.g. Acme Corp or John Smith';
+
+  const partyAddressLabel = isPurchasing
+    ? 'Vendor Registered Address (Optional)'
+    : isLogistics
+    ? 'Destination / Delivery Address (Optional)'
+    : isHR
+    ? 'Residential Address (Optional)'
+    : 'Billing Address (Optional)';
+
+  const savedPartyBtnLabel = isPurchasing
+    ? 'Saved Vendors'
+    : isLogistics
+    ? 'Saved Locations'
+    : isHR
+    ? 'Saved Personnel'
+    : 'Saved Clients';
+
+  const isEstimateOrQuote = docType === 'estimate' || docType === 'quotation' || docDef?.category === 'quotations_proposals';
+  const hasDueDate = !isHR && docType !== 'receipt' && docType !== 'payment_voucher';
+  const dueDateLabel = isPurchasing || isLogistics
+    ? 'Expected Delivery Date *'
+    : isEstimateOrQuote
+    ? 'Valid Until *'
+    : docType === 'work_order'
+    ? 'Target Completion Date *'
+    : 'Due Date *';
+
+  const showPaymentTerms = docType === 'invoice' || docType === 'tax_invoice' || docType === 'commercial_invoice' || docType === 'service_invoice' || docType === 'progress_invoice';
+  const isInvoiceFamily = docType === 'invoice' || docType === 'tax_invoice' || docType === 'commercial_invoice' || docType === 'service_invoice' || docType === 'bill_of_supply' || docType === 'debit_note';
 
   // Form State
   const [docId, setDocId] = useState<string>(existingId || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
-  const [docNumber, setDocNumber] = useState<string>(docType === 'invoice' ? 'INV-2026-001' : 'EST-2026-001');
+  const [docNumber, setDocNumber] = useState<string>(`${defaultPrefix}${new Date().getFullYear()}-001`);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [businessProfileId, setBusinessProfileId] = useState<string>('default_business_profile');
   const [currency, setCurrency] = useState<string>('USD');
@@ -168,8 +261,36 @@ export default function DocumentEditScreen() {
   const [editingItem, setEditingItem] = useState<{ item: LineItemInput | null; index: number } | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const initialGstTemplate = (searchParams.templateId as PdfTemplateType) || 'gst_executive';
-  const [selectedGstTemplate, setSelectedGstTemplate] = useState<PdfTemplateType>(initialGstTemplate);
+  const availableTemplates = React.useMemo(() => {
+    if (activeConfig?.templates && activeConfig.templates.length > 0) {
+      return activeConfig.templates;
+    }
+    return GST_LAYOUT_DEFINITIONS.map((l) => ({
+      id: l.code,
+      code: l.referenceId,
+      name: l.name,
+      tagline: l.keyFeatures,
+      category: 'executive' as const,
+      categoryLabel: 'Layout',
+      similarTemplateIds: [],
+    }));
+  }, [activeConfig]);
+
+  const initialTemplateId = (searchParams.templateId as string) || activeConfig?.defaultTemplateId || availableTemplates[0]?.id || 'gst_executive';
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(initialTemplateId);
+
+  useEffect(() => {
+    if (searchParams.templateId) {
+      const match = availableTemplates.find((t) => t.id === searchParams.templateId);
+      if (match) {
+        setSelectedTemplateId(match.id);
+        return;
+      }
+    }
+    if (!availableTemplates.some((t) => t.id === selectedTemplateId)) {
+      setSelectedTemplateId(activeConfig?.defaultTemplateId || availableTemplates[0]?.id || 'gst_executive');
+    }
+  }, [availableTemplates, activeConfig, searchParams.templateId]);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [showReadinessChecklist, setShowReadinessChecklist] = useState(false);
   const [showQualityRubric, setShowQualityRubric] = useState(false);
@@ -196,6 +317,7 @@ export default function DocumentEditScreen() {
         const existing = await DocumentRepository.getById(existingId);
         if (existing) {
           setDocId(existing.id);
+          if (existing.doc_type) setDocType(existing.doc_type);
           if (existing.document_number) setDocNumber(existing.document_number);
           setBusinessProfileId(existing.business_profile_id);
           setCurrency(existing.currency);
@@ -398,7 +520,7 @@ export default function DocumentEditScreen() {
       customer_id: customer?.id || null,
       lifecycle_status: 'draft',
       issue_date: issueDate,
-      due_date: docType === 'invoice' ? dueDate : null,
+      due_date: hasDueDate ? dueDate : null,
       currency,
       subtotal_minor: subtotalMinor,
       discount_minor: discountMinor,
@@ -411,7 +533,7 @@ export default function DocumentEditScreen() {
       total_minor: totalMinor,
       deposit_minor: Number(calculatedDepositMinor),
       po_number: poNumber || null,
-      payment_terms_preset: paymentTermsPreset,
+      payment_terms_preset: showPaymentTerms ? paymentTermsPreset : undefined,
       shipping_address: shippingAddress || null,
       payment_instructions: paymentInstructions || null,
       notes: notes || null,
@@ -464,8 +586,8 @@ export default function DocumentEditScreen() {
   }, [fullDocForPreview, businessProfile]);
 
   const qualityResult = React.useMemo(() => {
-    return TemplateQualityScoreEngine.evaluate(selectedGstTemplate);
-  }, [selectedGstTemplate]);
+    return TemplateQualityScoreEngine.evaluate(selectedTemplateId as any);
+  }, [selectedTemplateId]);
 
   const handleExportPdf = useCallback(async () => {
     if (!businessProfile) {
@@ -474,13 +596,13 @@ export default function DocumentEditScreen() {
     }
     try {
       setIsExportingPdf(true);
-      await PdfService.shareDocumentPdfAsync(fullDocForPreview, businessProfile, selectedGstTemplate);
+      await PdfService.shareDocumentPdfAsync(fullDocForPreview, businessProfile, selectedTemplateId as any);
     } catch (err: any) {
       Alert.alert('Export Error', err?.message || 'Could not export document PDF.');
     } finally {
       setIsExportingPdf(false);
     }
-  }, [fullDocForPreview, businessProfile, selectedGstTemplate]);
+  }, [fullDocForPreview, businessProfile, selectedTemplateId]);
 
   // Autosave flush
   const flushAutosave = useCallback(async () => {
@@ -492,7 +614,7 @@ export default function DocumentEditScreen() {
         docType,
         customerId: customer?.id || null,
         issueDate,
-        dueDate: docType === 'invoice' ? dueDate : null,
+        dueDate: hasDueDate ? dueDate : null,
         currency,
         discountType,
         discountValue: calculatedDiscountValue,
@@ -503,7 +625,7 @@ export default function DocumentEditScreen() {
         terms,
         items,
         poNumber: poNumber.trim() || undefined,
-        paymentTermsPreset: docType === 'invoice' ? paymentTermsPreset : undefined,
+        paymentTermsPreset: showPaymentTerms ? paymentTermsPreset : undefined,
         shippingAddress: shippingAddress.trim() || undefined,
         paymentInstructions: paymentInstructions.trim() || undefined,
         internalNotes: internalNotes.trim() || undefined,
@@ -713,7 +835,7 @@ export default function DocumentEditScreen() {
     }
 
     if (activeItems.length === 0) {
-      const msg = `Please add at least one line item (service or product) with a price before issuing this ${docType}.`;
+      const msg = `Please add at least one line item (service or product) with a price before issuing this ${docShortTitle.toLowerCase()}.`;
       setServerErrorMessage(msg);
       showAlert('Line Item Required', msg);
       return;
@@ -753,7 +875,7 @@ export default function DocumentEditScreen() {
         docType,
         customerId: activeCustomer.id,
         issueDate,
-        dueDate: docType === 'invoice' ? dueDate : null,
+        dueDate: hasDueDate ? dueDate : null,
         currency,
         discountType,
         discountValue: calculatedDiscountValue,
@@ -764,7 +886,7 @@ export default function DocumentEditScreen() {
         terms,
         items: activeItems,
         poNumber: poNumber.trim() || undefined,
-        paymentTermsPreset: docType === 'invoice' ? paymentTermsPreset : undefined,
+        paymentTermsPreset: showPaymentTerms ? paymentTermsPreset : undefined,
         shippingAddress: shippingAddress.trim() || undefined,
         paymentInstructions: paymentInstructions.trim() || undefined,
         internalNotes: internalNotes.trim() || undefined,
@@ -838,7 +960,7 @@ export default function DocumentEditScreen() {
         docType,
         customerId: activeCustomer?.id || null,
         issueDate,
-        dueDate: docType === 'invoice' ? dueDate : null,
+        dueDate: hasDueDate ? dueDate : null,
         currency,
         discountType,
         discountValue: calculatedDiscountValue,
@@ -849,7 +971,7 @@ export default function DocumentEditScreen() {
         terms,
         items: activeItems,
         poNumber: poNumber.trim() || undefined,
-        paymentTermsPreset: docType === 'invoice' ? paymentTermsPreset : undefined,
+        paymentTermsPreset: showPaymentTerms ? paymentTermsPreset : undefined,
         shippingAddress: shippingAddress.trim() || undefined,
         paymentInstructions: paymentInstructions.trim() || undefined,
         internalNotes: internalNotes.trim() || undefined,
@@ -858,7 +980,7 @@ export default function DocumentEditScreen() {
       setSaveStatus('saved');
       showAlert(
         'Draft Saved',
-        `Your ${docType === 'invoice' ? 'invoice' : 'estimate'} draft was saved successfully.`,
+        `Your ${docShortTitle.toLowerCase()} draft was saved successfully.`,
         [
           { text: 'Keep Editing', style: 'cancel' },
           {
@@ -915,12 +1037,8 @@ export default function DocumentEditScreen() {
           <View style={styles.topBarCenter}>
             <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>
               {existingId
-                ? docType === 'invoice'
-                  ? 'Edit Invoice Draft'
-                  : 'Edit Estimate Draft'
-                : docType === 'invoice'
-                ? 'New Invoice'
-                : 'New Estimate'}
+                ? `Edit ${docShortTitle} Draft`
+                : `New ${docShortTitle}`}
             </Text>
             <Text style={[styles.topBarStatus, { color: theme.textMuted }]}>
               {saveStatus === 'saving' ? 'Saving draft...' : 'Draft saved'}
@@ -970,7 +1088,7 @@ export default function DocumentEditScreen() {
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.headingBadgeRow}>
                   <Text style={[styles.sectionHeading, { color: isCustomerMissing ? theme.statusDanger : theme.textPrimary }]}>
-                    Customer *
+                    {partySectionTitle}
                   </Text>
                   <View style={[styles.badgeRequired, { backgroundColor: isCustomerMissing ? theme.statusDanger + '1A' : theme.surfaceSecondary, borderColor: isCustomerMissing ? theme.statusDanger : theme.borderSubtle }]}>
                     <Text style={[styles.badgeRequiredText, { color: isCustomerMissing ? theme.statusDanger : theme.textSecondary }]}>
@@ -1033,10 +1151,10 @@ export default function DocumentEditScreen() {
                 </View>
               ) : (
                 <View style={[styles.customerInlineBox, { borderColor: isCustomerMissing ? theme.statusDanger : theme.borderSubtle, backgroundColor: theme.surface }]}>
-                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Client / Business Name *</Text>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{partyNameLabel}</Text>
                   <TextInput
                     style={[styles.input, { color: theme.textPrimary, borderColor: isCustomerMissing ? theme.statusDanger : theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
-                    placeholder="e.g. Acme Corp or John Smith"
+                    placeholder={partyPlaceholder}
                     placeholderTextColor={theme.textMuted}
                     value={inlineCustomerName}
                     onChangeText={(val) => {
@@ -1064,7 +1182,7 @@ export default function DocumentEditScreen() {
                       hitSlop={6}
                     >
                       <Users size={13} color={theme.textSecondary} />
-                      <Text style={[styles.chooseClientMiniText, { color: theme.textSecondary }]}>Saved Clients</Text>
+                      <Text style={[styles.chooseClientMiniText, { color: theme.textSecondary }]}>{savedPartyBtnLabel}</Text>
                     </Pressable>
                   </View>
 
@@ -1096,7 +1214,7 @@ export default function DocumentEditScreen() {
                         </View>
                       </View>
                       <View style={{ marginTop: spacing.xs }}>
-                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Billing Address (Optional)</Text>
+                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{partyAddressLabel}</Text>
                         <TextInput
                           style={[styles.input, styles.multiInput, { color: theme.textPrimary, borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}
                           placeholder="Street, City, Postal Code, Country"
@@ -1124,7 +1242,7 @@ export default function DocumentEditScreen() {
 
               {isCustomerMissing && (
                 <Text style={[styles.fieldInlineError, { color: theme.statusDanger }]}>
-                  Please enter a customer or client name before issuing this {docType}.
+                  Please enter a name for {partyNameLabel.replace('*', '').trim().toLowerCase()} before issuing this {docShortTitle}.
                 </Text>
               )}
             </View>
@@ -1194,20 +1312,20 @@ export default function DocumentEditScreen() {
                   </View>
                 </View>
 
-                {docType === 'invoice' && (
+                {hasDueDate && (
                   <View style={styles.dateCol}>
-                    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Due Date *</Text>
+                    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{dueDateLabel}</Text>
                     <View style={[styles.dateDisplayRow, { borderBottomColor: theme.borderSubtle }]}>
                       <Calendar color={theme.textMuted} size={16} />
                       <Text style={[styles.dateText, { color: theme.textPrimary }]}>
-                        {dueDate ? new Date(dueDate).toLocaleDateString(documentLocale) : 'Due on receipt'}
+                        {dueDate ? new Date(dueDate).toLocaleDateString(documentLocale) : (isEstimateOrQuote ? 'No expiry' : 'Due on receipt')}
                       </Text>
                     </View>
                   </View>
                 )}
               </View>
 
-              {docType === 'invoice' && (
+              {showPaymentTerms && (
                 <View style={{ marginTop: spacing.sm }}>
                   <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Payment Terms</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.termsPresetsScroll}>
@@ -1842,7 +1960,7 @@ export default function DocumentEditScreen() {
               <View style={styles.checkItemRow}>
                 <CheckCircle2 size={16} color={effectiveCustomerName ? theme.statusSuccess : theme.statusDanger} />
                 <Text style={[styles.checkItemText, { color: effectiveCustomerName ? theme.textPrimary : theme.statusDanger }]}>
-                  {effectiveCustomerName ? `Client: ${effectiveCustomerName}` : 'Client required (Type name or choose client)'}
+                  {effectiveCustomerName ? `${partyNameLabel.replace('*', '').trim()}: ${effectiveCustomerName}` : `${partyNameLabel.replace('*', '').trim()} required (Type name or choose from list)`}
                 </Text>
               </View>
               <View style={styles.checkItemRow}>
@@ -1885,15 +2003,13 @@ export default function DocumentEditScreen() {
                 label={
                   isIssuing
                     ? 'Issuing...'
-                    : docType === 'invoice'
-                    ? 'Issue Official Invoice'
-                    : 'Issue Official Estimate'
+                    : `Issue Official ${docShortTitle}`
                 }
                 icon={<FileCheck color={theme.primaryActionText} size={20} />}
                 onPress={handleIssue}
                 disabled={isIssuing || isSavingManual}
                 loading={isIssuing}
-                accessibilityLabel={docType === 'invoice' ? 'Issue official invoice' : 'Issue official estimate'}
+                accessibilityLabel={`Issue official ${docShortTitle.toLowerCase()}`}
                 fullWidth
               />
             </View>
@@ -1911,10 +2027,10 @@ export default function DocumentEditScreen() {
             <View style={[styles.topBar, { borderBottomColor: theme.borderSubtle, backgroundColor: theme.surface }]}>
               <View style={styles.topBarCenter}>
                 <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>
-                  {docType === 'invoice' ? 'Invoice Preview' : 'Estimate Preview'}
+                  {docShortTitle} Preview
                 </Text>
                 <Text style={[styles.topBarStatus, { color: theme.textMuted }]}>
-                  Draft (Not yet issued)
+                  Draft (Not yet issued) · {provenanceRule}
                 </Text>
               </View>
               <Pressable
@@ -1928,18 +2044,18 @@ export default function DocumentEditScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-              {/* 5 GST Layout Switcher Pills */}
+              {/* Layout Switcher Pills */}
               <View style={{ marginBottom: 12 }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textSecondary, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
-                  Select Tax Invoice Layout
+                  Select {docShortTitle} Layout ({availableTemplates.length} layouts)
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  {GST_LAYOUT_DEFINITIONS.map((l) => {
-                    const isSelected = selectedGstTemplate === l.code;
+                  {availableTemplates.map((l) => {
+                    const isSelected = selectedTemplateId === l.id;
                     return (
                       <Pressable
-                        key={l.code}
-                        onPress={() => setSelectedGstTemplate(l.code as PdfTemplateType)}
+                        key={l.id}
+                        onPress={() => setSelectedTemplateId(l.id)}
                         style={{
                           paddingHorizontal: 12,
                           paddingVertical: 7,
@@ -1956,7 +2072,7 @@ export default function DocumentEditScreen() {
                             color: isSelected ? theme.brandAnchorText : theme.textPrimary,
                           }}
                         >
-                          {l.referenceId} {l.name}
+                          {l.code} {l.name}
                         </Text>
                       </Pressable>
                     );
@@ -1982,8 +2098,8 @@ export default function DocumentEditScreen() {
                       <Shield size={16} color={readinessResult?.hardGatePassed ? '#4ade80' : '#f59e0b'} />
                       <Text style={{ fontSize: 13, fontWeight: '700', color: readinessResult?.hardGatePassed ? '#4ade80' : '#f59e0b' }}>
                         {readinessResult?.hardGatePassed
-                          ? 'Rule 46 Compliant (100% Passed)'
-                          : `Statutory Gate Incomplete (${readinessResult?.violations.length || 0} issues)`}
+                          ? `${provenanceRule} Verified (100% Passed)`
+                          : `${provenanceRule} Incomplete (${readinessResult?.violations.length || 0} issues)`}
                       </Text>
                     </View>
                     <Text style={{ fontSize: 11, color: '#94a3b8' }}>
@@ -2058,10 +2174,10 @@ export default function DocumentEditScreen() {
                       </View>
                     ) : null}
                     <Text style={[styles.previewDocType, { color: theme.textPrimary }]}>
-                      {docType.toUpperCase()}
+                      {docTitle.toUpperCase()}
                     </Text>
                     <View style={[styles.previewDraftTag, { borderColor: theme.statusDraft, backgroundColor: theme.surfaceSecondary }]}>
-                      <Text style={[styles.previewDraftTagText, { color: theme.statusDraft }]}>DRAFT</Text>
+                      <Text style={[styles.previewDraftTagText, { color: theme.statusDraft }]}>{provenanceRule ? `${provenanceRule.toUpperCase()} · DRAFT` : 'DRAFT'}</Text>
                     </View>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
@@ -2069,9 +2185,9 @@ export default function DocumentEditScreen() {
                     <Text style={[styles.previewDateValue, { color: theme.textPrimary }]}>
                       {new Date(issueDate).toLocaleDateString(documentLocale)}
                     </Text>
-                    {docType === 'invoice' && dueDate && (
+                    {hasDueDate && dueDate && (
                       <>
-                        <Text style={[styles.previewDateLabel, { color: theme.textSecondary, marginTop: 4 }]}>Due Date</Text>
+                        <Text style={[styles.previewDateLabel, { color: theme.textSecondary, marginTop: 4 }]}>{dueDateLabel.replace('*', '').trim()}</Text>
                         <Text style={[styles.previewDateValue, { color: theme.textPrimary }]}>
                           {new Date(dueDate).toLocaleDateString(documentLocale)}
                         </Text>
@@ -2089,7 +2205,9 @@ export default function DocumentEditScreen() {
 
                 {/* Customer */}
                 <View style={[styles.previewSectionBlock, { borderTopColor: theme.borderSubtle, borderTopWidth: 1 }]}>
-                  <Text style={[styles.previewSectionHeading, { color: theme.textSecondary }]}>Bill To:</Text>
+                  <Text style={[styles.previewSectionHeading, { color: theme.textSecondary }]}>
+                    {isPurchasing ? 'Vendor / Supplier:' : isLogistics ? 'Consignee / Deliver To:' : isHR ? 'Employee / Recipient:' : 'Bill To:'}
+                  </Text>
                   {customer ? (
                     <View style={{ marginTop: 2 }}>
                       <Text style={[styles.previewCustomerName, { color: theme.textPrimary }]}>{customer.name}</Text>
@@ -2188,7 +2306,7 @@ export default function DocumentEditScreen() {
                       {formatMoney(calculation.grandTotal, documentLocale)}
                     </Text>
                   </View>
-                  {docType === 'invoice' && calculation.deposit.amountMinor > 0n && (
+                  {isInvoiceFamily && calculation.deposit.amountMinor > 0n && (
                     <View style={styles.totalRow}>
                       <Text style={[styles.totalLabel, { color: theme.textSecondary }]}>Deposit Applied</Text>
                       <Text style={[styles.totalValue, { color: theme.statusSuccess }]}>
@@ -2196,7 +2314,7 @@ export default function DocumentEditScreen() {
                       </Text>
                     </View>
                   )}
-                  {docType === 'invoice' && (
+                  {isInvoiceFamily && (
                     <View style={[styles.totalRow, { marginTop: 4 }]}>
                       <Text style={[styles.balanceDueLabel, { color: theme.brandAnchor }]}>Balance Due</Text>
                       <Text style={[styles.balanceDueValue, { color: theme.brandAnchor }]}>
@@ -2248,7 +2366,7 @@ export default function DocumentEditScreen() {
                   label={
                     isExportingPdf
                       ? 'Generating Official PDF...'
-                      : `Export PDF (${GST_LAYOUT_DEFINITIONS.find((l) => l.code === selectedGstTemplate)?.referenceId || 'GST'})`
+                      : `Export PDF (${availableTemplates.find((t) => t.id === selectedTemplateId)?.code || docShortTitle})`
                   }
                   icon={<Share2 color={theme.primaryActionText} size={18} />}
                   onPress={handleExportPdf}

@@ -10,6 +10,7 @@ import { formatMoney } from '../../../domain/money/Money';
 import { quantityScaledToString } from '../../../domain/documents/quantity';
 import { escapeHtml, formatDate, getBaseCss } from './commonStyles';
 import { TemplateCustomization } from '../types';
+import { DocumentTypeRegistry } from '../../../domain/documents/DocumentTypeRegistry';
 
 export function renderModernTemplate(
   doc: FullDocument,
@@ -19,8 +20,10 @@ export function renderModernTemplate(
 ): string {
   const currency = doc.currency || 'USD';
 
+  const docDef = DocumentTypeRegistry.get(doc.doc_type);
   const docTitle =
-    doc.doc_type === 'estimate'
+    docDef?.name?.toUpperCase() ||
+    (doc.doc_type === 'estimate'
       ? 'ESTIMATE'
       : doc.doc_type === 'receipt'
       ? 'PAYMENT RECEIPT'
@@ -32,7 +35,7 @@ export function renderModernTemplate(
       ? 'DELIVERY NOTE'
       : doc.doc_type === 'work_order'
       ? 'WORK ORDER'
-      : 'INVOICE';
+      : 'INVOICE');
 
   const itemsHtml = (doc.items || [])
     .map((item, idx) => {

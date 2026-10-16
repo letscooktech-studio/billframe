@@ -51,7 +51,7 @@ export function renderGst01ExecutiveLetterheadHtml(
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Tax Invoice - ${escapeHtml(d.invoiceNo)}</title>
+  <title>${escapeHtml(d.documentTitle)} - ${escapeHtml(d.invoiceNo)}</title>
   <style>
     ${MONOCHROME_PRINT_CSS}
 
@@ -292,7 +292,7 @@ export function renderGst01ExecutiveLetterheadHtml(
         </td>
         <td style="width: 2%; border-left: 1px solid #D1D5DB;"></td>
         <td style="width: 40%; vertical-align: top;">
-          <div class="tax-invoice-heading">TAX INVOICE</div>
+          <div class="tax-invoice-heading">${escapeHtml(d.documentTitle)}</div>
           <table class="invoice-meta-kv">
             <tr><td class="k">Invoice No.</td><td>:</td><td class="v">${escapeHtml(d.invoiceNo)}</td></tr>
             <tr><td class="k">Invoice Date</td><td>:</td><td class="v">${escapeHtml(d.issueDateStr)}</td></tr>

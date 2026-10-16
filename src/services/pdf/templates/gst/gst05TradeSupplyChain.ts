@@ -50,7 +50,7 @@ export function renderGst05TradeSupplyChainHtml(
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Tax Invoice - ${escapeHtml(d.invoiceNo)}</title>
+  <title>${escapeHtml(d.documentTitle)} - ${escapeHtml(d.invoiceNo)}</title>
   <style>
     ${MONOCHROME_PRINT_CSS}
 
@@ -298,7 +298,7 @@ export function renderGst05TradeSupplyChainHtml(
           </div>
         </td>
         <td style="width: 38%; vertical-align: top; text-align: right;">
-          <div class="tax-heading">TAX INVOICE</div>
+          <div class="tax-heading">${escapeHtml(d.documentTitle)}</div>
           <div class="invoice-no-box">
             Invoice No.<br />
             <span class="invoice-no-val">[${escapeHtml(d.invoiceNo)}]</span>

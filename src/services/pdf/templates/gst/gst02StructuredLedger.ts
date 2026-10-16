@@ -50,7 +50,7 @@ export function renderGst02StructuredLedgerHtml(
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Tax Invoice - ${escapeHtml(d.invoiceNo)}</title>
+  <title>${escapeHtml(d.documentTitle)} - ${escapeHtml(d.invoiceNo)}</title>
   <style>
     ${MONOCHROME_PRINT_CSS}
 
@@ -312,7 +312,7 @@ export function renderGst02StructuredLedgerHtml(
         </td>
         <td style="width: 2%; border-left: 1px solid #000000;"></td>
         <td style="width: 36%; vertical-align: top; text-align: right;">
-          <div class="tax-invoice-heading">TAX INVOICE</div>
+          <div class="tax-invoice-heading">${escapeHtml(d.documentTitle)}</div>
           <div class="invoice-classification">ORIGINAL FOR RECIPIENT</div>
         </td>
       </tr>

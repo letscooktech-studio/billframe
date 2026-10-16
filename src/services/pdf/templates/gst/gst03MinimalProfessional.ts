@@ -31,7 +31,7 @@ export function renderGst03MinimalProfessionalHtml(
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Tax Invoice - ${escapeHtml(d.invoiceNo)}</title>
+  <title>${escapeHtml(d.documentTitle)} - ${escapeHtml(d.invoiceNo)}</title>
   <style>
     ${MONOCHROME_PRINT_CSS}
 
@@ -234,7 +234,7 @@ export function renderGst03MinimalProfessionalHtml(
     <table class="header-table">
       <tr>
         <td style="width: 50%; vertical-align: bottom;">
-          <div class="invoice-title-tag">TAX INVOICE</div>
+          <div class="invoice-title-tag">${escapeHtml(d.documentTitle)}</div>
           <div class="big-invoice-number">[${escapeHtml(d.invoiceNo)}]</div>
           <div class="original-recipient-tag">ORIGINAL FOR RECIPIENT</div>
         </td>

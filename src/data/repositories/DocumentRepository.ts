@@ -14,6 +14,7 @@ import { buildDocumentSnapshot } from '../../domain/documents/SnapshotBuilder';
 import { formatDocumentNumber } from '../../domain/numbering/SequenceEngine';
 import { AuditEventRepository } from './AuditEventRepository';
 import { calculateDocumentBalance } from '../../domain/accounting/BalanceEngine';
+import { DocumentTypeRegistry } from '../../domain/documents/DocumentTypeRegistry';
 import {
   DiscountType,
   DocumentCalculationOutput,
@@ -193,6 +194,7 @@ export class DocumentRepository {
           parent_document_id, is_archived, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
+          doc_type = excluded.doc_type,
           customer_id = excluded.customer_id,
           job_id = excluded.job_id,
           issue_date = excluded.issue_date,
@@ -346,7 +348,9 @@ export class DocumentRepository {
         [activeProfileId, doc.doc_type]
       );
 
-      const prefix = seq?.prefix || (doc.doc_type === 'invoice' ? 'INV-' : 'EST-');
+      const docDef = DocumentTypeRegistry.get(doc.doc_type);
+      const defaultPrefix = docDef?.defaultPrefix || (doc.doc_type === 'invoice' ? 'INV-' : doc.doc_type === 'estimate' ? 'EST-' : 'DOC-');
+      const prefix = seq?.prefix || defaultPrefix;
       const padding = seq?.padding || 4;
       const suffix = seq?.suffix || '';
 

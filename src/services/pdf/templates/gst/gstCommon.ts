@@ -12,6 +12,7 @@ import { FullDocument } from '../../../../data/repositories/DocumentRepository';
 import { BusinessProfile } from '../../../../domain/profile/types';
 import { formatMoney } from '../../../../domain/money/Money';
 import { quantityScaledToString } from '../../../../domain/documents/quantity';
+import { DocumentTypeRegistry } from '../../../../domain/documents/DocumentTypeRegistry';
 import { TemplateCustomization } from '../../types';
 
 export function escapeHtml(str: any): string {
@@ -90,6 +91,7 @@ export interface GstParsedData {
   logoHtml: string;
 
   invoiceNo: string;
+  documentTitle: string;
   issueDateStr: string;
   dueDateStr: string;
   placeOfSupply: string;
@@ -205,6 +207,17 @@ export function parseGstInvoiceData(
     : supplierStateCode;
   const placeOfSupplyCode = (doc as any).place_of_supply_code || detectedPosCode;
   const reverseChargeStr = (doc as any).reverse_charge ? 'YES' : 'NO';
+  const docDef = DocumentTypeRegistry.get(doc.doc_type);
+  let documentTitle = (doc as any).document_title;
+  if (!documentTitle) {
+    if (!doc.doc_type || doc.doc_type === 'invoice' || doc.doc_type === 'tax_invoice') {
+      documentTitle = 'TAX INVOICE';
+    } else if (docDef?.name) {
+      documentTitle = docDef.name.toUpperCase();
+    } else {
+      documentTitle = doc.doc_type.replace(/_/g, ' ').toUpperCase();
+    }
+  }
   const invoiceTypeStr = (doc as any).invoice_type || 'REGULAR';
   const supplyTypeStr = (doc as any).supply_type || 'SERVICES';
   const orderRef = (doc as any).order_reference || (doc as any).po_number || 'PO-98214';
@@ -314,6 +327,7 @@ export function parseGstInvoiceData(
     logoHtml,
 
     invoiceNo,
+    documentTitle,
     issueDateStr,
     dueDateStr,
     placeOfSupply,

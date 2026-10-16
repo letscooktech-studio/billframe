@@ -10,6 +10,7 @@ import { formatMoney } from '../../../domain/money/Money';
 import { quantityScaledToString } from '../../../domain/documents/quantity';
 import { escapeHtml, formatDate, getBaseCss } from './commonStyles';
 import { TemplateCustomization } from '../types';
+import { DocumentTypeRegistry } from '../../../domain/documents/DocumentTypeRegistry';
 
 export function renderMinimalTemplate(
   doc: FullDocument,
@@ -19,8 +20,10 @@ export function renderMinimalTemplate(
 ): string {
   const currency = doc.currency || 'USD';
 
+  const docDef = DocumentTypeRegistry.get(doc.doc_type);
   const docTitle =
-    doc.doc_type === 'estimate'
+    docDef?.name ||
+    (doc.doc_type === 'estimate'
       ? 'Estimate'
       : doc.doc_type === 'receipt'
       ? 'Payment Receipt'
@@ -36,7 +39,7 @@ export function renderMinimalTemplate(
       ? 'Statement of Work'
       : doc.doc_type === 'proposal'
       ? 'Proposal'
-      : 'Invoice';
+      : 'Invoice');
 
   const itemsHtml = (doc.items || [])
     .map((item) => {
