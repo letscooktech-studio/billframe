@@ -408,3 +408,354 @@ export class GenericCountryPack implements CountryPack {
     };
   }
 }
+
+/**
+ * AUSTRALIA GST PACK (AU)
+ * Standard 10% Goods and Services Tax (GST) under A New Tax System (GST) Act 1999.
+ */
+export class AustraliaGstPack implements CountryPack {
+  readonly metadata: CountryPackMetadata = {
+    packId: 'AU_GST',
+    countryCode: 'AU',
+    name: 'Australia Goods and Services Tax',
+    version: '2026.01',
+    taxSystem: 'GST',
+    defaultCurrency: 'AUD',
+    capabilities: ['place_of_supply', 'inclusive_exclusive', 'flat_override'],
+    defaultRateBasisPoints: 1000n, // 10% Standard GST
+  };
+
+  resolveItemTax(context: TaxContext): TaxDecision {
+    const { item, taxType, customer } = context;
+    const rateBasisPoints = item.taxRateBasisPoints ?? this.metadata.defaultRateBasisPoints;
+
+    const rawQty = item.quantityScaled > 0n ? item.quantityScaled : 10000n;
+    const rawLine = roundHalfUp(item.unitPriceMinor * rawQty, 10000n);
+    const disc = item.discountMinor && item.discountMinor > 0n ? item.discountMinor : 0n;
+    const lineNet = rawLine > disc ? rawLine - disc : 0n;
+
+    const placeOfSupply = customer?.subdivisionCode || customer?.countryIso2 || 'AU';
+
+    if (taxType === 'none' || rateBasisPoints <= 0n) {
+      return {
+        packId: this.metadata.packId,
+        packVersion: this.metadata.version,
+        ruleId: 'AU_GST_FREE',
+        placeOfSupply,
+        supplyType: 'exempt',
+        reverseCharge: false,
+        taxType,
+        components: [],
+        totalTaxRateBasisPoints: 0n,
+        taxableAmountMinor: lineNet,
+        totalTaxAmountMinor: 0n,
+        grossAmountMinor: lineNet,
+        roundingAdjustmentMinor: 0n,
+        notes: ['GST-Free Supply under Division 38 of GST Act 1999'],
+      };
+    }
+
+    let taxableAmountMinor = 0n;
+    let totalTaxAmountMinor = 0n;
+    let grossAmountMinor = 0n;
+
+    if (taxType === 'exclusive') {
+      taxableAmountMinor = lineNet;
+      totalTaxAmountMinor = roundHalfUp(taxableAmountMinor * rateBasisPoints, 10000n);
+      grossAmountMinor = taxableAmountMinor + totalTaxAmountMinor;
+    } else {
+      grossAmountMinor = lineNet;
+      const denom = 10000n + rateBasisPoints;
+      taxableAmountMinor = roundHalfUp(grossAmountMinor * 10000n, denom);
+      totalTaxAmountMinor = grossAmountMinor - taxableAmountMinor;
+    }
+
+    return {
+      packId: this.metadata.packId,
+      packVersion: this.metadata.version,
+      ruleId: 'AU_GST_STANDARD',
+      placeOfSupply,
+      supplyType: 'intra_state',
+      reverseCharge: false,
+      taxType,
+      components: [
+        {
+          code: 'GST',
+          name: 'Goods and Services Tax',
+          rateBasisPoints,
+          amountMinor: totalTaxAmountMinor,
+          jurisdiction: placeOfSupply,
+        },
+      ],
+      totalTaxRateBasisPoints: rateBasisPoints,
+      taxableAmountMinor,
+      totalTaxAmountMinor,
+      grossAmountMinor,
+      roundingAdjustmentMinor: 0n,
+      notes: [],
+    };
+  }
+}
+
+/**
+ * UNITED ARAB EMIRATES VAT PACK (AE)
+ * Standard 5% Value Added Tax under Federal Decree-Law No. (8) of 2017.
+ */
+export class UaeVatPack implements CountryPack {
+  readonly metadata: CountryPackMetadata = {
+    packId: 'AE_VAT',
+    countryCode: 'AE',
+    name: 'United Arab Emirates Value Added Tax',
+    version: '2026.01',
+    taxSystem: 'VAT',
+    defaultCurrency: 'AED',
+    capabilities: ['place_of_supply', 'inclusive_exclusive', 'flat_override'],
+    defaultRateBasisPoints: 500n, // 5% Standard VAT
+  };
+
+  resolveItemTax(context: TaxContext): TaxDecision {
+    const { item, taxType, customer } = context;
+    const rateBasisPoints = item.taxRateBasisPoints ?? this.metadata.defaultRateBasisPoints;
+
+    const rawQty = item.quantityScaled > 0n ? item.quantityScaled : 10000n;
+    const rawLine = roundHalfUp(item.unitPriceMinor * rawQty, 10000n);
+    const disc = item.discountMinor && item.discountMinor > 0n ? item.discountMinor : 0n;
+    const lineNet = rawLine > disc ? rawLine - disc : 0n;
+
+    const placeOfSupply = customer?.subdivisionCode || customer?.countryIso2 || 'AE';
+
+    if (taxType === 'none' || rateBasisPoints <= 0n) {
+      return {
+        packId: this.metadata.packId,
+        packVersion: this.metadata.version,
+        ruleId: 'AE_VAT_ZERO',
+        placeOfSupply,
+        supplyType: 'exempt',
+        reverseCharge: false,
+        taxType,
+        components: [],
+        totalTaxRateBasisPoints: 0n,
+        taxableAmountMinor: lineNet,
+        totalTaxAmountMinor: 0n,
+        grossAmountMinor: lineNet,
+        roundingAdjustmentMinor: 0n,
+        notes: ['Zero-rated or Designated Free Zone Supply under Article 45/51'],
+      };
+    }
+
+    let taxableAmountMinor = 0n;
+    let totalTaxAmountMinor = 0n;
+    let grossAmountMinor = 0n;
+
+    if (taxType === 'exclusive') {
+      taxableAmountMinor = lineNet;
+      totalTaxAmountMinor = roundHalfUp(taxableAmountMinor * rateBasisPoints, 10000n);
+      grossAmountMinor = taxableAmountMinor + totalTaxAmountMinor;
+    } else {
+      grossAmountMinor = lineNet;
+      const denom = 10000n + rateBasisPoints;
+      taxableAmountMinor = roundHalfUp(grossAmountMinor * 10000n, denom);
+      totalTaxAmountMinor = grossAmountMinor - taxableAmountMinor;
+    }
+
+    return {
+      packId: this.metadata.packId,
+      packVersion: this.metadata.version,
+      ruleId: 'AE_VAT_STANDARD',
+      placeOfSupply,
+      supplyType: 'intra_state',
+      reverseCharge: false,
+      taxType,
+      components: [
+        {
+          code: 'VAT',
+          name: 'Value Added Tax (ضريبة القيمة المضافة)',
+          rateBasisPoints,
+          amountMinor: totalTaxAmountMinor,
+          jurisdiction: placeOfSupply,
+        },
+      ],
+      totalTaxRateBasisPoints: rateBasisPoints,
+      taxableAmountMinor,
+      totalTaxAmountMinor,
+      grossAmountMinor,
+      roundingAdjustmentMinor: 0n,
+      notes: [],
+    };
+  }
+}
+
+/**
+ * GERMANY / EU VAT PACK (DE)
+ * Standard 19% Mehrwertsteuer (MwSt) under § 12 UStG & EU VAT Directive 2006/112/EC.
+ */
+export class GermanyVatPack implements CountryPack {
+  readonly metadata: CountryPackMetadata = {
+    packId: 'DE_VAT',
+    countryCode: 'DE',
+    name: 'Germany Value Added Tax (MwSt / USt)',
+    version: '2026.01',
+    taxSystem: 'MwSt',
+    defaultCurrency: 'EUR',
+    capabilities: ['place_of_supply', 'inclusive_exclusive', 'flat_override'],
+    defaultRateBasisPoints: 1900n, // 19% Standard MwSt
+  };
+
+  resolveItemTax(context: TaxContext): TaxDecision {
+    const { item, taxType, customer } = context;
+    const rateBasisPoints = item.taxRateBasisPoints ?? this.metadata.defaultRateBasisPoints;
+
+    const rawQty = item.quantityScaled > 0n ? item.quantityScaled : 10000n;
+    const rawLine = roundHalfUp(item.unitPriceMinor * rawQty, 10000n);
+    const disc = item.discountMinor && item.discountMinor > 0n ? item.discountMinor : 0n;
+    const lineNet = rawLine > disc ? rawLine - disc : 0n;
+
+    const placeOfSupply = customer?.subdivisionCode || customer?.countryIso2 || 'DE';
+
+    if (taxType === 'none' || rateBasisPoints <= 0n) {
+      return {
+        packId: this.metadata.packId,
+        packVersion: this.metadata.version,
+        ruleId: 'DE_UST_STEUERFREI',
+        placeOfSupply,
+        supplyType: 'exempt',
+        reverseCharge: false,
+        taxType,
+        components: [],
+        totalTaxRateBasisPoints: 0n,
+        taxableAmountMinor: lineNet,
+        totalTaxAmountMinor: 0n,
+        grossAmountMinor: lineNet,
+        roundingAdjustmentMinor: 0n,
+        notes: ['Steuerfreie Lieferung (§ 4 UStG) oder Umkehrung der Steuerschuldnerschaft (Reverse Charge)'],
+      };
+    }
+
+    let taxableAmountMinor = 0n;
+    let totalTaxAmountMinor = 0n;
+    let grossAmountMinor = 0n;
+
+    if (taxType === 'exclusive') {
+      taxableAmountMinor = lineNet;
+      totalTaxAmountMinor = roundHalfUp(taxableAmountMinor * rateBasisPoints, 10000n);
+      grossAmountMinor = taxableAmountMinor + totalTaxAmountMinor;
+    } else {
+      grossAmountMinor = lineNet;
+      const denom = 10000n + rateBasisPoints;
+      taxableAmountMinor = roundHalfUp(grossAmountMinor * 10000n, denom);
+      totalTaxAmountMinor = grossAmountMinor - taxableAmountMinor;
+    }
+
+    return {
+      packId: this.metadata.packId,
+      packVersion: this.metadata.version,
+      ruleId: 'DE_UST_STANDARD',
+      placeOfSupply,
+      supplyType: 'intra_state',
+      reverseCharge: false,
+      taxType,
+      components: [
+        {
+          code: 'MWST',
+          name: 'Mehrwertsteuer (Umsatzsteuer)',
+          rateBasisPoints,
+          amountMinor: totalTaxAmountMinor,
+          jurisdiction: placeOfSupply,
+        },
+      ],
+      totalTaxRateBasisPoints: rateBasisPoints,
+      taxableAmountMinor,
+      totalTaxAmountMinor,
+      grossAmountMinor,
+      roundingAdjustmentMinor: 0n,
+      notes: [],
+    };
+  }
+}
+
+/**
+ * SINGAPORE GST PACK (SG)
+ * Standard 9% Goods and Services Tax under IRAS GST Act 1993.
+ */
+export class SingaporeGstPack implements CountryPack {
+  readonly metadata: CountryPackMetadata = {
+    packId: 'SG_GST',
+    countryCode: 'SG',
+    name: 'Singapore Goods and Services Tax',
+    version: '2026.01',
+    taxSystem: 'GST',
+    defaultCurrency: 'SGD',
+    capabilities: ['place_of_supply', 'inclusive_exclusive', 'flat_override'],
+    defaultRateBasisPoints: 900n, // 9% Standard GST (effective 2024+)
+  };
+
+  resolveItemTax(context: TaxContext): TaxDecision {
+    const { item, taxType } = context;
+    const rateBasisPoints = item.taxRateBasisPoints ?? this.metadata.defaultRateBasisPoints;
+
+    const rawQty = item.quantityScaled > 0n ? item.quantityScaled : 10000n;
+    const rawLine = roundHalfUp(item.unitPriceMinor * rawQty, 10000n);
+    const disc = item.discountMinor && item.discountMinor > 0n ? item.discountMinor : 0n;
+    const lineNet = rawLine > disc ? rawLine - disc : 0n;
+
+    if (taxType === 'none' || rateBasisPoints <= 0n) {
+      return {
+        packId: this.metadata.packId,
+        packVersion: this.metadata.version,
+        ruleId: 'SG_GST_ZERO',
+        placeOfSupply: 'SG',
+        supplyType: 'exempt',
+        reverseCharge: false,
+        taxType,
+        components: [],
+        totalTaxRateBasisPoints: 0n,
+        taxableAmountMinor: lineNet,
+        totalTaxAmountMinor: 0n,
+        grossAmountMinor: lineNet,
+        roundingAdjustmentMinor: 0n,
+        notes: ['Zero-rated international supply or exempt financial service'],
+      };
+    }
+
+    let taxableAmountMinor = 0n;
+    let totalTaxAmountMinor = 0n;
+    let grossAmountMinor = 0n;
+
+    if (taxType === 'exclusive') {
+      taxableAmountMinor = lineNet;
+      totalTaxAmountMinor = roundHalfUp(taxableAmountMinor * rateBasisPoints, 10000n);
+      grossAmountMinor = taxableAmountMinor + totalTaxAmountMinor;
+    } else {
+      grossAmountMinor = lineNet;
+      const denom = 10000n + rateBasisPoints;
+      taxableAmountMinor = roundHalfUp(grossAmountMinor * 10000n, denom);
+      totalTaxAmountMinor = grossAmountMinor - taxableAmountMinor;
+    }
+
+    return {
+      packId: this.metadata.packId,
+      packVersion: this.metadata.version,
+      ruleId: 'SG_GST_STANDARD',
+      placeOfSupply: 'SG',
+      supplyType: 'intra_state',
+      reverseCharge: false,
+      taxType,
+      components: [
+        {
+          code: 'GST',
+          name: 'Goods and Services Tax',
+          rateBasisPoints,
+          amountMinor: totalTaxAmountMinor,
+          jurisdiction: 'SG',
+        },
+      ],
+      totalTaxRateBasisPoints: rateBasisPoints,
+      taxableAmountMinor,
+      totalTaxAmountMinor,
+      grossAmountMinor,
+      roundingAdjustmentMinor: 0n,
+      notes: [],
+    };
+  }
+}
+

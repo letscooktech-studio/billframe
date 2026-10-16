@@ -81,6 +81,7 @@ import { PdfTemplateType } from '../../services/pdf/types';
 import { DocumentReadinessValidator } from '../../domain/documents/universal/DocumentReadinessValidator';
 import { TemplateQualityScoreEngine } from '../../domain/documents/universal/TemplateQualityScore';
 import { GST_LAYOUT_DEFINITIONS } from '../../services/pdf/templates/gst';
+import { COUNTRIES } from '../../data/geography/countries';
 
 const COMMON_CURRENCIES = [
   { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
@@ -282,10 +283,17 @@ export default function DocumentEditScreen() {
             setNotes(profile.default_notes);
             setIsNotesTermsExpanded(true);
           }
-          if (profile.country_iso2 === 'IN') {
-            setTaxLabel('GST');
-          } else if (profile.country_iso2 === 'GB') {
-            setTaxLabel('VAT');
+          if (profile.country_iso2) {
+            const countryMeta = COUNTRIES.find((c) => c.iso2.toUpperCase() === profile.country_iso2?.toUpperCase());
+            if (countryMeta?.taxSystemName) {
+              setTaxLabel(countryMeta.taxSystemName);
+            } else if (profile.country_iso2 === 'IN') {
+              setTaxLabel('GST');
+            } else if (profile.country_iso2 === 'GB') {
+              setTaxLabel('VAT');
+            } else if (profile.country_iso2 === 'US') {
+              setTaxLabel('Sales Tax');
+            }
           }
         }
         if (searchParams.customerId) {

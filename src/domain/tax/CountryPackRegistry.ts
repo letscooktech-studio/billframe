@@ -7,8 +7,12 @@
 import { CountryPack } from './CountryPack';
 import { IndiaGstPack } from './packs/IndiaGstPack';
 import {
+  AustraliaGstPack,
   CanadaGstHstPack,
   GenericCountryPack,
+  GermanyVatPack,
+  SingaporeGstPack,
+  UaeVatPack,
   UkVatPack,
   UsSalesTaxPack,
 } from './packs/GlobalCountryPacks';
@@ -22,12 +26,20 @@ export class CountryPackRegistry {
     const usPack = new UsSalesTaxPack();
     const ukPack = new UkVatPack();
     const caPack = new CanadaGstHstPack();
+    const auPack = new AustraliaGstPack();
+    const aePack = new UaeVatPack();
+    const dePack = new GermanyVatPack();
+    const sgPack = new SingaporeGstPack();
 
     this.packs.set('IN', indiaPack);
     this.packs.set('US', usPack);
     this.packs.set('GB', ukPack);
     this.packs.set('UK', ukPack);
     this.packs.set('CA', caPack);
+    this.packs.set('AU', auPack);
+    this.packs.set('AE', aePack);
+    this.packs.set('DE', dePack);
+    this.packs.set('SG', sgPack);
   }
 
   /**
