@@ -990,7 +990,218 @@ export const DOCUMENT_TYPE_CONFIGS: Record<string, DocumentTypeConfig> = {
       { id: 'nda_retail', code: 'NDA-05', name: 'Employee Confidentiality Memo', tagline: 'Standard employee onboarding secrecy pledge with trade secret return policy', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['nda_minimal', 'nda_ledger'] },
     ],
   },
+  commercial_invoice: {
+    id: 'commercial_invoice',
+    title: 'Commercial Invoice',
+    shortName: 'Commercial Invoice',
+    subtitle: 'Standard commercial sales billing for international & non-GST B2B trade',
+    icon: Globe,
+    defaultTemplateId: 'ci_executive',
+    templates: [
+      { id: 'ci_executive', code: 'CI-01', name: 'Executive Commercial Invoice', tagline: 'Classic brand masthead with Incoterms and international wire routing', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['ci_corporate', 'ci_minimal'] },
+      { id: 'ci_ledger', code: 'CI-02', name: 'Structured Itemized Ledger', tagline: 'Dense tabular grid with unit rates, package tallies, and customs commodity codes', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['ci_executive', 'ci_corporate'] },
+      { id: 'ci_minimal', code: 'CI-03', name: 'Modern Minimalist Invoice', tagline: 'Clean typography with quiet whitespace and prominent commercial invoice number', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['ci_executive', 'ci_ledger'] },
+      { id: 'ci_corporate', code: 'CI-04', name: 'Corporate Global Trade', tagline: 'Dual entity billing with destination port, currency parity, and payment terms', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['ci_executive', 'ci_ledger'] },
+      { id: 'ci_retail', code: 'CI-05', name: 'Trade Dispatch Bill', tagline: 'Fast commercial dispatch bill with courier consignment tracking', category: 'retail', categoryLabel: 'Trade', similarTemplateIds: ['ci_minimal', 'ci_ledger'] },
+    ],
+  },
+  invoice_cum_bill_of_supply: {
+    id: 'invoice_cum_bill_of_supply',
+    title: 'Invoice-cum-Bill of Supply',
+    shortName: 'Invoice-cum-Bill',
+    subtitle: 'Rule 46A statutory instrument for taxable & exempt mixed supplies',
+    icon: FileSpreadsheet,
+    defaultTemplateId: 'icb_ledger',
+    templates: [
+      { id: 'icb_executive', code: 'ICB-01', name: 'Executive Mixed Supply Memo', tagline: 'Statutory Rule 46A banner with distinct taxable and exempt item separation', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['icb_ledger', 'icb_corporate'] },
+      { id: 'icb_ledger', code: 'ICB-02', name: 'Dual Schedule Ledger', tagline: 'Side-by-side taxable value calculation and exempt supply reconciliation tally', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['icb_executive', 'icb_corporate'] },
+      { id: 'icb_minimal', code: 'ICB-03', name: 'Modern Composite Bill', tagline: 'Clean format with concise Rule 46A declaration and quiet totals band', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['icb_executive', 'icb_ledger'] },
+      { id: 'icb_corporate', code: 'ICB-04', name: 'Enterprise Composite Contract', tagline: 'Dual buyer/consignee panels with multi-tier GST tax component breakdown', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['icb_executive', 'icb_ledger'] },
+      { id: 'icb_retail', code: 'ICB-05', name: 'Retail Composite Counter Slip', tagline: 'Counter receipt handling mixed grocery/hardware taxable and exempt products', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['icb_minimal', 'icb_ledger'] },
+    ],
+  },
+  cash_bill: {
+    id: 'cash_bill',
+    title: 'Cash Bill / Cash Memo',
+    shortName: 'Cash Memo',
+    subtitle: 'Over-the-counter sales memo with immediate cash settlement',
+    icon: Receipt,
+    defaultTemplateId: 'cb_retail',
+    templates: [
+      { id: 'cb_executive', code: 'CB-01', name: 'Executive Cash Bill', tagline: 'Formal cash transaction memo with cashier signature and payment seal', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['cb_minimal', 'cb_retail'] },
+      { id: 'cb_ledger', code: 'CB-02', name: 'Itemized Cash Ledger', tagline: 'Structured list of counter sales items with cash tendered and change returned', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['cb_retail', 'cb_corporate'] },
+      { id: 'cb_minimal', code: 'CB-03', name: 'Modern Minimal Cash Slip', tagline: 'Clean typography with paid in cash badge and zero remaining balance', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['cb_executive', 'cb_retail'] },
+      { id: 'cb_corporate', code: 'CB-04', name: 'Corporate Petty Cash Sale', tagline: 'Internal petty cash sales bill with cost center billing code', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['cb_executive', 'cb_ledger'] },
+      { id: 'cb_retail', code: 'CB-05', name: 'Store Cash Memo', tagline: 'High-speed counter cash memo with cashier register stamp and barcode', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['cb_minimal', 'cb_ledger'] },
+    ],
+  },
+  pos_receipt: {
+    id: 'pos_receipt',
+    title: 'POS Terminal Receipt',
+    shortName: 'POS Receipt',
+    subtitle: 'High-speed thermal register slip with dynamic QR & barcode verification',
+    icon: Receipt,
+    defaultTemplateId: 'pos_retail',
+    templates: [
+      { id: 'pos_executive', code: 'POS-01', name: 'Executive Register Voucher', tagline: 'Premium terminal receipt with customer reward points and tax tally', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['pos_retail', 'pos_minimal'] },
+      { id: 'pos_ledger', code: 'POS-02', name: 'Detailed Thermal Slip', tagline: 'High-density line-by-line item barcode tally with discounts and card approval', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['pos_retail', 'pos_corporate'] },
+      { id: 'pos_minimal', code: 'POS-03', name: 'Modern Fast-Lane Receipt', tagline: 'Minimalist thermal layout with bold hero total and digital UPI QR code', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['pos_retail', 'pos_executive'] },
+      { id: 'pos_corporate', code: 'POS-04', name: 'Enterprise Terminal Audit', tagline: 'Shift register audit tally with payment method split (Cash, Card, UPI)', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['pos_ledger', 'pos_executive'] },
+      { id: 'pos_retail', code: 'POS-05', name: 'Counter Thermal Slip', tagline: 'Standard 80mm thermal receipt format with transaction auth and return barcode', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['pos_minimal', 'pos_ledger'] },
+    ],
+  },
+  service_invoice: {
+    id: 'service_invoice',
+    title: 'Service Tax Invoice',
+    shortName: 'Service Invoice',
+    subtitle: 'Professional consulting & service tax billing with 6-digit SAC codes',
+    icon: Briefcase,
+    defaultTemplateId: 'srv_executive',
+    templates: [
+      { id: 'srv_executive', code: 'SRV-01', name: 'Executive Advisory Letterhead', tagline: 'Brand masthead with consulting engagement reference and professional SAC breakdown', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['srv_minimal', 'srv_corporate'] },
+      { id: 'srv_ledger', code: 'SRV-02', name: 'Structured SAC Ledger', tagline: 'Itemized service deliverables, billing periods, hourly rates, and tax analysis', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['srv_corporate', 'srv_retail'] },
+      { id: 'srv_minimal', code: 'SRV-03', name: 'Agency Minimalist Bill', tagline: 'Clean modern invoice for creative and tech services with quiet typography', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['srv_executive', 'srv_ledger'] },
+      { id: 'srv_corporate', code: 'SRV-04', name: 'Enterprise SOW Service Invoice', tagline: 'Master Services Agreement (MSA) reference with dual tax and RCM declaration', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['srv_executive', 'srv_ledger'] },
+      { id: 'srv_retail', code: 'SRV-05', name: 'Direct Consultation Slip', tagline: 'Compact service bill for walk-in professional advice and quick service fees', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['srv_minimal', 'srv_ledger'] },
+    ],
+  },
+  milestone_invoice: {
+    id: 'milestone_invoice',
+    title: 'Milestone / Tranche Invoice',
+    shortName: 'Milestone Invoice',
+    subtitle: 'Project billing linked to SOW deliverable completion signoff',
+    icon: Layers,
+    defaultTemplateId: 'mst_ledger',
+    templates: [
+      { id: 'mst_executive', code: 'MST-01', name: 'Executive Deliverable Bill', tagline: 'Formal milestone release statement with milestone verification certificate', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['mst_corporate', 'mst_ledger'] },
+      { id: 'mst_ledger', code: 'MST-02', name: 'Phase Completion Ledger', tagline: 'Detailed schedule of contract phases, weightage %, and cumulative billed sum', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['mst_executive', 'mst_corporate'] },
+      { id: 'mst_minimal', code: 'MST-03', name: 'Modern Agile Sprint Invoice', tagline: 'Sprint delivery signoff with transparent acceptance criteria and milestone total', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['mst_executive', 'mst_ledger'] },
+      { id: 'mst_corporate', code: 'MST-04', name: 'Enterprise Stage-Gate Draw', tagline: 'Dual entity signoff panels with project manager acceptance verification', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['mst_executive', 'mst_ledger'] },
+      { id: 'mst_retail', code: 'MST-05', name: 'Project Stage Payment Slip', tagline: 'Compact milestone invoice for trade contractors and fabrication milestones', category: 'retail', categoryLabel: 'Trade', similarTemplateIds: ['mst_minimal', 'mst_ledger'] },
+    ],
+  },
+  progress_invoice: {
+    id: 'progress_invoice',
+    title: 'Progress Billing Invoice',
+    shortName: 'Progress Bill',
+    subtitle: 'AIA G702 construction progress draw with retainage accounting',
+    icon: Building2,
+    defaultTemplateId: 'prg_ledger',
+    templates: [
+      { id: 'prg_executive', code: 'PRG-01', name: 'Executive Application for Payment', tagline: 'Formal contractor draw request with architect/engineer approval certification', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['prg_ledger', 'prg_corporate'] },
+      { id: 'prg_ledger', code: 'PRG-02', name: 'AIA G702/G703 Schedule', tagline: 'Schedule of values: scheduled value, work completed, stored materials & retainage', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['prg_executive', 'prg_corporate'] },
+      { id: 'prg_minimal', code: 'PRG-03', name: 'Modern Interim Contractor Bill', tagline: 'Clean progress draw format with prominent % complete and net amount payable', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['prg_executive', 'prg_ledger'] },
+      { id: 'prg_corporate', code: 'PRG-04', name: 'Enterprise EPC Progress Claim', tagline: 'Multi-site construction billing with lien waiver declaration and escrow notes', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['prg_ledger', 'prg_executive'] },
+      { id: 'prg_retail', code: 'PRG-05', name: 'Subcontractor Draw Memo', tagline: 'Fast trade contractor progress slip with site supervisor verification signoff', category: 'retail', categoryLabel: 'Trade', similarTemplateIds: ['prg_minimal', 'prg_ledger'] },
+    ],
+  },
+  recurring_invoice: {
+    id: 'recurring_invoice',
+    title: 'Recurring Subscription Invoice',
+    shortName: 'Subscription Bill',
+    subtitle: 'Automated periodic SaaS subscriptions & annual maintenance contracts',
+    icon: FileClock,
+    defaultTemplateId: 'sub_minimal',
+    templates: [
+      { id: 'sub_executive', code: 'SUB-01', name: 'Executive Subscription Statement', tagline: 'Brand masthead with billing cycle dates, user seat count, and auto-pay status', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['sub_minimal', 'sub_corporate'] },
+      { id: 'sub_ledger', code: 'SUB-02', name: 'Usage & Tier Breakdown', tagline: 'Itemized base plan tiers, metered overages, and annual discount reconciliation', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['sub_executive', 'sub_corporate'] },
+      { id: 'sub_minimal', code: 'SUB-03', name: 'Modern SaaS Minimalist', tagline: 'Quiet typography with clean period dates, plan name, and one-click renewal link', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['sub_executive', 'sub_ledger'] },
+      { id: 'sub_corporate', code: 'SUB-04', name: 'Enterprise Cloud Agreement', tagline: 'Master subscription agreement with SLA uptime commitment and dedicated support', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['sub_executive', 'sub_ledger'] },
+      { id: 'sub_retail', code: 'SUB-05', name: 'Membership / AMC Bill', tagline: 'Compact recurring bill for retail memberships, fitness, and equipment maintenance', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['sub_minimal', 'sub_ledger'] },
+    ],
+  },
+  advance_invoice: {
+    id: 'advance_invoice',
+    title: 'Advance Payment Invoice',
+    shortName: 'Advance Voucher',
+    subtitle: 'Rule 50 statutory advance receipt voucher & tax determination',
+    icon: Landmark,
+    defaultTemplateId: 'adv_executive',
+    templates: [
+      { id: 'adv_executive', code: 'ADV-01', name: 'Statutory Advance Voucher', tagline: 'CBIC Rule 50 advance receipt with tax rate breakdown and place of supply', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['adv_ledger', 'adv_corporate'] },
+      { id: 'adv_ledger', code: 'ADV-02', name: 'Advance Deposit Ledger', tagline: 'Detailed advance allocation tally against upcoming milestone contracts', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['adv_executive', 'adv_corporate'] },
+      { id: 'adv_minimal', code: 'ADV-03', name: 'Modern Advance Acknowledgment', tagline: 'Clean deposit receipt with bank UTR and forthcoming invoice reference', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['adv_executive', 'adv_ledger'] },
+      { id: 'adv_corporate', code: 'ADV-04', name: 'Corporate Escrow / Retainer', tagline: 'Enterprise client deposit acknowledgment with legal escrow interest covenants', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['adv_executive', 'adv_ledger'] },
+      { id: 'adv_retail', code: 'ADV-05', name: 'Customer Booking Deposit Slip', tagline: 'Fast retail booking deposit slip with order reservation code', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['adv_minimal', 'adv_ledger'] },
+    ],
+  },
+  revised_tax_invoice: {
+    id: 'revised_tax_invoice',
+    title: 'Revised Tax Invoice',
+    shortName: 'Revised Invoice',
+    subtitle: 'Rule 53 statutory supplementary tax invoice against prior bills',
+    icon: RotateCcw,
+    defaultTemplateId: 'rev_ledger',
+    templates: [
+      { id: 'rev_executive', code: 'REV-01', name: 'Statutory Revised Invoice', tagline: 'Rule 53 formal revised bill with original invoice number and date cross-reference', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['rev_ledger', 'rev_corporate'] },
+      { id: 'rev_ledger', code: 'REV-02', name: 'Differential Rate Ledger', tagline: 'Side-by-side comparison of original invoiced rates vs revised statutory rates', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['rev_executive', 'rev_corporate'] },
+      { id: 'rev_minimal', code: 'REV-03', name: 'Modern Revised Bill', tagline: 'Quiet typography with prominent revised totals and CBIC statutory reference', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['rev_executive', 'rev_ledger'] },
+      { id: 'rev_corporate', code: 'REV-04', name: 'Enterprise Contract Revision', tagline: 'Dual entity billing with contractual amendment clause and tax reconciliation', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['rev_executive', 'rev_ledger'] },
+      { id: 'rev_retail', code: 'REV-05', name: 'Counter Revised Bill', tagline: 'Fast point-of-sale bill replacement with original receipt surrender record', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['rev_minimal', 'rev_ledger'] },
+    ],
+  },
+  sales_return_note: {
+    id: 'sales_return_note',
+    title: 'Sales Return Note',
+    shortName: 'Sales Return',
+    subtitle: 'Commercial return authorization & merchandise condition triage',
+    icon: RotateCcw,
+    defaultTemplateId: 'srn_ledger',
+    templates: [
+      { id: 'srn_executive', code: 'SRN-01', name: 'Executive Return Memo', tagline: 'Formal merchandise return authorization with customer signoff and QC inspection', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['srn_ledger', 'srn_corporate'] },
+      { id: 'srn_ledger', code: 'SRN-02', name: 'Return Inspection Ledger', tagline: 'Itemized condition grade (Resellable, Damaged, Defective) with credit value tally', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['srn_executive', 'srn_corporate'] },
+      { id: 'srn_minimal', code: 'SRN-03', name: 'Modern RMA Note', tagline: 'Clean RMA format with barcode tracking and credit refund recommendation', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['srn_executive', 'srn_ledger'] },
+      { id: 'srn_corporate', code: 'SRN-04', name: 'Enterprise Restocking Report', tagline: 'Warehouse intake coordinates, supplier warranty return pass, and ledger tally', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['srn_ledger', 'srn_executive'] },
+      { id: 'srn_retail', code: 'SRN-05', name: 'Store Return Slip', tagline: 'Fast customer store return slip with instant credit note voucher reference', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['srn_minimal', 'srn_ledger'] },
+    ],
+  },
+  invoice_aging_report: {
+    id: 'invoice_aging_report',
+    title: 'AR Aging Report',
+    shortName: 'Aging Schedule',
+    subtitle: 'Accounts receivable overdue aging bands & collection priority',
+    icon: ScrollText,
+    defaultTemplateId: 'age_ledger',
+    templates: [
+      { id: 'age_executive', code: 'AGE-01', name: 'Executive Aging Overview', tagline: 'Executive financial summary of outstanding receivables by aging buckets', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['age_ledger', 'age_corporate'] },
+      { id: 'age_ledger', code: 'AGE-02', name: 'Comprehensive Aging Ledger', tagline: 'Multi-column debtor schedule: Current, 1-30, 31-60, 61-90, and 90+ days past due', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['age_executive', 'age_corporate'] },
+      { id: 'age_minimal', code: 'AGE-03', name: 'Modern Aging Summary', tagline: 'Crisp overdue tally with risk status badges and priority collection tags', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['age_executive', 'age_ledger'] },
+      { id: 'age_corporate', code: 'AGE-04', name: 'Enterprise Credit Risk Analysis', tagline: 'Credit limit utilization, bad-debt risk provisioning, and CFO signoff', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['age_ledger', 'age_executive'] },
+      { id: 'age_retail', code: 'AGE-05', name: 'Store Credit Aging Slip', tagline: 'Compact customer credit ledger for branch and wholesale account monitoring', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['age_minimal', 'age_ledger'] },
+    ],
+  },
+  payment_reminder: {
+    id: 'payment_reminder',
+    title: 'Payment Reminder Notice',
+    shortName: 'Payment Reminder',
+    subtitle: 'Formal overdue dunning notice with late interest calculation',
+    icon: FileClock,
+    defaultTemplateId: 'rem_executive',
+    templates: [
+      { id: 'rem_executive', code: 'REM-01', name: 'Executive Overdue Notice', tagline: 'Formal dunning letterhead with invoice schedule, accrued interest, and wire coordinates', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['rem_corporate', 'rem_minimal'] },
+      { id: 'rem_ledger', code: 'REM-02', name: 'Itemized Overdue Schedule', tagline: 'List of past-due invoices with due dates, days overdue, and contractual interest rate', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['rem_executive', 'rem_corporate'] },
+      { id: 'rem_minimal', code: 'REM-03', name: 'Modern Friendly Reminder', tagline: 'Courteous payment reminder with quiet typography and instant UPI QR link', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['rem_executive', 'rem_ledger'] },
+      { id: 'rem_corporate', code: 'REM-04', name: 'Final Statutory Demand', tagline: 'Pre-legal collection demand with formal notice period and governing court warning', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['rem_executive', 'rem_ledger'] },
+      { id: 'rem_retail', code: 'REM-05', name: 'Customer Account Due Slip', tagline: 'Quick billing reminder slip for retail credit accounts and monthly subscribers', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['rem_minimal', 'rem_ledger'] },
+    ],
+  },
+  order_confirmation: {
+    id: 'order_confirmation',
+    title: 'Order Confirmation',
+    shortName: 'Order Confirmation',
+    subtitle: 'Binding vendor acceptance of purchase order & committed delivery dates',
+    icon: Send,
+    defaultTemplateId: 'oc_executive',
+    templates: [
+      { id: 'oc_executive', code: 'OC-01', name: 'Executive Order Acceptance', tagline: 'Formal acknowledgment of customer PO with committed production schedule', category: 'executive', categoryLabel: 'Executive', similarTemplateIds: ['oc_corporate', 'oc_minimal'] },
+      { id: 'oc_ledger', code: 'OC-02', name: 'Manufacturing Tally Ledger', tagline: 'Itemized bill of materials, committed dispatch dates, and quality specifications', category: 'ledger', categoryLabel: 'Ledger', similarTemplateIds: ['oc_executive', 'oc_corporate'] },
+      { id: 'oc_minimal', code: 'OC-03', name: 'Modern Order Confirmation', tagline: 'Clean order acceptance with prominent order code and delivery terms', category: 'minimal', categoryLabel: 'Minimal', similarTemplateIds: ['oc_executive', 'oc_ledger'] },
+      { id: 'oc_corporate', code: 'OC-04', name: 'Enterprise Contract Acceptance', tagline: 'Dual entity signoffs with warranty covenants and dispute resolution clause', category: 'corporate', categoryLabel: 'Corporate', similarTemplateIds: ['oc_executive', 'oc_ledger'] },
+      { id: 'oc_retail', code: 'OC-05', name: 'Store Order Slip', tagline: 'Fast customer order booking confirmation with pickup verification barcode', category: 'retail', categoryLabel: 'Retail', similarTemplateIds: ['oc_minimal', 'oc_ledger'] },
+    ],
+  },
 };
+
 
 /**
  * Miniature Wireframe Schematic
@@ -3636,6 +3847,346 @@ export default function DocumentTemplateSelectionScreen() {
             secondaryRole: 'Authorized Signatory (Party 2)',
             secondaryEntity: countryCfg.samplePartyName,
           },
+        };
+      }
+
+      case 'commercial_invoice': {
+        const subtotalVal = isIndia ? '₹1,50,000.00' : isGermany ? '1.500,00 €' : `${sym}1,800.00`;
+        const totalVal = subtotalVal;
+        const wordsVal = isIndia ? 'INR One Lakh Fifty Thousand Only' : 'Commercial Invoice Value in Full';
+
+        return {
+          docTypeTag: 'INTERNATIONAL COMMERCIAL INVOICE · UN/EDIFACT',
+          docTitle: 'COMMERCIAL INVOICE',
+          docNumber: 'CI-2026-0198',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: `Country of Origin: ${countryCfg.name} · Incoterms®: CIF · Currency: ${countryCfg.currencyCode}`,
+          statutoryBanner: {
+            text: 'OFFICIAL COMMERCIAL INVOICE — FOR CUSTOMS CLEARANCE & CROSS-BORDER TRADE',
+            subtext: 'Certified true and correct commercial value for goods exported pursuant to international sales terms.',
+          },
+          ledgerBand: [
+            { label: 'Invoice No', val: 'CI-2026-0198' },
+            { label: 'Issue Date', val: '16-OCT-2026' },
+            { label: 'Incoterms®', val: 'CIF / DDP' },
+            { label: 'Payment Terms', val: 'Wire / Net 30' },
+          ],
+          partyTitle: 'CONSIGNEE / BUYER (IMPORTER)',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Origin', val: countryCfg.code },
+            { label: 'Incoterm', val: 'CIF' },
+            { label: 'Freight', val: 'Prepaid' },
+          ],
+          tableHeaders: [
+            { title: 'ITEM / COMMODITY DESCRIPTION', flex: 3, align: 'left' },
+            { title: itemCodeHdr, width: 80, align: 'left' },
+            { title: 'QTY', width: 50, align: 'center' },
+            { title: 'UNIT PRICE', width: 75, align: 'right' },
+            { title: 'TOTAL', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Precision CNC Machined Aluminum Enclosures', flex: 3, align: 'left', isBold: true },
+                { text: '7616 9990', width: 80, align: 'left' },
+                { text: '100 Pcs', width: 50, align: 'center' },
+                { text: isIndia ? '₹1,000' : isGermany ? '10 €' : `${sym}12`, width: 75, align: 'right' },
+                { text: isIndia ? '₹1,00,000' : isGermany ? '1.000 €' : `${sym}1,200`, width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Anodized Surface Treatment & Thermal Coating', flex: 3, align: 'left' },
+                { text: '9988 73', width: 80, align: 'left' },
+                { text: '100 Pcs', width: 50, align: 'center' },
+                { text: isIndia ? '₹500' : isGermany ? '5 €' : `${sym}6`, width: 75, align: 'right' },
+                { text: isIndia ? '₹50,000' : isGermany ? '500 €' : `${sym}600`, width: 85, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'FOB Commercial Value',
+          subtotalValue: subtotalVal,
+          taxRows: [
+            { label: 'Insurance & Freight', val: isGermany ? '0,00 €' : `${sym}0.00` },
+            { label: 'Customs Valuation', val: 'Non-Taxable Supply' },
+          ],
+          totalLabel: 'Total Invoice Value',
+          totalAmount: totalVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'We declare that this invoice shows the actual price of the goods described, that no other invoice has been or will be issued, and that all particulars are true and correct.',
+          legalStandardBadge: 'UN/EDIFACT & ICC Incoterms® 2020',
+          showBankDetails: true,
+        };
+      }
+
+      case 'service_invoice': {
+        const subtotalVal = isIndia ? '₹1,20,000.00' : isGermany ? '1.200,00 €' : `${sym}1,500.00`;
+        const totalVal = isIndia ? '₹1,41,600.00' : isGermany ? '1.428,00 €' : `${sym}1,635.00`;
+        const wordsVal = isIndia ? 'INR One Lakh Forty-One Thousand Six Hundred Only' : 'Professional Fees in Full';
+
+        return {
+          docTypeTag: isIndia ? 'CBIC GST RULE 46 (SERVICES) · SAC MANDATORY' : 'PROFESSIONAL SERVICE TAX INVOICE',
+          docTitle: 'SERVICE TAX INVOICE',
+          docNumber: 'SRV-2026-0084',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'SAC: 998314 · Service Period: 01-Oct-2026 to 31-Oct-2026 · Reverse Charge: NO',
+          statutoryBanner: {
+            text: 'PROFESSIONAL SERVICE TAX INVOICE — STATUTORY CBIC GST RULE 46 COMPLIANT',
+            subtext: 'Services Classified Under Heading 9983 (Information Technology & Architecture Consulting)',
+          },
+          ledgerBand: [
+            { label: 'Service Inv #', val: 'SRV-2026-0084' },
+            { label: 'Service SAC', val: '998314' },
+            { label: 'Billing Period', val: 'October 2026' },
+            { label: 'RCM Status', val: 'No (Forward Charge)' },
+          ],
+          partyTitle: 'CLIENT (BILL TO)',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Discipline', val: 'IT Architecture' },
+            { label: 'Delivery', val: 'Remote / On-site' },
+            { label: 'Terms', val: 'Net 15 Days' },
+          ],
+          tableHeaders: [
+            { title: 'SERVICE DELIVERABLE & SCOPE', flex: 3, align: 'left' },
+            { title: 'SAC CODE', width: 75, align: 'left' },
+            { title: 'EFFORT', width: 65, align: 'center' },
+            { title: 'RATE / HR', width: 75, align: 'right' },
+            { title: 'AMOUNT', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Core Enterprise Cloud Architecture & Migration Oversight', flex: 3, align: 'left', isBold: true },
+                { text: '998314', width: 75, align: 'left' },
+                { text: '40 Hours', width: 65, align: 'center' },
+                { text: isIndia ? '₹2,000' : isGermany ? '20 €' : `${sym}25`, width: 75, align: 'right' },
+                { text: isIndia ? '₹80,000' : isGermany ? '800 €' : `${sym}1,000`, width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Security Audit & Compliance Hardening Review', flex: 3, align: 'left' },
+                { text: '998315', width: 75, align: 'left' },
+                { text: '20 Hours', width: 65, align: 'center' },
+                { text: isIndia ? '₹2,000' : isGermany ? '20 €' : `${sym}25`, width: 75, align: 'right' },
+                { text: isIndia ? '₹40,000' : isGermany ? '400 €' : `${sym}500`, width: 85, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Taxable Service Value',
+          subtotalValue: subtotalVal,
+          taxRows: [
+            { label: isIndia ? 'CGST (9.0%)' : 'State / Provincial Tax', val: isIndia ? '₹10,800.00' : `${sym}67.50` },
+            { label: isIndia ? 'SGST (9.0%)' : 'Federal / National Tax', val: isIndia ? '₹10,800.00' : `${sym}67.50` },
+          ],
+          totalLabel: 'Grand Total Payable',
+          totalAmount: totalVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'Certified that the service descriptions, SAC codes, and statutory particulars furnished in this tax invoice are true, correct, and in accordance with applicable tax regulations.',
+          legalStandardBadge: 'CBIC GST Rule 46 (Services) Verified',
+          showBankDetails: true,
+        };
+      }
+
+      case 'pos_receipt':
+      case 'cash_bill': {
+        const subtotalVal = isIndia ? '₹3,450.00' : isGermany ? '34,50 €' : `${sym}42.00`;
+        const totalVal = subtotalVal;
+        const wordsVal = isIndia ? 'INR Three Thousand Four Hundred Fifty Only' : 'Amount Paid in Full (Settled)';
+
+        return {
+          docTypeTag: 'POS REGISTER CHECKOUT · INSTANT SETTLEMENT',
+          docTitle: activeDocType === 'pos_receipt' ? 'POINT OF SALE RECEIPT' : 'CASH BILL / CASH MEMO',
+          docNumber: activeDocType === 'pos_receipt' ? 'POS-2026-1049' : 'CB-2026-0512',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Register Terminal #01 · Cashier: Counter #02 · Status: CLEARED',
+          statutoryBanner: {
+            text: 'OFFICIAL RETAIL CHECKOUT MEMO — TRANSACTION PAID IN FULL',
+            subtext: 'Payment received across counter. Retain this slip for merchandise exchange.',
+          },
+          ledgerBand: [
+            { label: 'Receipt No', val: 'POS-2026-1049' },
+            { label: 'Register Terminal', val: 'Terminal #01' },
+            { label: 'Payment Mode', val: 'Cash / Instant QR' },
+            { label: 'Balance Due', val: 'NIL (₹0.00)' },
+          ],
+          partyTitle: 'CUSTOMER DETAILS',
+          partyName: 'Walk-in Retail Shopper',
+          partyMeta: 'Phone: +91 98200 XXXXX · Guest Checkout',
+          retailStrip: [
+            { label: 'Terminal', val: 'POS-01' },
+            { label: 'Cashier', val: 'Staff #04' },
+            { label: 'Time', val: '14:23 PM' },
+          ],
+          tableHeaders: [
+            { title: 'ITEM / BARCODE', flex: 3, align: 'left' },
+            { title: 'QTY', width: 45, align: 'center' },
+            { title: 'RATE', width: 70, align: 'right' },
+            { title: 'AMOUNT', width: 80, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Premium Matte Black Pen Stand [SKU-9921]', flex: 3, align: 'left', isBold: true },
+                { text: '2 Pcs', width: 45, align: 'center' },
+                { text: isIndia ? '₹950' : `${sym}12`, width: 70, align: 'right' },
+                { text: isIndia ? '₹1,900' : `${sym}24`, width: 80, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Refillable Archival Gel Ink Cartridges (Pack 10)', flex: 3, align: 'left' },
+                { text: '1 Set', width: 45, align: 'center' },
+                { text: isIndia ? '₹1,550' : `${sym}18`, width: 70, align: 'right' },
+                { text: isIndia ? '₹1,550' : `${sym}18`, width: 80, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Net Counter Total',
+          subtotalValue: subtotalVal,
+          taxRows: [{ label: 'Tax Included in Price', val: isIndia ? '₹526.27 (18% GST)' : `${sym}5.80` }],
+          totalLabel: 'Total Paid (Settled)',
+          totalAmount: totalVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'Thank you for your business. Exchange allowed within 7 days against original printed counter slip.',
+          legalStandardBadge: 'Shops & Establishments Retail Standard',
+          showBankDetails: false,
+        };
+      }
+
+      case 'invoice_cum_bill_of_supply': {
+        const subtotalVal = isIndia ? '₹85,000.00' : `${sym}1,100.00`;
+        const totalVal = isIndia ? '₹95,800.00' : `${sym}1,210.00`;
+        const wordsVal = isIndia ? 'INR Ninety-Five Thousand Eight Hundred Only' : 'Composite Value in Full';
+
+        return {
+          docTypeTag: 'CBIC GST RULE 46A · MIXED SUPPLY INSTRUMENT',
+          docTitle: 'INVOICE-CUM-BILL OF SUPPLY',
+          docNumber: 'ICB-2026-0042',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Single Combined Document for Taxable & Exempt Supplies under Rule 46A',
+          statutoryBanner: {
+            text: 'STATUTORY INVOICE-CUM-BILL OF SUPPLY — ISSUED UNDER CBIC GST RULE 46A',
+            subtext: 'Composite bill providing separate itemization of taxable supplies and exempted zero-tax items.',
+          },
+          ledgerBand: [
+            { label: 'Composite Inv #', val: 'ICB-2026-0042' },
+            { label: 'Date', val: '16-OCT-2026' },
+            { label: 'Taxable Total', val: isIndia ? '₹60,000.00' : `${sym}800.00` },
+            { label: 'Exempt Total', val: isIndia ? '₹25,000.00' : `${sym}300.00` },
+          ],
+          partyTitle: 'BUYER / RECIPIENT',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Supply Type', val: 'Composite' },
+            { label: 'Rule', val: 'Rule 46A' },
+            { label: 'Status', val: 'Standard' },
+          ],
+          tableHeaders: [
+            { title: 'PRODUCT & SUPPLY CATEGORY', flex: 3, align: 'left' },
+            { title: 'TAX STATUS', width: 85, align: 'center' },
+            { title: 'QTY', width: 45, align: 'center' },
+            { title: 'RATE', width: 75, align: 'right' },
+            { title: 'TOTAL', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Commercial Industrial Sensor Modules', flex: 3, align: 'left', isBold: true },
+                { text: 'Taxable 18%', width: 85, align: 'center' },
+                { text: '2 Pcs', width: 45, align: 'center' },
+                { text: isIndia ? '₹30,000' : `${sym}400`, width: 75, align: 'right' },
+                { text: isIndia ? '₹60,000' : `${sym}800`, width: 85, align: 'right' },
+              ],
+            },
+            {
+              cells: [
+                { text: 'Certified Organic Packing Grain Materials', flex: 3, align: 'left' },
+                { text: 'Exempt (Nil)', width: 85, align: 'center' },
+                { text: '5 Bags', width: 45, align: 'center' },
+                { text: isIndia ? '₹5,000' : `${sym}60`, width: 75, align: 'right' },
+                { text: isIndia ? '₹25,000' : `${sym}300`, width: 85, align: 'right' },
+              ],
+            },
+          ],
+          subtotalLabel: 'Subtotal (Taxable + Exempt)',
+          subtotalValue: subtotalVal,
+          taxRows: [
+            { label: 'GST on Taxable Portion (18%)', val: isIndia ? '₹10,800.00' : `${sym}110.00` },
+            { label: 'Tax on Exempt Portion (0%)', val: '₹0.00 (NIL)' },
+          ],
+          totalLabel: 'Invoice-cum-Bill Total',
+          totalAmount: totalVal,
+          amountInWords: wordsVal,
+          legalDeclaration: 'Issued in accordance with CBIC CGST Rule 46A. Contains both taxable and exempted goods as detailed.',
+          legalStandardBadge: 'CBIC Rule 46A Composite Standard',
+          showBankDetails: true,
+        };
+      }
+
+      case 'payment_reminder': {
+        const overdueVal = isIndia ? '₹70,800.00' : `${sym}950.00`;
+        const interestVal = isIndia ? '₹1,593.00' : `${sym}21.38`;
+        const totalDueVal = isIndia ? '₹72,393.00' : `${sym}971.38`;
+
+        return {
+          docTypeTag: 'FORMAL DUNNING NOTICE · PAYMENT OVERDUE',
+          docTitle: 'OVERDUE PAYMENT REMINDER NOTICE',
+          docNumber: 'REM-2026-0033',
+          issueDate: '16 Oct 2026',
+          secondaryMeta: 'Ref Invoice: INV-2026-0112 · Overdue: 45 Days · Contractual Interest: 18% p.a.',
+          statutoryBanner: {
+            text: 'FORMAL NOTICE OF PAST DUE ACCOUNT — IMMEDIATE REMITTANCE REQUESTED',
+            subtext: 'The invoice referenced below has matured beyond agreed credit terms. Please discharge outstanding liabilities.',
+          },
+          ledgerBand: [
+            { label: 'Reminder Ref', val: 'REM-2026-0033' },
+            { label: 'Original Invoice', val: 'INV-2026-0112' },
+            { label: 'Invoice Date', val: '01-Sep-2026' },
+            { label: 'Days Overdue', val: '45 Days' },
+          ],
+          partyTitle: 'ATTENTION: ACCOUNTS PAYABLE',
+          partyName: countryCfg.samplePartyName,
+          partyMeta: countryCfg.samplePartyTaxId,
+          partySubMeta: countryCfg.samplePartySubMeta,
+          retailStrip: [
+            { label: 'Notice Level', val: 'Second Demand' },
+            { label: 'Remit By', val: '23-Oct-2026' },
+            { label: 'Payment Mode', val: 'Bank Wire / UPI' },
+          ],
+          tableHeaders: [
+            { title: 'OVERDUE INVOICE PARTICULARS', flex: 3, align: 'left' },
+            { title: 'INVOICED', width: 85, align: 'right' },
+            { title: 'PAID', width: 70, align: 'right' },
+            { title: 'OVERDUE', width: 85, align: 'right' },
+          ],
+          tableRows: [
+            {
+              cells: [
+                { text: 'Tax Invoice INV-2026-0112 (Cloud Services & IT Infrastructure)', flex: 3, align: 'left', isBold: true },
+                { text: overdueVal, width: 85, align: 'right' },
+                { text: '₹0.00', width: 70, align: 'right' },
+                { text: overdueVal, width: 85, align: 'right', isBold: true },
+              ],
+            },
+          ],
+          subtotalLabel: 'Principal Overdue Sum',
+          subtotalValue: overdueVal,
+          taxRows: [{ label: 'Contractual Late Interest (1.5%/mo)', val: interestVal }],
+          totalLabel: 'Total Outstanding Remittance',
+          totalAmount: totalDueVal,
+          amountInWords: 'Immediate Wire Transfer Requested',
+          legalDeclaration: 'Kindly note that continued delay in discharging invoices past their agreed credit maturity may result in suspension of services and escalation.',
+          legalStandardBadge: 'Commercial Credit Terms Standard',
+          showBankDetails: true,
         };
       }
 

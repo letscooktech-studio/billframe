@@ -58,7 +58,15 @@ import {
   Laptop,
   Shield,
   FileClock,
+  Compass,
 } from 'lucide-react-native';
+import {
+  OrganizationPackRegistry,
+  ORGANIZATION_PACKS,
+  OrganizationPackDefinition,
+  OrganizationSector,
+  SECTOR_DEFINITIONS,
+} from '../../domain/organization/OrganizationPackRegistry';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { useTheme } from '../../design/ThemeContext';
 import { useNavigationDrawer } from '../../components/navigation/NavigationDrawerContext';
@@ -117,11 +125,11 @@ export interface DocumentCreateOption {
 }
 
 export const CREATE_MODAL_CATEGORIES: { key: string; label: string }[] = [
-  { key: 'all', label: 'All (26)' },
-  { key: 'billing', label: 'Sales & Billing (5)' },
-  { key: 'orders', label: 'Orders & Quotes (3)' },
+  { key: 'all', label: 'All Documents' },
+  { key: 'billing', label: 'Sales & Billing (19)' },
+  { key: 'orders', label: 'Orders & Quotes (4)' },
   { key: 'logistics', label: 'Logistics (4)' },
-  { key: 'finance', label: 'Finance & Payments (5)' },
+  { key: 'finance', label: 'Finance & Payments (6)' },
   { key: 'hr', label: 'HR & Payroll (3)' },
   { key: 'legal', label: 'Institutional & Legal (6)' },
 ];
@@ -139,6 +147,16 @@ export const DOCUMENT_CREATE_OPTIONS: DocumentCreateOption[] = [
     keywords: ['tax', 'invoice', 'gst', 'bill', 'commercial', 'b2b', 'b2c', 'sales', 'rule 46'],
   },
   {
+    id: 'commercial_invoice',
+    name: 'Commercial Invoice',
+    tagline: 'Standard non-GST & international commercial B2B sales billing with Incoterms',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'STANDARD B2B',
+    icon: Globe,
+    keywords: ['commercial', 'invoice', 'international', 'b2b', 'foreign', 'non-gst', 'standard'],
+  },
+  {
     id: 'bill_of_supply',
     name: 'Bill of Supply',
     tagline: 'Section 31(3)(c) for composition dealers & exempt zero-tax supplies',
@@ -147,6 +165,116 @@ export const DOCUMENT_CREATE_OPTIONS: DocumentCreateOption[] = [
     badge: 'RULE 49',
     icon: FileSpreadsheet,
     keywords: ['composition', 'exempt', 'supply', 'bill of supply', 'tax-free', 'rule 49'],
+  },
+  {
+    id: 'invoice_cum_bill_of_supply',
+    name: 'Invoice-cum-Bill of Supply',
+    tagline: 'CBIC GST Rule 46A statutory composite instrument for mixed taxable & exempt supplies',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'RULE 46A',
+    icon: FileSpreadsheet,
+    keywords: ['composite', 'rule 46a', 'mixed', 'exempt', 'taxable', 'cum bill'],
+  },
+  {
+    id: 'service_invoice',
+    name: 'Service Tax Invoice',
+    tagline: 'Professional consulting & service tax billing with 6-digit SAC codes & periods',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'SAC SERVICE',
+    icon: Briefcase,
+    keywords: ['service', 'consulting', 'sac', 'agency', 'professional fee', 'service invoice'],
+  },
+  {
+    id: 'milestone_invoice',
+    name: 'Milestone / Tranche Invoice',
+    tagline: 'Contractual deliverable stage-gate billing linked to verified SOW milestones',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'SOW TRANCHE',
+    icon: Layers,
+    keywords: ['milestone', 'tranche', 'stage', 'phase', 'sow', 'deliverable bill'],
+  },
+  {
+    id: 'progress_invoice',
+    name: 'Progress Billing Invoice',
+    tagline: 'AIA Document G702 construction progress draw with retainage accounting',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'AIA G702',
+    icon: Building,
+    keywords: ['progress', 'draw', 'aia', 'construction', 'retainage', 'contractor bill'],
+  },
+  {
+    id: 'recurring_invoice',
+    name: 'Recurring Subscription Invoice',
+    tagline: 'Periodic SaaS subscriptions, annual maintenance (AMC), and monthly retainers',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'SUBSCRIPTION',
+    icon: FileClock,
+    keywords: ['subscription', 'recurring', 'amc', 'saas', 'retainer', 'monthly bill'],
+  },
+  {
+    id: 'advance_invoice',
+    name: 'Advance Payment Invoice',
+    tagline: 'CBIC Rule 50 statutory advance receipt voucher with tax determination',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'RULE 50',
+    icon: FileCheck,
+    keywords: ['advance', 'prepayment', 'deposit', 'voucher', 'rule 50', 'advance receipt'],
+  },
+  {
+    id: 'revised_tax_invoice',
+    name: 'Revised Tax Invoice',
+    tagline: 'CBIC Rule 53 statutory revised invoice against previously issued instruments',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'RULE 53',
+    icon: RotateCcw,
+    keywords: ['revised', 'supplementary', 'amendment', 'rule 53', 'revised invoice'],
+  },
+  {
+    id: 'cash_bill',
+    name: 'Cash Bill / Cash Memo',
+    tagline: 'Over-the-counter sales memo with immediate cash settlement & zero balance',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'CASH MEMO',
+    icon: Receipt,
+    keywords: ['cash', 'memo', 'counter bill', 'walk-in', 'instant bill', 'cash bill'],
+  },
+  {
+    id: 'pos_receipt',
+    name: 'POS Terminal Receipt',
+    tagline: 'Thermal register checkout receipt with barcode & dynamic UPI QR payment code',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'THERMAL POS',
+    icon: Receipt,
+    keywords: ['pos', 'thermal', 'register', 'checkout', 'slip', 'qr code'],
+  },
+  {
+    id: 'sales_return_note',
+    name: 'Sales Return Note',
+    tagline: 'Merchandise return authorization with triage inspection & credit voucher reference',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'RETURN RMA',
+    icon: RotateCcw,
+    keywords: ['sales return', 'return', 'rma', 'goods rejection', 'credit slip'],
+  },
+  {
+    id: 'payment_reminder',
+    name: 'Payment Reminder Notice',
+    tagline: 'Formal dunning notice detailing overdue days, contractual interest & payment link',
+    category: 'billing',
+    categoryLabel: 'Sales & Billing',
+    badge: 'OVERDUE',
+    icon: FileClock,
+    keywords: ['reminder', 'overdue', 'dunning', 'collection notice', 'late fee', 'due notice'],
   },
   {
     id: 'proforma',
@@ -199,6 +327,16 @@ export const DOCUMENT_CREATE_OPTIONS: DocumentCreateOption[] = [
     badge: 'SALES ORDER',
     icon: PackageCheck,
     keywords: ['sales order', 'order confirmation', 'so', 'po acceptance', 'booking'],
+  },
+  {
+    id: 'order_confirmation',
+    name: 'Order Confirmation',
+    tagline: 'Statutory binding confirmation of customer purchase order & delivery dates',
+    category: 'orders',
+    categoryLabel: 'Orders & Quotes',
+    badge: 'CONFIRMATION',
+    icon: Send,
+    keywords: ['order confirmation', 'acceptance', 'po acceptance', 'booking confirmation'],
   },
   {
     id: 'work_order',
@@ -303,6 +441,16 @@ export const DOCUMENT_CREATE_OPTIONS: DocumentCreateOption[] = [
     badge: 'LEDGER',
     icon: Scale,
     keywords: ['statement', 'ledger', 'account statement', 'aging', 'balance due', 'running balance'],
+  },
+  {
+    id: 'invoice_aging_report',
+    name: 'Accounts Receivable Aging Report',
+    tagline: 'Multi-column debtor aging schedule: Current, 1-30, 31-60, 61-90, 90+ days past due',
+    category: 'finance',
+    categoryLabel: 'Finance & Payments',
+    badge: 'AR AGING',
+    icon: ScrollText,
+    keywords: ['aging', 'ar', 'debtors', 'receivables', 'overdue', 'schedule', 'aging report'],
   },
 
   // ── HR & PAYROLL ──
@@ -416,23 +564,49 @@ export default function DocumentsScreen() {
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const [createModalSearch, setCreateModalSearch] = useState('');
   const [createModalCategory, setCreateModalCategory] = useState('all');
+  const [modalMode, setModalMode] = useState<'categories' | 'packs'>('categories');
+  const [selectedPackSector, setSelectedPackSector] = useState<string>('all');
+  const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
+
+  const activePack = useMemo(() => {
+    return selectedPackId ? OrganizationPackRegistry.getPackById(selectedPackId) : null;
+  }, [selectedPackId]);
+
+  const visiblePacks = useMemo(() => {
+    if (selectedPackSector === 'all') return ORGANIZATION_PACKS;
+    return OrganizationPackRegistry.getPacksBySector(selectedPackSector as OrganizationSector);
+  }, [selectedPackSector]);
 
   const filteredCreateOptions = useMemo(() => {
-    return DOCUMENT_CREATE_OPTIONS.filter((opt) => {
-      if (createModalCategory !== 'all' && opt.category !== createModalCategory) {
-        return false;
-      }
-      if (createModalSearch.trim()) {
-        const query = createModalSearch.trim().toLowerCase();
+    let pool = DOCUMENT_CREATE_OPTIONS;
+
+    // Filter by Organization Pack recommendations when in packs mode and a pack is selected
+    if (modalMode === 'packs' && selectedPackId && activePack) {
+      const recSet = new Set<string>(activePack.recommendedDocIds);
+      if (recSet.has('tax_invoice')) recSet.add('invoice');
+      if (recSet.has('customer_statement')) recSet.add('customer_account_statement');
+      if (recSet.has('job_offer_letter')) recSet.add('job_offer');
+      if (recSet.has('experience_certificate')) recSet.add('experience_cert');
+      if (recSet.has('equipment_responsibility_letter')) recSet.add('equipment_handover');
+      if (recSet.has('site_inspection_report')) recSet.add('site_inspection');
+      pool = pool.filter((opt) => recSet.has(opt.id) || recSet.has(opt.id.replace('-', '_')));
+    } else if (modalMode === 'categories' && createModalCategory !== 'all') {
+      pool = pool.filter((opt) => opt.category === createModalCategory);
+    }
+
+    if (createModalSearch.trim()) {
+      const query = createModalSearch.trim().toLowerCase();
+      pool = pool.filter((opt) => {
         const matchesName = opt.name.toLowerCase().includes(query);
         const matchesTagline = opt.tagline.toLowerCase().includes(query);
         const matchesBadge = opt.badge.toLowerCase().includes(query);
         const matchesKeywords = opt.keywords.some((k) => k.toLowerCase().includes(query));
         return matchesName || matchesTagline || matchesBadge || matchesKeywords;
-      }
-      return true;
-    });
-  }, [createModalCategory, createModalSearch]);
+      });
+    }
+
+    return pool;
+  }, [modalMode, selectedPackId, activePack, createModalCategory, createModalSearch]);
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -579,6 +753,8 @@ export default function DocumentsScreen() {
     setShowCreateSheet(false);
     setCreateModalSearch('');
     setCreateModalCategory('all');
+    setSelectedPackId(null);
+    setModalMode('categories');
     if (choice === 'quick-bill') {
       router.push('/quick-bill');
     } else {
@@ -781,7 +957,7 @@ export default function DocumentsScreen() {
                   New Document
                 </Text>
                 <Text style={[styles.sheetSubtitle, { color: theme.textSecondary }]}>
-                  Choose from 26 statutory and enterprise business document templates
+                  Universal document engine: 26 statutory and enterprise business document templates
                 </Text>
               </View>
               <IconButton
@@ -790,6 +966,8 @@ export default function DocumentsScreen() {
                   setShowCreateSheet(false);
                   setCreateModalSearch('');
                   setCreateModalCategory('all');
+                  setSelectedPackId(null);
+                  setModalMode('categories');
                 }}
                 accessibilityLabel="Close"
                 size={36}
@@ -806,54 +984,234 @@ export default function DocumentsScreen() {
               />
             </View>
 
-            {/* Modal Category Filter Chips */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.modalCategoryContent}
-              style={styles.modalCategoryScroll}
-            >
-              {CREATE_MODAL_CATEGORIES.map((cat) => {
-                const isSelected = createModalCategory === cat.key;
-                return (
+            {/* Navigation Mode Selector: Categories vs Industry Packs */}
+            <View style={styles.modeToggleRow}>
+              <Pressable
+                onPress={() => {
+                  setModalMode('categories');
+                  setSelectedPackId(null);
+                }}
+                style={[
+                  styles.modeToggleBtn,
+                  {
+                    backgroundColor: modalMode === 'categories' ? theme.primaryActionBg : theme.surfaceSecondary,
+                    borderColor: modalMode === 'categories' ? theme.borderFocused : theme.borderDefault,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modeToggleText,
+                    { color: modalMode === 'categories' ? theme.primaryActionText : theme.textSecondary },
+                  ]}
+                >
+                  Document Categories
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setModalMode('packs')}
+                style={[
+                  styles.modeToggleBtn,
+                  {
+                    backgroundColor: modalMode === 'packs' ? theme.primaryActionBg : theme.surfaceSecondary,
+                    borderColor: modalMode === 'packs' ? theme.borderFocused : theme.borderDefault,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modeToggleText,
+                    { color: modalMode === 'packs' ? theme.primaryActionText : theme.textSecondary },
+                  ]}
+                >
+                  Industry Packs (26)
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Categories Mode View */}
+            {modalMode === 'categories' && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.modalCategoryContent}
+                style={styles.modalCategoryScroll}
+              >
+                {CREATE_MODAL_CATEGORIES.map((cat) => {
+                  const isSelected = createModalCategory === cat.key;
+                  return (
+                    <Pressable
+                      key={cat.key}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Filter by ${cat.label}`}
+                      onPress={() => setCreateModalCategory(cat.key)}
+                      style={[
+                        styles.modalCategoryChip,
+                        {
+                          backgroundColor: isSelected ? theme.primaryActionBg : theme.surfaceSecondary,
+                          borderColor: isSelected ? theme.borderFocused : theme.borderDefault,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.modalCategoryText,
+                          { color: isSelected ? theme.primaryActionText : theme.textSecondary },
+                        ]}
+                      >
+                        {cat.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            {/* Industry Packs Mode View */}
+            {modalMode === 'packs' && (
+              <View>
+                {/* Sector Selector */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.sectorContent}
+                  style={styles.sectorScroll}
+                >
                   <Pressable
-                    key={cat.key}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Filter by ${cat.label}`}
-                    onPress={() => setCreateModalCategory(cat.key)}
+                    onPress={() => setSelectedPackSector('all')}
                     style={[
-                      styles.modalCategoryChip,
+                      styles.sectorChip,
                       {
-                        backgroundColor: isSelected ? theme.primaryActionBg : theme.surfaceSecondary,
-                        borderColor: isSelected ? theme.borderFocused : theme.borderDefault,
+                        backgroundColor: selectedPackSector === 'all' ? theme.primaryActionBg : theme.surfaceSecondary,
+                        borderColor: selectedPackSector === 'all' ? theme.borderFocused : theme.borderDefault,
                       },
                     ]}
                   >
                     <Text
                       style={[
-                        styles.modalCategoryText,
-                        { color: isSelected ? theme.primaryActionText : theme.textSecondary },
+                        styles.sectorText,
+                        { color: selectedPackSector === 'all' ? theme.primaryActionText : theme.textSecondary },
                       ]}
                     >
-                      {cat.label}
+                      All Sectors
                     </Text>
                   </Pressable>
-                );
-              })}
-            </ScrollView>
+                  {SECTOR_DEFINITIONS.map((sec) => {
+                    const isSel = selectedPackSector === sec.id;
+                    return (
+                      <Pressable
+                        key={sec.id}
+                        onPress={() => setSelectedPackSector(sec.id)}
+                        style={[
+                          styles.sectorChip,
+                          {
+                            backgroundColor: isSel ? theme.primaryActionBg : theme.surfaceSecondary,
+                            borderColor: isSel ? theme.borderFocused : theme.borderDefault,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.sectorText,
+                            { color: isSel ? theme.primaryActionText : theme.textSecondary },
+                          ]}
+                        >
+                          {sec.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Organization Pack Chips */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.packContent}
+                  style={styles.packScroll}
+                >
+                  {visiblePacks.map((pack) => {
+                    const isSel = selectedPackId === pack.id;
+                    return (
+                      <Pressable
+                        key={pack.id}
+                        onPress={() => setSelectedPackId(isSel ? null : pack.id)}
+                        style={[
+                          styles.packChip,
+                          {
+                            backgroundColor: isSel ? theme.primaryActionBg : theme.surfaceSecondary,
+                            borderColor: isSel ? theme.borderFocused : theme.borderDefault,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.packText,
+                            { color: isSel ? theme.primaryActionText : theme.textPrimary },
+                          ]}
+                        >
+                          {pack.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Active Pack Banner */}
+                {activePack && (
+                  <View
+                    style={[
+                      styles.packBanner,
+                      { backgroundColor: theme.surfaceSecondary, borderColor: 'rgba(255, 255, 255, 0.12)' },
+                    ]}
+                  >
+                    <View style={styles.packBannerTop}>
+                      <Text style={[styles.packBannerTitle, { color: theme.textPrimary }]}>
+                        {activePack.name}
+                      </Text>
+                      <Pressable onPress={() => setSelectedPackId(null)} hitSlop={8}>
+                        <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '700' }}>
+                          CLEAR PACK ✕
+                        </Text>
+                      </Pressable>
+                    </View>
+                    <Text style={[styles.packBannerSector, { color: theme.textSecondary }]}>
+                      {activePack.sectorLabel} · {activePack.samplePartyType}
+                    </Text>
+                    <Text style={[styles.packBannerDesc, { color: theme.textSecondary }]}>
+                      {activePack.description}
+                    </Text>
+                    <View style={styles.packBannerMeta}>
+                      <View style={[styles.packWorkflowBadge, { borderColor: theme.borderDefault, backgroundColor: theme.surface }]}>
+                        <Text style={[styles.packWorkflowText, { color: theme.textPrimary }]}>
+                          WORKFLOW: {activePack.workflowIds.join(' · ').toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 4 }}>
+                      Statutory: {activePack.statutoryNotes}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Counter bar */}
             <View style={styles.modalMetaRow}>
               <Text style={[styles.modalMetaText, { color: theme.textMuted }]}>
-                {filteredCreateOptions.length === 1
+                {activePack
+                  ? `${filteredCreateOptions.length} recommended for ${activePack.name}`
+                  : filteredCreateOptions.length === 1
                   ? '1 document available'
                   : `${filteredCreateOptions.length} documents available`}
               </Text>
-              {createModalSearch.trim() || createModalCategory !== 'all' ? (
+              {createModalSearch.trim() || createModalCategory !== 'all' || selectedPackId ? (
                 <Pressable
                   onPress={() => {
                     setCreateModalSearch('');
                     setCreateModalCategory('all');
+                    setSelectedPackId(null);
                   }}
                   hitSlop={6}
                 >
@@ -1232,5 +1590,109 @@ const styles = StyleSheet.create({
   modalEmptyBtnText: {
     fontSize: 12.5,
     fontWeight: '600',
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: spacing.sm,
+  },
+  modeToggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  sectorScroll: {
+    maxHeight: 36,
+    marginBottom: 6,
+  },
+  sectorContent: {
+    gap: 6,
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  sectorChip: {
+    minHeight: 28,
+    paddingHorizontal: 10,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectorText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  packScroll: {
+    maxHeight: 40,
+    marginBottom: 8,
+  },
+  packContent: {
+    gap: 6,
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  packChip: {
+    minHeight: 30,
+    paddingHorizontal: 12,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  packText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  packBanner: {
+    padding: spacing.md,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+  },
+  packBannerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  packBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  packBannerSector: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  packBannerDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 6,
+  },
+  packBannerMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
+  },
+  packWorkflowBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  packWorkflowText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
 });

@@ -11,14 +11,28 @@ import { FullDocument } from '../../src/data/repositories/DocumentRepository';
 import { BusinessProfile } from '../../src/domain/profile/types';
 
 describe('Document Type Registry', () => {
-  it('registers all 25 professional enterprise document types with metadata', () => {
+  it('registers all 39 professional enterprise document types with metadata', () => {
     const allTypes = DocumentTypeRegistry.getAll();
-    expect(allTypes.length).toBe(25);
+    expect(allTypes.length).toBe(39);
 
     const typeCodes = allTypes.map((t) => t.type);
     expect(typeCodes).toContain('tax_invoice');
     expect(typeCodes).toContain('bill_of_supply');
     expect(typeCodes).toContain('export_invoice');
+    expect(typeCodes).toContain('commercial_invoice');
+    expect(typeCodes).toContain('invoice_cum_bill_of_supply');
+    expect(typeCodes).toContain('cash_bill');
+    expect(typeCodes).toContain('pos_receipt');
+    expect(typeCodes).toContain('service_invoice');
+    expect(typeCodes).toContain('milestone_invoice');
+    expect(typeCodes).toContain('progress_invoice');
+    expect(typeCodes).toContain('recurring_invoice');
+    expect(typeCodes).toContain('advance_invoice');
+    expect(typeCodes).toContain('revised_tax_invoice');
+    expect(typeCodes).toContain('sales_return_note');
+    expect(typeCodes).toContain('invoice_aging_report');
+    expect(typeCodes).toContain('payment_reminder');
+    expect(typeCodes).toContain('order_confirmation');
     expect(typeCodes).toContain('proforma');
     expect(typeCodes).toContain('quotation');
     expect(typeCodes).toContain('purchase_order');
