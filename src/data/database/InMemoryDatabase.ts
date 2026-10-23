@@ -126,12 +126,22 @@ export class InMemorySQLiteDatabase {
     return;
   }
 
+  private _inTransaction = false;
+
+  isInTransactionSync(): boolean {
+    return this._inTransaction;
+  }
+
   async withTransactionAsync<T>(action: () => Promise<T>): Promise<T> {
     // Deep clone state for atomic rollback on exception
     const backup = JSON.stringify(this.state);
+    this._inTransaction = true;
     try {
-      return await action();
+      const res = await action();
+      this._inTransaction = false;
+      return res;
     } catch (err) {
+      this._inTransaction = false;
       this.state = JSON.parse(backup);
       throw err;
     }

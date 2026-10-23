@@ -59,6 +59,7 @@ import {
   Shield,
   FileClock,
   Compass,
+  Sparkles,
 } from 'lucide-react-native';
 import {
   OrganizationPackRegistry,
@@ -816,6 +817,22 @@ export default function DocumentsScreen() {
             </Text>
           </View>
           <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => router.push('/ai/assistant' as any)}
+              style={[
+                styles.aiHeaderBtn,
+                {
+                  backgroundColor: theme.primaryActionBg,
+                  borderColor: theme.borderFocused,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Open AI Document Assistant"
+              hitSlop={8}
+            >
+              <Sparkles size={16} color={theme.primaryActionText} strokeWidth={2.2} />
+              <Text style={[styles.aiHeaderBtnText, { color: theme.primaryActionText }]}>AI</Text>
+            </Pressable>
             <IconButton
               icon={<Plus size={20} color={theme.textPrimary} />}
               onPress={() => setShowCreateSheet(true)}
@@ -1227,6 +1244,38 @@ export default function DocumentsScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.modalScrollContent}
             >
+              <Pressable
+                style={[
+                  styles.aiModalHero,
+                  {
+                    backgroundColor: theme.surfaceSecondary,
+                    borderColor: 'rgba(245, 158, 11, 0.4)',
+                  },
+                ]}
+                onPress={() => {
+                  setShowCreateSheet(false);
+                  router.push('/ai/assistant' as any);
+                }}
+              >
+                <View style={styles.aiModalHeroIcon}>
+                  <Sparkles size={18} color="#F59E0B" strokeWidth={2.2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <Text style={[styles.aiModalHeroTitle, { color: theme.textPrimary }]}>
+                      Draft with AI Agent
+                    </Text>
+                    <View style={styles.aiModalHeroBadge}>
+                      <Text style={styles.aiModalHeroBadgeText}>SMART CHAT</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.aiModalHeroDesc, { color: theme.textSecondary }]}>
+                    Speak or type details. Agent links customer & rates from SQLite automatically.
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={theme.textMuted} />
+              </Pressable>
+
               {filteredCreateOptions.length === 0 ? (
                 <View style={styles.modalEmptyBox}>
                   <Text style={[styles.modalEmptyTitle, { color: theme.textPrimary }]}>
@@ -1392,6 +1441,23 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     marginLeft: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: radii.button,
+    borderWidth: 1,
+  },
+  aiHeaderBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   searchContainer: {
     marginTop: spacing.sm,
@@ -1515,6 +1581,45 @@ const styles = StyleSheet.create({
   },
   modalScrollContent: {
     paddingBottom: spacing.lg,
+  },
+  aiModalHero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: radii.card,
+    borderWidth: 1.5,
+    marginBottom: spacing.md,
+    gap: 12,
+  },
+  aiModalHeroIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiModalHeroTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  aiModalHeroBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    backgroundColor: '#F59E0B',
+  },
+  aiModalHeroBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#090A0F',
+    letterSpacing: 0.5,
+  },
+  aiModalHeroDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
   },
   sheetOptions: {
     gap: 10,

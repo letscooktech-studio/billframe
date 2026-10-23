@@ -1,4 +1,6 @@
 import { BackupManager } from '../../src/services/backup/BackupManager';
+import { DatabaseManager } from '../../src/data/database/DatabaseManager';
+import { WorkspaceRepository } from '../../src/data/repositories/WorkspaceRepository';
 import { CsvExporter, parseCsvRows, escapeCsvField } from '../../src/services/backup/CsvExporter';
 import { CustomerRepository } from '../../src/data/repositories/CustomerRepository';
 import { CatalogRepository } from '../../src/data/repositories/CatalogRepository';
@@ -120,6 +122,39 @@ describe('Offline Backup & Restore Integrity Engine', () => {
     const customersAfter = await CustomerRepository.listAllCustomers();
     expect(customersAfter.length).toBe(2);
     expect(customersAfter[0].name).toBe('Client One');
+  });
+
+  it('backs up and restores workspace preferences and onboarding state atomically', async () => {
+    // 1. Save workspace preferences
+    await DatabaseManager.getDatabaseAsync();
+    await WorkspaceRepository.completeOnboardingAsync({
+      businessProfileId: 'default_business_profile',
+      businessType: 'service',
+      primaryIntent: 'business_documents',
+    });
+
+    // 2. Create full backup
+    const { jsonString, manifest } = await BackupManager.createFullBackupAsync();
+    expect(manifest.counts.workspace_preferences).toBe(1);
+
+    // 3. Clear database
+    getMockDb().reset();
+    await DatabaseManager.closeDatabaseAsync();
+
+    // 4. Validate and restore backup
+    const validation = await BackupManager.validateBackupJson(jsonString);
+    expect(validation.valid).toBe(true);
+    expect(validation.payload).toBeDefined();
+
+    const restoreResult = await BackupManager.restoreFromPayloadAsync(validation.payload!);
+    expect(restoreResult.success).toBe(true);
+
+    // 5. Verify restored workspace preferences in DB
+    const restoredPrefs = await (await DatabaseManager.getDatabaseAsync()).getFirstAsync<{ business_type: string; onboarding_completed: number }>(
+      'SELECT business_type, onboarding_completed FROM workspace_preferences LIMIT 1;'
+    );
+    expect(restoredPrefs?.business_type).toBe('service');
+    expect(restoredPrefs?.onboarding_completed).toBe(1);
   });
 });
 

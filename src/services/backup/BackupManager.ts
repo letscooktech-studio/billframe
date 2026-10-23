@@ -51,6 +51,7 @@ export class BackupManager {
     const template_assignments = await safeGetAll('SELECT * FROM template_assignments;');
     const custom_document_types = await safeGetAll('SELECT * FROM custom_document_types;');
     const document_instances = await safeGetAll('SELECT * FROM document_instances;');
+    const workspace_preferences = await safeGetAll('SELECT * FROM workspace_preferences;');
 
     const counts: BackupTableCounts = {
       business_profiles: business_profiles.length,
@@ -72,6 +73,7 @@ export class BackupManager {
       payment_refunds: payment_refunds.length,
       reminder_events: reminder_events.length,
       invoice_collection_metadata: invoice_collection_metadata.length,
+      workspace_preferences: workspace_preferences.length,
     };
 
     const dataPayload = {
@@ -98,6 +100,7 @@ export class BackupManager {
       template_assignments,
       custom_document_types,
       document_instances,
+      workspace_preferences,
     };
 
     // Calculate deterministic SHA-256 checksum over data payload
@@ -607,6 +610,30 @@ export class BackupManager {
               di.status, di.issue_date, di.party_name || null, di.party_details_json || null,
               di.content_json, di.template_code || 'letterhead', di.branding_json || null,
               di.created_at, di.updated_at,
+            ]
+          );
+        }
+
+        // 25. Restore workspace preferences
+        for (const wp of (data as any).workspace_preferences || []) {
+          await safeRun(
+            `INSERT OR REPLACE INTO workspace_preferences (
+              id, business_profile_id, business_type, sales_type, is_gst_registered,
+              track_inventory, track_jobs, partial_payments, recurring_billing,
+              adaptive_enabled, layout_locked, primary_modules_json, onboarding_completed,
+              onboarding_version, onboarding_completed_at, profile_version,
+              workspace_config_version, geography_dataset_version, primary_intent,
+              favorite_document_types_json, selected_document_families_json,
+              onboarding_state, onboarding_step, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              wp.id, wp.business_profile_id, wp.business_type, wp.sales_type, wp.is_gst_registered,
+              wp.track_inventory, wp.track_jobs, wp.partial_payments, wp.recurring_billing,
+              wp.adaptive_enabled, wp.layout_locked, wp.primary_modules_json, wp.onboarding_completed,
+              wp.onboarding_version, wp.onboarding_completed_at || null, wp.profile_version,
+              wp.workspace_config_version, wp.geography_dataset_version, wp.primary_intent,
+              wp.favorite_document_types_json, wp.selected_document_families_json,
+              wp.onboarding_state, wp.onboarding_step, wp.created_at, wp.updated_at,
             ]
           );
         }

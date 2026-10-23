@@ -113,6 +113,7 @@ function RootLayoutInner() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="document/edit" options={{ presentation: 'card' }} />
       <Stack.Screen name="document/[id]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="ai/assistant" options={{ presentation: 'card' }} />
       <Stack.Screen name="templates/index" options={{ presentation: 'card' }} />
       <Stack.Screen name="templates/studio" options={{ presentation: 'card' }} />
       <Stack.Screen name="templates/edit" options={{ presentation: 'card' }} />
@@ -125,6 +126,7 @@ function RootLayoutInner() {
       <Stack.Screen name="onboarding/setup" options={{ presentation: 'card' }} />
       <Stack.Screen name="settings/workspace" options={{ presentation: 'card' }} />
       <Stack.Screen name="settings/payments" options={{ presentation: 'card' }} />
+      <Stack.Screen name="settings/cloud-sync" options={{ presentation: 'card' }} />
       <Stack.Screen name="collections/index" options={{ presentation: 'card' }} />
       <Stack.Screen name="backup" options={{ presentation: 'card' }} />
       <Stack.Screen name="expenses/index" options={{ presentation: 'card' }} />

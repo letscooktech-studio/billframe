@@ -5,7 +5,7 @@ export async function setItemAsync(key: string, value: string): Promise<void> {
 }
 
 export async function getItemAsync(key: string): Promise<string | null> {
-  return store.get(key) || null;
+  return store.has(key) ? (store.get(key) as string) : null;
 }
 
 export async function deleteItemAsync(key: string): Promise<void> {

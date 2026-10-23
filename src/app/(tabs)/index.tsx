@@ -38,6 +38,7 @@ import {
   ClipboardList,
   Receipt,
   ChevronRight,
+  Sparkles,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { useTheme } from '../../design/ThemeContext';
@@ -218,12 +219,20 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            <IconButton
-              icon={<Search size={20} color={theme.textPrimary} />}
-              onPress={() => router.push('/search' as any)}
-              accessibilityLabel="Search documents and organization records"
-              size={44}
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <IconButton
+                icon={<Sparkles size={18} color="#F59E0B" />}
+                onPress={() => router.push('/ai/assistant' as any)}
+                accessibilityLabel="Open AI Document Agent"
+                size={44}
+              />
+              <IconButton
+                icon={<Search size={20} color={theme.textPrimary} />}
+                onPress={() => router.push('/search' as any)}
+                accessibilityLabel="Search documents and organization records"
+                size={44}
+              />
+            </View>
           </View>
 
           {/* Hero Section: Your documents */}
@@ -235,7 +244,7 @@ export default function HomeScreen() {
               Create, continue and manage your work.
             </Text>
 
-            {/* Primary Action Button: + New Document */}
+            {/* Primary Action Button: + New Document & AI Agent */}
             <View style={styles.primaryActionWrapper}>
               <PrimaryButton
                 label="+ New Document"
@@ -244,6 +253,30 @@ export default function HomeScreen() {
                 accessibilityLabel="Create a new document"
                 fullWidth
               />
+              <Pressable
+                style={({ pressed }) => [
+                  {
+                    marginTop: 8,
+                    height: 44,
+                    borderRadius: radii.md,
+                    borderWidth: 1,
+                    borderColor: '#F59E0B40',
+                    backgroundColor: pressed ? '#F59E0B25' : '#F59E0B12',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  },
+                ]}
+                onPress={() => router.push('/ai/assistant' as any)}
+                accessibilityRole="button"
+                accessibilityLabel="Draft with AI Agent"
+              >
+                <Sparkles size={16} color="#F59E0B" />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
+                  ✨ Draft with AI Agent (Chat)
+                </Text>
+              </Pressable>
             </View>
           </View>
 

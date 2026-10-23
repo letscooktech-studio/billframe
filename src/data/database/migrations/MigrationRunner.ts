@@ -83,13 +83,29 @@ export class MigrationRunner {
     for (const migration of pending) {
       const now = Date.now();
       try {
-        await db.withTransactionAsync(async () => {
+        const inTx = typeof (db as any).isInTransactionSync === 'function' ? (db as any).isInTransactionSync() : false;
+        const executeMigration = async () => {
           await migration.up(db);
           await db.runAsync(
             'INSERT INTO migration_history (version, name, checksum, applied_at) VALUES (?, ?, ?, ?);',
             [migration.version, migration.name, migration.checksum, now]
           );
-        });
+        };
+
+        if (inTx) {
+          await executeMigration();
+        } else {
+          try {
+            await db.withTransactionAsync(executeMigration);
+          } catch (txErr: any) {
+            const msg = String(txErr?.message || '').toLowerCase();
+            if (msg.includes('cannot start a transaction') || msg.includes('within a transaction')) {
+              await executeMigration();
+            } else {
+              throw txErr;
+            }
+          }
+        }
 
         newlyApplied.push({
           version: migration.version,

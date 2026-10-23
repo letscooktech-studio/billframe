@@ -30,6 +30,8 @@ import {
   FileText,
   AlertCircle,
   CheckCircle2,
+  Cloud,
+  ChevronRight,
 } from 'lucide-react-native';
 import {
   colors,
@@ -265,8 +267,37 @@ export default function BackupScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.container}>
 
+          {/* ── CLOUD SYNC & AUTO-BACKUP ───────────────────────── */}
+          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>CLOUD DELTA SYNC</Text>
+          <Pressable
+            style={[
+              styles.card,
+              {
+                backgroundColor: theme.surface,
+                borderColor: 'rgba(245, 158, 11, 0.35)',
+                marginBottom: spacing.lg,
+              },
+            ]}
+            onPress={() => router.push('/settings/cloud-sync' as any)}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                <Cloud color="#F59E0B" size={24} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cardTitle, { color: theme.textPrimary, marginBottom: 2 }]}>
+                    Supabase Cloud Delta Sync
+                  </Text>
+                  <Text style={[styles.cardDescription, { color: theme.textSecondary, marginBottom: 0 }]}>
+                    Mirror local SQLite to your private Supabase Postgres cluster for multi-device sync & cloud backup.
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight color={theme.textMuted} size={18} />
+            </View>
+          </Pressable>
+
           {/* ── BACKUP & RESTORE ─────────────────────────────── */}
-          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>BACKUP & RESTORE</Text>
+          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>OFFLINE BACKUP & RESTORE</Text>
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
             <View style={styles.cardHeader}>
               <ShieldCheck color={theme.statusSuccess} size={20} />

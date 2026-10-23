@@ -23,6 +23,7 @@ export interface BackupTableCounts {
   payment_refunds?: number;
   reminder_events?: number;
   invoice_collection_metadata?: number;
+  workspace_preferences?: number;
 }
 
 export interface BackupManifest {
@@ -55,6 +56,7 @@ export interface BackupPayload {
     payment_refunds?: any[];
     reminder_events?: any[];
     invoice_collection_metadata?: any[];
+    workspace_preferences?: any[];
   };
 }
 

@@ -126,12 +126,22 @@ export class MockSQLiteDatabase {
     return;
   }
 
+  private _inTransaction = false;
+
+  isInTransactionSync(): boolean {
+    return this._inTransaction;
+  }
+
   async withTransactionAsync<T>(action: () => Promise<T>): Promise<T> {
     // Deep clone state for atomic rollback on exception
     const backup = JSON.stringify(this.state);
+    this._inTransaction = true;
     try {
-      return await action();
+      const res = await action();
+      this._inTransaction = false;
+      return res;
     } catch (err) {
+      this._inTransaction = false;
       this.state = JSON.parse(backup);
       throw err;
     }
@@ -887,7 +897,7 @@ export class MockSQLiteDatabase {
     }
 
     // 24. Workspace Preferences Upsert
-    if (s.startsWith('INSERT INTO workspace_preferences')) {
+    if (s.startsWith('INSERT INTO workspace_preferences') || s.startsWith('INSERT OR REPLACE INTO workspace_preferences')) {
       const id = params[0];
       const business_profile_id = params[1];
       const business_type = params[2];
@@ -1370,9 +1380,12 @@ export class MockSQLiteDatabase {
     }
 
     // Workspace preferences
-    if (s.includes('FROM workspace_preferences WHERE business_profile_id = ?')) {
-      const [profileId] = params;
-      return (this.state.workspace_preferences.find((w) => w.business_profile_id === profileId) as T) || null;
+    if (s.includes('FROM workspace_preferences')) {
+      if (s.includes('WHERE business_profile_id = ?')) {
+        const [profileId] = params;
+        return (this.state.workspace_preferences.find((w) => w.business_profile_id === profileId) as T) || null;
+      }
+      return (this.state.workspace_preferences[0] as T) || null;
     }
 
     // Payment provider connection
@@ -1505,6 +1518,11 @@ export class MockSQLiteDatabase {
         return this.state.feature_usage.filter((f) => f.business_id === params[0] || !f.business_id) as T[];
       }
       return this.state.feature_usage.slice() as T[];
+    }
+
+    // Workspace preferences
+    if (s.includes('FROM workspace_preferences')) {
+      return this.state.workspace_preferences.slice() as T[];
     }
 
     // Document Items

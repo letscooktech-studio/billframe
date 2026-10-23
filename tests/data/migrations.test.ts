@@ -185,4 +185,27 @@ describe('Database Migrations Engine Tests', () => {
     expect(historyAfter.length).toBe(1);
     expect(historyAfter[0].version).toBe(1);
   });
+
+  it('safely handles migration execution when an active transaction is already open', async () => {
+    // Simulate isInTransactionSync returning true
+    (mockDb as any).isInTransactionSync = () => true;
+
+    const newlyApplied = await MigrationRunner.runMigrationsAsync(mockDb as any, [MIGRATIONS[0]]);
+    expect(newlyApplied.length).toBe(1);
+    expect(newlyApplied[0].version).toBe(1);
+
+    const history = await MigrationRunner.getAppliedMigrationsAsync(mockDb as any);
+    expect(history.length).toBe(1);
+  });
+
+  it('safely recovers if withTransactionAsync throws nested transaction error', async () => {
+    // Simulate withTransactionAsync throwing native SQLite nested transaction error
+    mockDb.withTransactionAsync = async () => {
+      throw new Error("Call to function 'NativeDatabase.execAsync' has been rejected. Caused by: cannot start a transaction within a transaction");
+    };
+
+    const newlyApplied = await MigrationRunner.runMigrationsAsync(mockDb as any, [MIGRATIONS[0]]);
+    expect(newlyApplied.length).toBe(1);
+    expect(newlyApplied[0].version).toBe(1);
+  });
 });

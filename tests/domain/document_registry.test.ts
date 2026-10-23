@@ -11,9 +11,9 @@ import { FullDocument } from '../../src/data/repositories/DocumentRepository';
 import { BusinessProfile } from '../../src/domain/profile/types';
 
 describe('Document Type Registry', () => {
-  it('registers all 39 professional enterprise document types with metadata', () => {
+  it('registers all 40 professional enterprise document types with metadata', () => {
     const allTypes = DocumentTypeRegistry.getAll();
-    expect(allTypes.length).toBe(39);
+    expect(allTypes.length).toBe(40);
 
     const typeCodes = allTypes.map((t) => t.type);
     expect(typeCodes).toContain('tax_invoice');
@@ -48,6 +48,7 @@ describe('Document Type Registry', () => {
     expect(typeCodes).toContain('customer_account_statement');
     expect(typeCodes).toContain('salary_slip');
     expect(typeCodes).toContain('job_offer_letter');
+    expect(typeCodes).toContain('job_application');
     expect(typeCodes).toContain('experience_certificate');
     expect(typeCodes).toContain('rent_receipt');
     expect(typeCodes).toContain('student_fee_receipt');

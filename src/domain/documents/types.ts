@@ -61,7 +61,8 @@ export type DocumentType =
   | 'equipment_responsibility_letter'
   | 'meeting_minutes'
   | 'site_inspection_report'
-  | 'nda_agreement';
+  | 'nda_agreement'
+  | 'job_application';
 
 /**
  * Orthogonal document lifecycle statuses

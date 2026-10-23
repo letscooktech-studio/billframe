@@ -32,6 +32,7 @@ import {
   Users,
   Search,
   Menu,
+  Cloud,
 } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { AuroraBackground } from '../../components/common/AuroraBackground';
@@ -177,9 +178,29 @@ export default function SettingsScreen() {
               })}
             </View>
 
-            {/* Section 2: Security & Local Database */}
-            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>SECURITY & DATA</Text>
+            {/* Section: AI Agent & Workflows */}
+            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>AI AGENT & AUTOMATION</Text>
             <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              {renderItem({
+                icon: <Sparkles color="#F59E0B" size={20} />,
+                title: 'AI Document Assistant (Chat)',
+                subtitle: 'Autonomous natural language drafting, live preview & SQLite grounding',
+                badge: 'Agentic',
+                onPress: () => router.push('/ai/assistant' as any),
+                isLast: true,
+              })}
+            </View>
+
+            {/* Section 2: Security & Local Database */}
+            <Text style={[styles.groupHeading, { color: theme.textSecondary }]}>SECURITY, BACKUP & CLOUD</Text>
+            <View style={[styles.groupCard, { backgroundColor: theme.surface, borderColor: theme.borderSubtle }]}>
+              {renderItem({
+                icon: <Cloud color={theme.brandAnchor} size={20} />,
+                title: 'Cloud Sync Engine (Supabase)',
+                subtitle: 'Local-first delta sync, cross-device relay & cloud backup',
+                badge: 'Local-First',
+                onPress: () => router.push('/settings/cloud-sync' as any),
+              })}
               {renderItem({
                 icon: <Lock color={theme.brandAnchor} size={20} />,
                 title: 'Security & App Lock',

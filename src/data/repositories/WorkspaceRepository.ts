@@ -22,9 +22,9 @@ export class WorkspaceRepository {
       const profile = await db.getFirstAsync<{ id: string }>(
         'SELECT id FROM business_profiles WHERE is_active = 1 LIMIT 1;'
       );
-      return profile?.id || 'default-profile';
+      return profile?.id || 'default_business_profile';
     } catch {
-      return 'default-profile';
+      return 'default_business_profile';
     }
   }
 
@@ -124,7 +124,7 @@ export class WorkspaceRepository {
     } catch {
       return {
         id: 'fallback-pref',
-        businessProfileId: 'default-profile',
+        businessProfileId: 'default_business_profile',
         ...DEFAULT_WORKSPACE_PREFERENCES,
       };
     }
