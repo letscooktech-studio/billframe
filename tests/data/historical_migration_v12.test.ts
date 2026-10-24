@@ -162,15 +162,18 @@ describe('Historical SQLite Migration v12 — Zero Data Loss & Balance Integrity
     // 7. EXECUTE MIGRATION RUNNER (Applies Migration 12)
     const newlyApplied = await MigrationRunner.runMigrationsAsync(mockDb as any);
 
-    // Verify exactly Migration 12 was executed
-    expect(newlyApplied.length).toBe(1);
+    // Verify Migration 12 and 13 were executed
+    expect(newlyApplied.length).toBe(2);
     expect(newlyApplied[0].version).toBe(12);
     expect(newlyApplied[0].name).toBe('v12_onboarding_v3_preferences');
+    expect(newlyApplied[1].version).toBe(13);
+    expect(newlyApplied[1].name).toBe('v13_ai_agent_and_task_ledger');
 
-    // Verify migration history has 12 applied records
+    // Verify migration history has 13 applied records
     const allHistory = await MigrationRunner.getAppliedMigrationsAsync(mockDb as any);
-    expect(allHistory.length).toBe(12);
+    expect(allHistory.length).toBe(13);
     expect(allHistory[11].version).toBe(12);
+    expect(allHistory[12].version).toBe(13);
 
     // 8. VERIFY BUSINESS PROFILE PRESERVATION
     const postBiz = mockDb.state.business_profiles.find((b) => b.id === existingBusiness.id);

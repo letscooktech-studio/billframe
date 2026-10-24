@@ -40,6 +40,12 @@ export interface MockDbState {
   custom_document_types: any[];
   document_instances: any[];
   settings: any[];
+  ai_sessions: any[];
+  ai_messages: any[];
+  agent_tasks: any[];
+  agent_events: any[];
+  agent_proposals: any[];
+  recommendation_entries: any[];
 }
 
 export class MockSQLiteDatabase {
@@ -79,6 +85,12 @@ export class MockSQLiteDatabase {
     custom_document_types: [],
     document_instances: [],
     settings: [],
+    ai_sessions: [],
+    ai_messages: [],
+    agent_tasks: [],
+    agent_events: [],
+    agent_proposals: [],
+    recommendation_entries: [],
   };
 
   reset() {
@@ -118,6 +130,12 @@ export class MockSQLiteDatabase {
       custom_document_types: [],
       document_instances: [],
       settings: [],
+      ai_sessions: [],
+      ai_messages: [],
+      agent_tasks: [],
+      agent_events: [],
+      agent_proposals: [],
+      recommendation_entries: [],
     };
   }
 
@@ -149,6 +167,83 @@ export class MockSQLiteDatabase {
 
   async runAsync(sql: string, params: any[] = []): Promise<{ lastInsertRowId: number; changes: number }> {
     const s = sql.trim();
+
+    // AI Sessions Insert
+    if (s.includes('INSERT INTO ai_sessions')) {
+      const [id, title, created_at, updated_at] = params;
+      this.state.ai_sessions.push({ id, title, active_draft_json: null, is_archived: 0, created_at, updated_at });
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // AI Sessions Update active draft
+    if (s.includes('UPDATE ai_sessions SET active_draft_json = ?, updated_at = ? WHERE id = ?')) {
+      const [active_draft_json, updated_at, id] = params;
+      const sess = this.state.ai_sessions.find((x) => x.id === id);
+      if (sess) {
+        sess.active_draft_json = active_draft_json;
+        sess.updated_at = updated_at;
+      }
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+
+    // AI Sessions Update clear active draft
+    if (s.includes('UPDATE ai_sessions SET active_draft_json = NULL, updated_at = ? WHERE id = ?')) {
+      const [updated_at, id] = params;
+      const sess = this.state.ai_sessions.find((x) => x.id === id);
+      if (sess) {
+        sess.active_draft_json = null;
+        sess.updated_at = updated_at;
+      }
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+
+    // AI Sessions Update timestamp
+    if (s.includes('UPDATE ai_sessions SET updated_at = ? WHERE id = ?')) {
+      const [updated_at, id] = params;
+      const sess = this.state.ai_sessions.find((x) => x.id === id);
+      if (sess) {
+        sess.updated_at = updated_at;
+      }
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+
+    // AI Messages Insert or Replace
+    if (s.includes('ai_messages') && s.includes('INSERT')) {
+      const [id, session_id, role, content, reasoning_trace, document_draft_json, task_steps_json, quick_actions_json, timestamp] = params;
+      const idx = this.state.ai_messages.findIndex((m) => m.id === id);
+      const row = { id, session_id, role, content, reasoning_trace, document_draft_json, task_steps_json, quick_actions_json, timestamp };
+      if (idx >= 0) {
+        this.state.ai_messages[idx] = row;
+      } else {
+        this.state.ai_messages.push(row);
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // AI Messages Delete by session_id
+    if (s.includes('DELETE FROM ai_messages WHERE session_id = ?')) {
+      const [session_id] = params;
+      this.state.ai_messages = this.state.ai_messages.filter((m) => m.session_id !== session_id);
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+
+    // Agent Proposals Insert
+    if (s.includes('INSERT INTO agent_proposals')) {
+      const [id, session_id, action_type, tier, status, target_id, payload_json, created_at, executed_at] = params;
+      this.state.agent_proposals.push({ id, session_id, action_type, tier, status, target_id, payload_json, created_at, executed_at });
+      return { lastInsertRowId: 1, changes: 1 };
+    }
+
+    // Agent Proposals Update Status
+    if (s.includes('UPDATE agent_proposals SET status = ?, executed_at = ? WHERE id = ?')) {
+      const [status, executed_at, id] = params;
+      const p = this.state.agent_proposals.find((x) => x.id === id);
+      if (p) {
+        p.status = status;
+        p.executed_at = executed_at;
+      }
+      return { lastInsertRowId: 0, changes: 1 };
+    }
 
     // Settings Insert / Replace
     if (s.includes('INSERT INTO settings') || s.includes('INSERT OR REPLACE INTO settings')) {
@@ -1205,6 +1300,12 @@ export class MockSQLiteDatabase {
   async getFirstAsync<T>(sql: string, params: any[] = []): Promise<T | null> {
     const s = sql.trim();
 
+    // AI Sessions
+    if (s.includes('FROM ai_sessions WHERE id = ?')) {
+      const [id] = params;
+      return (this.state.ai_sessions.find((sess) => sess.id === id) as T) || null;
+    }
+
     // Template assignment
     if (s.includes('FROM template_assignments WHERE business_profile_id = ? AND doc_type = ?')) {
       const [busId, docType] = params;
@@ -1441,6 +1542,22 @@ export class MockSQLiteDatabase {
 
   async getAllAsync<T>(sql: string, params: any[] = []): Promise<T[]> {
     const s = sql.trim();
+
+    // AI Messages
+    if (s.includes('FROM ai_messages') && s.includes('WHERE session_id = ?')) {
+      const [sessionId] = params;
+      return this.state.ai_messages
+        .filter((m) => m.session_id === sessionId)
+        .sort((a, b) => a.timestamp - b.timestamp) as T[];
+    }
+
+    // Agent Proposals
+    if (s.includes('FROM agent_proposals') && s.includes('WHERE session_id = ?')) {
+      const [sessionId] = params;
+      return this.state.agent_proposals
+        .filter((p) => p.session_id === sessionId && (s.includes("status = 'pending'") ? p.status === 'pending' : true))
+        .sort((a, b) => a.created_at - b.created_at) as T[];
+    }
 
     // PRAGMA table_info check
     if (s.startsWith('PRAGMA table_info')) {

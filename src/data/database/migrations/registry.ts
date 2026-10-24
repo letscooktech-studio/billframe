@@ -914,4 +914,92 @@ export const MIGRATIONS: readonly Migration[] = [
       );
     },
   },
+  {
+    version: 13,
+    name: 'v13_ai_agent_and_task_ledger',
+    checksum: 'a8f4c2e71d934bb1823ef05492167d4e3cb09918237582918274619385019283',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS ai_sessions (
+          id TEXT PRIMARY KEY NOT NULL,
+          title TEXT NOT NULL,
+          active_draft_json TEXT,
+          is_archived INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS ai_messages (
+          id TEXT PRIMARY KEY NOT NULL,
+          session_id TEXT NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT NOT NULL,
+          reasoning_trace TEXT,
+          document_draft_json TEXT,
+          task_steps_json TEXT,
+          quick_actions_json TEXT,
+          timestamp INTEGER NOT NULL,
+          FOREIGN KEY (session_id) REFERENCES ai_sessions(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ai_messages_session ON ai_messages(session_id);
+        CREATE INDEX IF NOT EXISTS idx_ai_messages_ts ON ai_messages(timestamp);
+
+        CREATE TABLE IF NOT EXISTS agent_tasks (
+          id TEXT PRIMARY KEY NOT NULL,
+          session_id TEXT,
+          title TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_agent_tasks_session ON agent_tasks(session_id);
+        CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
+
+        CREATE TABLE IF NOT EXISTS agent_events (
+          id TEXT PRIMARY KEY NOT NULL,
+          task_id TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          label TEXT NOT NULL,
+          status TEXT NOT NULL,
+          payload_json TEXT,
+          created_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_agent_events_task ON agent_events(task_id);
+
+        CREATE TABLE IF NOT EXISTS agent_proposals (
+          id TEXT PRIMARY KEY NOT NULL,
+          session_id TEXT,
+          action_type TEXT NOT NULL,
+          tier INTEGER NOT NULL DEFAULT 3,
+          status TEXT NOT NULL DEFAULT 'pending',
+          target_id TEXT,
+          payload_json TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          executed_at INTEGER
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_agent_proposals_status ON agent_proposals(status);
+
+        CREATE TABLE IF NOT EXISTS recommendation_entries (
+          id TEXT PRIMARY KEY NOT NULL,
+          rule_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          severity TEXT NOT NULL DEFAULT 'info',
+          entity_type TEXT,
+          entity_id TEXT,
+          action_label TEXT,
+          action_payload_json TEXT,
+          is_dismissed INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_recommendations_dismissed ON recommendation_entries(is_dismissed);
+      `);
+    },
+  },
 ];

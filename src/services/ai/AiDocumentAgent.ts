@@ -19,6 +19,8 @@ import { DocumentTypeRegistry } from '../../domain/documents/DocumentTypeRegistr
 import { calculateDocument } from '../../domain/documents/DocumentCalculator';
 import { DocumentRepository } from '../../data/repositories/DocumentRepository';
 import { CustomerRepository } from '../../data/repositories/CustomerRepository';
+import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
+import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DocumentType } from '../../domain/documents/types';
 import { createMoney, formatMoney } from '../../domain/money/Money';
 
@@ -244,6 +246,70 @@ export const AGENT_DOCUMENT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'get_business_summary',
+      description: 'Get active business profile, default currency, and high-level financial overview (outstanding receivables, overdue count and amount, and payments collected this month). Use when the user asks how their business is doing, asks for revenue/payments overview, or asks what happened to their money.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_customers',
+      description: 'Search customers in the local SQLite database by keyword (name, phone, email, or company). Use when the user wants to look up a counterparty or client contact details.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Customer search keyword or name' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_customer_balance',
+      description: 'Get customer ledger balance from local SQLite database: total invoiced, total paid, and outstanding receivable balance. Use when the user asks how much a customer owes, asks for their balance, or checks their payment status.',
+      parameters: {
+        type: 'object',
+        properties: {
+          customerNameOrId: { type: 'string', description: 'Customer name or ID' },
+        },
+        required: ['customerNameOrId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_invoices',
+      description: 'List documents and invoices in the database with document number, type, counterparty, total amount, lifecycle status, and balance. Can filter by customer name.',
+      parameters: {
+        type: 'object',
+        properties: {
+          customerName: { type: 'string', description: 'Optional customer name to filter' },
+          limit: { type: 'number', description: 'Maximum invoices to return (default 10)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_overdue_invoices',
+      description: 'List all currently overdue invoices that have an unpaid balance past their due date, including days overdue, customer name, and balance.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
 ];
 
 export class AiDocumentAgent {
@@ -280,34 +346,37 @@ export class AiDocumentAgent {
           if (finalResult) {
             resolve(finalResult);
           } else {
-            this.runDeterministicHeuristic(userPrompt, activeDraft, null).then((h) => {
-              this.commitAndVerifyDraft(h.draft, null).then((v) => {
-                resolve({
-                  replyText: h.reply,
-                  reasoningTrace: h.reasoning,
-                  documentDraft: v,
-                  quickActions: [
-                    { label: 'View PDF Preview', action: 'preview_pdf' },
-                    { label: 'Edit in Form', action: 'open_editor' },
-                    { label: 'Export PDF', action: 'export_pdf' },
-                  ],
-                });
+            this.runDeterministicHeuristic(userPrompt, activeDraft, null).then(async (h) => {
+              const v = h.draft ? await this.commitAndVerifyDraft(h.draft, null) : null;
+              resolve({
+                replyText: h.reply,
+                reasoningTrace: h.reasoning,
+                documentDraft: v,
+                quickActions: v
+                  ? [
+                      { label: 'View PDF Preview', action: 'preview_pdf' },
+                      { label: 'Edit in Form', action: 'open_editor' },
+                      { label: 'Export PDF', action: 'export_pdf' },
+                    ]
+                  : [],
               });
             });
           }
         })
         .catch(async () => {
           const h = await this.runDeterministicHeuristic(userPrompt, activeDraft, null);
-          const v = await this.commitAndVerifyDraft(h.draft, null);
+          const v = h.draft ? await this.commitAndVerifyDraft(h.draft, null) : null;
           resolve({
             replyText: h.reply,
             reasoningTrace: h.reasoning,
             documentDraft: v,
-            quickActions: [
-              { label: 'View PDF Preview', action: 'preview_pdf' },
-              { label: 'Edit in Form', action: 'open_editor' },
-              { label: 'Export PDF', action: 'export_pdf' },
-            ],
+            quickActions: v
+              ? [
+                  { label: 'View PDF Preview', action: 'preview_pdf' },
+                  { label: 'Edit in Form', action: 'open_editor' },
+                  { label: 'Export PDF', action: 'export_pdf' },
+                ]
+              : [],
           });
         });
     });
@@ -461,21 +530,14 @@ CORE AGENTIC INVARIANTS:
                 status: 'completed',
               };
 
-              // Stream reply word-by-word with smooth typewriter animation
-              const words = reply.split(' ');
-              let accumulated = '';
-              for (let i = 0; i < words.length; i++) {
-                accumulated += (i > 0 ? ' ' : '') + words[i];
-                onEvent({
-                  type: 'content',
-                  contentChunk: words[i],
-                  fullContent: accumulated,
-                  displayText: accumulated,
-                  isCompilingDraft: i >= words.length - 2,
-                  taskSteps: [...taskSteps],
-                });
-                await new Promise((r) => setTimeout(r, 16));
-              }
+              onEvent({
+                type: 'content',
+                contentChunk: reply,
+                fullContent: reply,
+                displayText: reply,
+                isCompilingDraft: false,
+                taskSteps: [...taskSteps],
+              });
 
               onEvent({
                 type: 'done',
@@ -511,21 +573,14 @@ CORE AGENTIC INVARIANTS:
               });
               onEvent({ type: 'step', taskSteps: [...taskSteps] });
 
-              // Stream answer words
-              const words = answer.split(' ');
-              let accumulated = '';
-              for (let i = 0; i < words.length; i++) {
-                accumulated += (i > 0 ? ' ' : '') + words[i];
-                onEvent({
-                  type: 'content',
-                  contentChunk: words[i],
-                  fullContent: accumulated,
-                  displayText: accumulated,
-                  isCompilingDraft: false,
-                  taskSteps: [...taskSteps],
-                });
-                await new Promise((r) => setTimeout(r, 14));
-              }
+              onEvent({
+                type: 'content',
+                contentChunk: answer,
+                fullContent: answer,
+                displayText: answer,
+                isCompilingDraft: false,
+                taskSteps: [...taskSteps],
+              });
 
               onEvent({
                 type: 'done',
@@ -536,9 +591,100 @@ CORE AGENTIC INVARIANTS:
               });
               return;
             }
+
+            // Case C: Read-Only Business / Ledger Tool Query
+            if (
+              toolName === 'get_business_summary' ||
+              toolName === 'search_customers' ||
+              toolName === 'get_customer_balance' ||
+              toolName === 'list_invoices' ||
+              toolName === 'list_overdue_invoices'
+            ) {
+              taskSteps[2] = {
+                id: 'neural_reasoning',
+                label: `Invoked local database query: ${toolName}`,
+                status: 'completed',
+              };
+              taskSteps.push({
+                id: 'financial_calc',
+                label: 'Extracting records from on-device SQLite database',
+                status: 'running',
+              });
+              onEvent({ type: 'step', taskSteps: [...taskSteps] });
+
+              const toolResult = await this.executeLocalTool(toolName, args);
+
+              taskSteps[3] = {
+                id: 'financial_calc',
+                label: `Verified ledger data: ${toolName} completed`,
+                status: 'completed',
+              };
+              onEvent({ type: 'step', taskSteps: [...taskSteps] });
+
+              // Follow-up turn with Groq to synthesize response
+              let finalAnswer = '';
+              try {
+                const followUpRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${effectiveApiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: config.model || 'openai/gpt-oss-120b',
+                    messages: [
+                      ...apiMessages,
+                      choice.message,
+                      {
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        name: toolName,
+                        content: JSON.stringify(toolResult),
+                      },
+                    ],
+                    temperature: 0.1,
+                  }),
+                });
+                if (followUpRes.ok) {
+                  const followUpData = await followUpRes.json();
+                  finalAnswer = followUpData.choices?.[0]?.message?.content || '';
+                }
+              } catch {}
+
+              if (!finalAnswer) {
+                finalAnswer = this.formatDirectToolSummary(toolName, toolResult);
+              }
+
+              const reasoning = `Executed read-only tool "${toolName}" on local SQLite database. Formatted factual results with verified arithmetic.`;
+
+              onEvent({
+                type: 'reasoning',
+                reasoningChunk: reasoning,
+                fullReasoning: reasoning,
+                taskSteps: [...taskSteps],
+              });
+
+              onEvent({
+                type: 'content',
+                contentChunk: finalAnswer,
+                fullContent: finalAnswer,
+                displayText: finalAnswer,
+                isCompilingDraft: false,
+                taskSteps: [...taskSteps],
+              });
+
+              onEvent({
+                type: 'done',
+                draft: null,
+                replyText: finalAnswer,
+                fullReasoning: reasoning,
+                taskSteps: [...taskSteps],
+              });
+              return;
+            }
           }
 
-          // Case C: Plain text response from LLM
+          // Case D: Plain text response from LLM
           if (choice?.message?.content) {
             const content = choice.message.content;
             const { displayText, jsonString } = parseStreamContent(content);
@@ -608,14 +754,22 @@ CORE AGENTIC INVARIANTS:
 
     // 2. Deterministic RAG Heuristic Engine Fallback with Progressive Live Animation
     const heuristicResult = await this.runDeterministicHeuristic(userPrompt, activeDraft, localContext);
-    const verified = await this.commitAndVerifyDraft(heuristicResult.draft, localContext);
-    const trace = this.synthesizeReasoning(userPrompt, verified);
+    const verified = heuristicResult.draft ? await this.commitAndVerifyDraft(heuristicResult.draft, localContext) : null;
+    const trace = heuristicResult.reasoning || (verified ? this.synthesizeReasoning(userPrompt, verified) : 'Local assistant processed query.');
 
-    taskSteps[3] = {
-      id: 'financial_calc',
-      label: `Verified: ${verified.documentTitle} · Total: ${verified.currency} ${(Number(verified.grandTotalMinor) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-      status: 'completed',
-    };
+    if (verified) {
+      taskSteps[3] = {
+        id: 'financial_calc',
+        label: `Verified: ${verified.documentTitle} · Total: ${verified.currency} ${(Number(verified.grandTotalMinor) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        status: 'completed',
+      };
+    } else {
+      taskSteps[2] = {
+        id: 'neural_reasoning',
+        label: 'Local query completed',
+        status: 'completed',
+      };
+    }
 
     // Stream the reasoning trace
     onEvent({
@@ -625,21 +779,14 @@ CORE AGENTIC INVARIANTS:
       taskSteps: [...taskSteps],
     });
 
-    // Stream the conversational reply tokens progressively
-    const words = heuristicResult.reply.split(' ');
-    let accumulated = '';
-    for (let i = 0; i < words.length; i++) {
-      accumulated += (i > 0 ? ' ' : '') + words[i];
-      onEvent({
-        type: 'content',
-        contentChunk: words[i],
-        fullContent: accumulated,
-        displayText: accumulated,
-        isCompilingDraft: i >= words.length - 2,
-        taskSteps: [...taskSteps],
-      });
-      await new Promise((r) => setTimeout(r, 16));
-    }
+    onEvent({
+      type: 'content',
+      contentChunk: heuristicResult.reply,
+      fullContent: heuristicResult.reply,
+      displayText: heuristicResult.reply,
+      isCompilingDraft: false,
+      taskSteps: [...taskSteps],
+    });
 
     onEvent({
       type: 'done',
@@ -926,7 +1073,85 @@ ${userPrompt}
       }
     }
 
-    // 2. Classify Document Archetype using Semantic RAG Scoring
+    // 2. Pure conversational queries, greetings, or general business advice (NOT document drafting)
+    const isGreeting = /^(hi|hello|hey|help|who are you|what can you do|what are you)\b/i.test(prompt.trim());
+    const isQuestion =
+      /^(what is|how to|how do|explain|tell me about|why is|where is)\b/i.test(prompt.trim()) ||
+      (prompt.trim().endsWith('?') && !/(?:draft|create|make|bill|invoice|slip|receipt)/i.test(prompt));
+
+    if (isGreeting) {
+      const bizName = context?.businessProfile?.name || 'your workspace';
+      return {
+        reply: `Hello! I am your Billframe Copilot for **${bizName}**.\n\nI can help you:\n• Draft 446 statutory documents (tax invoices, quotes, receipts, job offers, salary slips)\n• Query customer balances and overdue payments\n• Verify GST tax compliance and integer minor-unit arithmetic\n\nWhat would you like to work on today?`,
+        reasoning: 'Grounded conversation handler: Recognized greeting and presented verified local operational capabilities.',
+        draft: null as any,
+      };
+    }
+
+    if (isQuestion) {
+      if (/gst/i.test(prompt)) {
+        return {
+          reply: `**Goods and Services Tax (GST) in India** is governed by the CGST Act 2017.\n\n• Standard commercial B2B invoices apply **18% GST** (9% CGST + 9% SGST intra-state, or 18% IGST inter-state).\n• Concessional rates: **0%**, **5%**, and **12%**.\n• Luxury/de-merit goods: **28%**.\n\nYou can ask me to draft a GST invoice anytime with specific items and rates!`,
+          reasoning: 'Statutory compliance grounding: Answered GST inquiry citing CGST Act 2017 tax rate schedule.',
+          draft: null as any,
+        };
+      }
+      return {
+        reply: `I am currently operating in **Offline Local Assistant** mode for **${context?.businessProfile?.name || 'your business'}**.\n\nTo ask open-ended questions with deep neural reasoning, connect to Groq in Settings. For document creation, you can ask me to draft an invoice, salary slip, rent receipt, or job offer directly.`,
+        reasoning: 'Offline transparency: Reported local mode status without generating fictitious records.',
+        draft: null as any,
+      };
+    }
+
+    // 3. Database Query & Ledger Inquiries (Zero Fake Invoices)
+    const isOverdueQuery = /overdue|unpaid invoice|unpaid bill|who owes/i.test(prompt);
+    const isCustomerBalanceQuery = /balance|how much does .* owe|unpaid by/i.test(prompt);
+    const isSummaryQuery = /summary|how is my business|payments this week|payments this month|total revenue|financial metrics/i.test(prompt);
+    const isCustomerSearchQuery = /find customer|search customer|list customers/i.test(prompt);
+
+    if (isOverdueQuery) {
+      const result = await this.executeLocalTool('list_overdue_invoices', {});
+      const reply = this.formatDirectToolSummary('list_overdue_invoices', result);
+      return {
+        reply,
+        reasoning: 'Grounded query execution: Checked SQLite aging table for issued invoices past their due dates.',
+        draft: null as any,
+      };
+    }
+
+    if (isCustomerBalanceQuery) {
+      const cleanPrompt = prompt.replace(/(?:what is|check|get|find|how much does|owe|unpaid by|customer|balance|for|\?)/gi, ' ').trim();
+      const result = await this.executeLocalTool('get_customer_balance', { customerNameOrId: cleanPrompt });
+      const reply = this.formatDirectToolSummary('get_customer_balance', result);
+      return {
+        reply,
+        reasoning: `Grounded query execution: Looked up customer balance for "${cleanPrompt}" with BigInt balance ledger calculation.`,
+        draft: null as any,
+      };
+    }
+
+    if (isSummaryQuery) {
+      const result = await this.executeLocalTool('get_business_summary', {});
+      const reply = this.formatDirectToolSummary('get_business_summary', result);
+      return {
+        reply,
+        reasoning: 'Grounded query execution: Calculated business receivables, overdue counts, and monthly payments.',
+        draft: null as any,
+      };
+    }
+
+    if (isCustomerSearchQuery) {
+      const cleanPrompt = prompt.replace(/(?:find|search|list|customer|customers|\?)/gi, ' ').trim();
+      const result = await this.executeLocalTool('search_customers', { query: cleanPrompt });
+      const reply = this.formatDirectToolSummary('search_customers', result);
+      return {
+        reply,
+        reasoning: `Grounded query execution: Queried customer repository with search keyword "${cleanPrompt}".`,
+        draft: null as any,
+      };
+    }
+
+    // 4. Classify Document Archetype using Semantic RAG Scoring
     const matchedArchetypes = AiRagRegistry.retrieve(prompt);
     const primary = matchedArchetypes[0] || { id: 'invoice', name: 'Tax Invoice' };
 
@@ -1739,5 +1964,193 @@ ${userPrompt}
       templateId: draftData.templateId,
       metadata: mergedMetadata,
     };
+  }
+
+  /**
+   * Executes authorized read-only local SQLite tools for AI agent grounding
+   */
+  static async executeLocalTool(name: string, args: any = {}): Promise<any> {
+    try {
+      if (name === 'get_business_summary') {
+        const profile = await BusinessProfileRepository.getActiveProfile().catch(() => null);
+        const metrics = await DocumentRepository.getHomeDashboardMetricsAsync().catch(() => ({
+          outstandingMinor: 0n,
+          paidThisMonthMinor: 0n,
+          overdueInvoicesCount: 0,
+          overdueMinor: 0n,
+        }));
+        return {
+          businessName: profile?.name || 'Local Business',
+          taxId: profile?.tax_id || null,
+          currency: profile?.default_currency || 'INR',
+          totalOutstandingMinor: metrics.outstandingMinor.toString(),
+          totalOverdueMinor: metrics.overdueMinor.toString(),
+          overdueInvoicesCount: metrics.overdueInvoicesCount,
+          paidThisMonthMinor: metrics.paidThisMonthMinor.toString(),
+        };
+      }
+
+      if (name === 'search_customers') {
+        const query = args.query || '';
+        const found = await CustomerRepository.search(query, false).catch(() => []);
+        return {
+          count: found.length,
+          customers: found.slice(0, 5).map((c) => ({
+            id: c.id,
+            name: c.name,
+            businessName: c.business_name,
+            phone: c.phone,
+            email: c.email,
+            taxId: c.tax_id,
+          })),
+        };
+      }
+
+      if (name === 'get_customer_balance') {
+        const query = (args.customerNameOrId || args.customerName || args.customerId || '').trim();
+        const customers = await CustomerRepository.search(query, false).catch(() => []);
+        if (customers.length === 0) {
+          return { error: `No customer found matching "${query}" in the database.` };
+        }
+        const target = customers[0];
+        const withBal = await CustomerRepository.getWithBalance(target.id);
+        return {
+          customerId: target.id,
+          customerName: target.name,
+          businessName: target.business_name,
+          totalInvoicedMinor: withBal?.total_invoiced_minor || 0,
+          totalPaidMinor: withBal?.total_paid_minor || 0,
+          outstandingBalanceMinor: withBal?.outstanding_balance_minor || 0,
+        };
+      }
+
+      if (name === 'list_invoices') {
+        const customerName = (args.customerName || '').trim();
+        const limit = args.limit || 10;
+        const db = await DatabaseManager.getDatabaseAsync();
+        let sql = `SELECT d.id, d.document_number, d.doc_type, d.total_minor, d.currency, d.lifecycle_status, d.issue_date, d.due_date, c.name AS customer_name
+                   FROM documents d
+                   LEFT JOIN customers c ON d.customer_id = c.id
+                   WHERE d.is_archived = 0`;
+        const params: any[] = [];
+        if (customerName) {
+          sql += ' AND c.name LIKE ?';
+          params.push(`%${customerName}%`);
+        }
+        sql += ' ORDER BY d.issue_date DESC LIMIT ?;';
+        params.push(limit);
+        const rows: any[] = await db.getAllAsync(sql, params).catch(() => []);
+        return {
+          count: rows.length,
+          invoices: rows.map((r) => ({
+            documentNumber: r.document_number,
+            docType: r.doc_type,
+            customerName: r.customer_name || 'Walk-in',
+            totalMinor: r.total_minor,
+            currency: r.currency || 'INR',
+            lifecycleStatus: r.lifecycle_status,
+            issueDate: r.issue_date,
+            dueDate: r.due_date,
+          })),
+        };
+      }
+
+      if (name === 'list_overdue_invoices') {
+        const aging = await DocumentRepository.getIssuedInvoicesForAgingAsync().catch(() => []);
+        const now = Date.now();
+        const overdue = aging.filter((a) => a.due_date && now > a.due_date);
+        return {
+          count: overdue.length,
+          overdueInvoices: overdue.map((o) => ({
+            documentNumber: o.document_number,
+            customerName: o.customer_name || 'Client',
+            customerPhone: o.customer_phone,
+            totalMinor: o.total_minor,
+            balanceMinor: o.balance_minor.toString(),
+            currency: o.currency || 'INR',
+            dueDate: o.due_date,
+            daysOverdue: Math.max(1, Math.floor((now - (o.due_date || now)) / (24 * 60 * 60 * 1000))),
+          })),
+        };
+      }
+
+      return { error: `Tool ${name} is not recognized` };
+    } catch (err: any) {
+      return { error: `Failed to execute ${name}: ${err?.message || 'Unknown database error'}` };
+    }
+  }
+
+  /**
+   * Formats direct grounded tool summaries for offline assistant or direct rendering
+   */
+  static formatDirectToolSummary(toolName: string, result: any): string {
+    if (result.error) {
+      return result.error;
+    }
+
+    if (toolName === 'get_business_summary') {
+      const outMajor = (Number(result.totalOutstandingMinor || 0) / 100).toFixed(2);
+      const overMajor = (Number(result.totalOverdueMinor || 0) / 100).toFixed(2);
+      const paidMajor = (Number(result.paidThisMonthMinor || 0) / 100).toFixed(2);
+      const cur = result.currency || 'INR';
+
+      return `**Business Financial Overview (${result.businessName})**:\n\n` +
+        `• **Total Outstanding Receivables:** ${cur} ${outMajor}\n` +
+        `• **Overdue Invoices:** ${result.overdueInvoicesCount} (${cur} ${overMajor})\n` +
+        `• **Collected This Month:** ${cur} ${paidMajor}\n\n` +
+        `All figures calculated directly from your local SQLite ledger.`;
+    }
+
+    if (toolName === 'get_customer_balance') {
+      const invMajor = (result.totalInvoicedMinor / 100).toFixed(2);
+      const paidMajor = (result.totalPaidMinor / 100).toFixed(2);
+      const balMajor = (result.outstandingBalanceMinor / 100).toFixed(2);
+
+      return `**Customer Balance for ${result.customerName}**:\n\n` +
+        `• **Total Invoiced:** ₹${invMajor}\n` +
+        `• **Total Paid:** ₹${paidMajor}\n` +
+        `• **Outstanding Balance:** ₹${balMajor}\n\n` +
+        (result.outstandingBalanceMinor > 0
+          ? `Status: Outstanding balance of ₹${balMajor} pending payment.`
+          : `Status: Account is completely settled (₹0.00 outstanding).`);
+    }
+
+    if (toolName === 'list_overdue_invoices') {
+      if (!result.overdueInvoices || result.overdueInvoices.length === 0) {
+        return '✓ **No overdue invoices!** All issued invoices in your database are fully paid or within their due dates.';
+      }
+
+      let text = `Found **${result.count} overdue invoice(s)** in your ledger:\n\n`;
+      result.overdueInvoices.forEach((inv: any) => {
+        const bal = (Number(inv.balanceMinor) / 100).toFixed(2);
+        text += `• **#${inv.documentNumber}** — ${inv.customerName}: **${inv.currency} ${bal}** (${inv.daysOverdue} day(s) overdue)\n`;
+      });
+      return text;
+    }
+
+    if (toolName === 'list_invoices') {
+      if (!result.invoices || result.invoices.length === 0) {
+        return 'No matching invoices found in your local database.';
+      }
+      let text = `Found **${result.count} invoice(s)** in your database:\n\n`;
+      result.invoices.forEach((inv: any) => {
+        const tot = (inv.totalMinor / 100).toFixed(2);
+        text += `• **#${inv.documentNumber}** (${inv.docType}) — ${inv.customerName}: ${inv.currency} ${tot} [${inv.lifecycleStatus}]\n`;
+      });
+      return text;
+    }
+
+    if (toolName === 'search_customers') {
+      if (!result.customers || result.customers.length === 0) {
+        return 'No customers matched your search query in the local database.';
+      }
+      let text = `Found **${result.count} customer(s)**:\n\n`;
+      result.customers.forEach((c: any) => {
+        text += `• **${c.name}**${c.businessName ? ` (${c.businessName})` : ''} — Phone: ${c.phone || 'N/A'}, Email: ${c.email || 'N/A'}\n`;
+      });
+      return text;
+    }
+
+    return 'Tool execution completed.';
   }
 }

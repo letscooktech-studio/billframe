@@ -18,6 +18,7 @@ import {
   Animated,
   Easing,
   Platform,
+  AccessibilityInfo,
 } from 'react-native';
 import Svg, { Line, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { ChevronDown, ChevronUp, Check } from 'lucide-react-native';
@@ -83,6 +84,11 @@ export function ClaudeThinkingIndicator({
   const mirrorSheenAnim = useRef(new Animated.Value(0.35)).current;
 
   const [activeWordIndex, setActiveWordIndex] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+  }, []);
 
   // Rotate Claude Sunburst, Liquid Wave & Mirror Glassy Sheen
   useEffect(() => {
@@ -91,7 +97,7 @@ export function ClaudeThinkingIndicator({
     let waveLoop: Animated.CompositeAnimation | null = null;
     let sheenLoop: Animated.CompositeAnimation | null = null;
 
-    if (isThinking) {
+    if (isThinking && !reduceMotion) {
       spinLoop = Animated.loop(
         Animated.timing(spinAnim, {
           toValue: 1,
@@ -216,7 +222,7 @@ export function ClaudeThinkingIndicator({
   }, [reasoningTrace]);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} accessibilityLiveRegion="polite">
       {/* ── 1. Container-Free Mirror Glassy Thinking Header Pill ── */}
       <Pressable
         style={[
@@ -225,6 +231,12 @@ export function ClaudeThinkingIndicator({
         ]}
         onPress={onToggleExpand}
         hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isThinking
+            ? 'Agent is reasoning'
+            : `Thinking complete in ${durationSec} seconds. Double tap to toggle reasoning trace.`
+        }
       >
         {/* Specular Liquid Wave Sweep Animation */}
         {isThinking && (

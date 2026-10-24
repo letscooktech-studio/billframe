@@ -53,6 +53,7 @@ import {
   Eye,
   Check,
   Maximize2,
+  RotateCcw,
 } from 'lucide-react-native';
 import { useTheme } from '../../design/ThemeContext';
 import { colors, radii, spacing, typography } from '../../design/tokens';
@@ -62,6 +63,9 @@ import { AiTemplateBridge, DocumentTemplateOption } from '../../services/ai/AiTe
 import { createMoney, formatMoney } from '../../domain/money/Money';
 import { BusinessProfileRepository } from '../../data/repositories/BusinessProfileRepository';
 import { DocumentRepository } from '../../data/repositories/DocumentRepository';
+import { AgentSessionRepository, AgentProposalRecord } from '../../data/repositories/AgentSessionRepository';
+import { ActionApprovalSheet } from '../../components/ai/ActionApprovalSheet';
+import { RecommendationEngine, RecommendationItem } from '../../services/ai/RecommendationEngine';
 import { BusinessProfile } from '../../domain/profile/types';
 import { ClaudeThinkingIndicator } from '../../components/animations/ClaudeThinkingIndicator';
 
@@ -109,11 +113,13 @@ function formatThinkingTrace(raw: string): string[] {
 function getSmartWorkflowChips(draft: ParsedDocumentDraft | null): Array<{ label: string; prompt: string }> {
   if (!draft) {
     return [
-      { label: '✦ Job Application', prompt: 'Draft a job application for Senior Fullstack Engineer' },
+      { label: '📊 Business Overview', prompt: 'What is my current business overview and total receivables?' },
+      { label: '⏰ Check Overdue Invoices', prompt: 'List all overdue invoices and unpaid customer balances' },
       { label: '✦ GST Tax Invoice', prompt: 'Draft a GST Tax Invoice for Acme Corp with 18% GST' },
       { label: '✦ Salary Slip', prompt: 'Create a salary slip for John Doe, Senior Architect, basic 65,000, HRA 25,000, PF 3,600 for October 2026' },
       { label: '✦ Grocery Bill (10 items)', prompt: 'draft me a complete bill for my grocery store and fille 10 random items' },
       { label: '✦ House Rent Receipt', prompt: 'Generate a House Rent Receipt for tenant Rahul Sharma for 28,000 INR' },
+      { label: '✦ Job Application', prompt: 'Draft a job application for Senior Fullstack Engineer' },
     ];
   }
 
@@ -207,6 +213,10 @@ export default function AiAssistantScreen() {
   const [selectedPreviewTemplate, setSelectedPreviewTemplate] = useState<string>('');
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
+  // Human-in-the-Loop T3/T4 Proposal State & Explainable Local Recommendations
+  const [pendingProposal, setPendingProposal] = useState<AgentProposalRecord | null>(null);
+  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
+
   // Automatically keep live HTML in sync for the desktop Artifact Canvas
   useEffect(() => {
     if (activeDraft) {
@@ -218,6 +228,27 @@ export default function AiAssistantScreen() {
   }, [activeDraft, selectedPreviewTemplate]);
 
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Hydrate persistent AI session and recommendations from SQLite on Mount
+  useEffect(() => {
+    async function hydrateSessionAndRecs() {
+      try {
+        const session = await AgentSessionRepository.getOrCreateDefaultSession();
+        if (session.activeDraft) {
+          setActiveDraft(session.activeDraft);
+        }
+        const saved = await AgentSessionRepository.getMessages(session.id);
+        if (saved && saved.length > 0) {
+          setMessages(saved);
+        }
+        const recs = await RecommendationEngine.evaluateRecommendations();
+        setRecommendations(recs);
+      } catch (err) {
+        console.warn('[Assistant] Failed to hydrate persistent session:', err);
+      }
+    }
+    hydrateSessionAndRecs();
+  }, []);
 
   // Load Config on Mount
   useEffect(() => {
@@ -306,6 +337,21 @@ export default function AiAssistantScreen() {
     }));
   }
 
+  // Clear / Reset Conversation
+  async function handleClearConversation() {
+    await AgentSessionRepository.clearSession().catch(() => {});
+    setActiveDraft(null);
+    setMessages([
+      {
+        id: `welcome_${Date.now()}`,
+        role: 'assistant',
+        content:
+          'What would you like to draft today?\n\nTell me what document you need in plain words, or tap a quick starter below.',
+        timestamp: Date.now(),
+      },
+    ]);
+  }
+
   // Handle Send Message with Real-Time Codex Streaming Animation
   async function handleSendMessage(promptOverride?: string) {
     const textToSend = (promptOverride || inputText).trim();
@@ -318,6 +364,7 @@ export default function AiAssistantScreen() {
       content: textToSend,
       timestamp: Date.now(),
     };
+    AgentSessionRepository.saveMessage('ai_session_default', userMsg).catch(() => {});
 
     const agentMsgId = `agent_${Date.now()}`;
     const initialAgentMsg: AgentChatMessage = {
@@ -386,26 +433,32 @@ export default function AiAssistantScreen() {
             );
           } else if (event.type === 'done') {
             const duration = Math.max(0.6, (Date.now() - startTime) / 1000);
+            const finishedAgentMsg: AgentChatMessage = {
+              id: agentMsgId,
+              role: 'assistant',
+              content: event.replyText || '',
+              reasoningTrace: event.fullReasoning,
+              documentDraft: event.draft || null,
+              taskSteps: event.taskSteps,
+              isStreaming: false,
+              isThinking: false,
+              isCompilingDraft: false,
+              thoughtDurationSeconds: duration,
+              timestamp: Date.now(),
+            };
+            AgentSessionRepository.saveMessage('ai_session_default', finishedAgentMsg).catch(() => {});
+
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === agentMsgId
-                  ? {
-                      ...m,
-                      content: event.replyText || m.content,
-                      reasoningTrace: event.fullReasoning || m.reasoningTrace,
-                      documentDraft: event.draft || null,
-                      taskSteps: event.taskSteps || m.taskSteps,
-                      isStreaming: false,
-                      isThinking: false,
-                      isCompilingDraft: false,
-                      thoughtDurationSeconds: duration,
-                    }
+                  ? finishedAgentMsg
                   : m
               )
             );
 
             if (event.draft) {
               setActiveDraft(event.draft);
+              AgentSessionRepository.updateActiveDraft('ai_session_default', event.draft).catch(() => {});
             }
           }
         }
@@ -601,15 +654,27 @@ export default function AiAssistantScreen() {
           </View>
         </View>
 
-        <Pressable
-          onPress={() => setShowConfigModal(true)}
-          style={[styles.settingsButton, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Open AI Settings"
-        >
-          <Settings color={theme.textSecondary} size={18} />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Pressable
+            onPress={handleClearConversation}
+            style={[styles.settingsButton, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Reset conversation"
+          >
+            <RotateCcw color={theme.textSecondary} size={16} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => setShowConfigModal(true)}
+            style={[styles.settingsButton, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open AI Settings"
+          >
+            <Settings color={theme.textSecondary} size={18} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Main Responsive Dual-Pane Layout */}
@@ -1496,6 +1561,32 @@ export default function AiAssistantScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Human-in-the-Loop Action Approval Sheet (T3/T4 Financial Gate) */}
+      <ActionApprovalSheet
+        visible={pendingProposal !== null}
+        proposal={pendingProposal}
+        currency={activeDraft?.currency || 'INR'}
+        onApprove={async (prop) => {
+          try {
+            if (prop.actionType === 'issue_document') {
+              await DocumentRepository.issueDocument(prop.targetId || prop.payload.documentId);
+            } else if (prop.actionType === 'void_document') {
+              await DocumentRepository.voidDocument(prop.targetId || prop.payload.documentId);
+            }
+            await AgentSessionRepository.updateProposalStatus(prop.id, 'executed');
+            setPendingProposal(null);
+            Alert.alert('Action Committed', `Action "${prop.actionType}" was successfully committed to the database.`);
+          } catch (err: any) {
+            Alert.alert('Error Executing Action', err?.message || 'Database transaction failed');
+          }
+        }}
+        onReject={async (prop) => {
+          await AgentSessionRepository.updateProposalStatus(prop.id, 'rejected');
+          setPendingProposal(null);
+        }}
+        onDismiss={() => setPendingProposal(null)}
+      />
     </SafeAreaView>
   );
 }
