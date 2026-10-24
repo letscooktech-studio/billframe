@@ -1724,7 +1724,24 @@ ${userPrompt}
     }
 
     // Format line items with robust normalization across diverse LLM outputs
-    const rawItems = draftData.items || [];
+    const anyDraft = draftData as any;
+    let rawItems = anyDraft.items || [];
+    if (rawItems.length === 0 && (docType === 'salary_slip' || anyDraft.documentTitle?.toLowerCase().includes('salary'))) {
+      if (Array.isArray(anyDraft.earnings)) {
+        rawItems = [...anyDraft.earnings, ...(Array.isArray(anyDraft.deductions) ? anyDraft.deductions : [])];
+      } else if (Array.isArray(anyDraft.metadata?.earnings)) {
+        rawItems = [...anyDraft.metadata.earnings, ...(Array.isArray(anyDraft.metadata?.deductions) ? anyDraft.metadata.deductions : [])];
+      } else {
+        const basic = anyDraft.metadata?.basicMinor ?? anyDraft.metadata?.basicSalary ?? 6500000n;
+        const hra = anyDraft.metadata?.hraMinor ?? anyDraft.metadata?.hra ?? 2500000n;
+        const pf = anyDraft.metadata?.pfMinor ?? anyDraft.metadata?.pf ?? 360000n;
+        rawItems = [
+          { description: 'Basic Salary', quantityScaled: 10000n, unitName: 'month', unitPriceMinor: typeof basic === 'bigint' ? basic : BigInt(basic) },
+          { description: 'House Rent Allowance (HRA)', quantityScaled: 10000n, unitName: 'month', unitPriceMinor: typeof hra === 'bigint' ? hra : BigInt(hra) },
+          { description: 'Provident Fund (PF Deduction)', quantityScaled: 10000n, unitName: 'month', unitPriceMinor: -(typeof pf === 'bigint' ? pf : BigInt(pf)) },
+        ];
+      }
+    }
     const items: any[] = rawItems.map((itm: any, idx: number) => {
       const desc = itm.description || itm.name || itm.title || itm.item || `Line item ${idx + 1}`;
 

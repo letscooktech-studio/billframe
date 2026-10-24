@@ -68,6 +68,7 @@ import { ActionApprovalSheet } from '../../components/ai/ActionApprovalSheet';
 import { RecommendationEngine, RecommendationItem } from '../../services/ai/RecommendationEngine';
 import { BusinessProfile } from '../../domain/profile/types';
 import { ClaudeThinkingIndicator } from '../../components/animations/ClaudeThinkingIndicator';
+import { IntelligentMessageRenderer } from '../../components/ai/IntelligentMessageRenderer';
 
 /**
  * Transforms raw neural reasoning thoughts into clean, high-elegance cognitive steps.
@@ -695,53 +696,138 @@ export default function AiAssistantScreen() {
             const isUser = msg.role === 'user';
             const isThoughtExpanded = Boolean(expandedThoughts[msg.id]);
 
+            if (isUser) {
+              return (
+                <View key={msg.id} style={[styles.messageRow, styles.messageRowUser]}>
+                  <View
+                    style={[
+                      styles.userBubbleContainer,
+                      {
+                        backgroundColor: theme.surfaceSecondary,
+                        borderColor: theme.borderDefault,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.userMessageText, { color: theme.textPrimary }]}>
+                      {msg.content}
+                    </Text>
+                    <Text style={[styles.messageTimestamp, { color: theme.textMuted }]}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+
             return (
-              <View
-                key={msg.id}
-                style={[
-                  styles.messageRow,
-                  isUser ? styles.messageRowUser : styles.messageRowAssistant,
-                ]}
-              >
+              <View key={msg.id} style={[styles.messageRow, styles.messageRowAssistant]}>
                 <View
-                  style={
-                    isUser
-                      ? [styles.messageBubble, styles.bubbleUser, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderDefault }]
-                      : styles.bubbleAssistant
-                  }
+                  style={[
+                    styles.assistantCardContainer,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.borderDefault,
+                    },
+                  ]}
                 >
+                  {/* Intelligent Agent Header Bar */}
+                  <View style={[styles.assistantHeaderRow, { borderBottomColor: theme.borderSubtle }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={[styles.agentAvatarBadge, { backgroundColor: theme.surfaceSecondary }]}>
+                        <Sparkles size={13} color="#CC785C" />
+                      </View>
+                      <View>
+                        <Text style={[styles.agentHeaderTitle, { color: theme.textPrimary }]}>
+                          Billframe AI Copilot
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <View style={styles.agentActiveDot} />
+                          <Text style={[styles.agentHeaderSubtitle, { color: theme.textMuted }]}>
+                            Grounded SQLite • Live
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    <Text style={[styles.messageTimestamp, { color: theme.textMuted }]}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+
                   {/* Claude Intelligent Thinking Indicator & Live Real Sub-Agent Tasks */}
                   {(msg.isThinking || msg.reasoningTrace || (msg.taskSteps && msg.taskSteps.length > 0)) && (
-                    <ClaudeThinkingIndicator
-                      isThinking={Boolean(msg.isThinking)}
-                      thoughtDurationSeconds={msg.thoughtDurationSeconds}
-                      elapsedSeconds={elapsedSeconds}
-                      taskSteps={msg.taskSteps || []}
-                      reasoningTrace={msg.reasoningTrace || ''}
-                      isExpanded={
-                        expandedThoughts[msg.id] !== undefined
-                          ? expandedThoughts[msg.id]
-                          : Boolean(msg.isThinking)
-                      }
-                      onToggleExpand={() => toggleThought(msg.id)}
-                      textColor={theme.textPrimary}
-                      textSecondaryColor={theme.textSecondary}
-                      borderColor={theme.borderSubtle}
-                      surfaceColor={theme.surfaceSecondary}
-                    />
+                    <View style={{ marginTop: 8 }}>
+                      <ClaudeThinkingIndicator
+                        isThinking={Boolean(msg.isThinking)}
+                        thoughtDurationSeconds={msg.thoughtDurationSeconds}
+                        elapsedSeconds={elapsedSeconds}
+                        taskSteps={msg.taskSteps || []}
+                        reasoningTrace={msg.reasoningTrace || ''}
+                        isExpanded={
+                          expandedThoughts[msg.id] !== undefined
+                            ? expandedThoughts[msg.id]
+                            : Boolean(msg.isThinking)
+                        }
+                        onToggleExpand={() => toggleThought(msg.id)}
+                        textColor={theme.textPrimary}
+                        textSecondaryColor={theme.textSecondary}
+                        borderColor={theme.borderSubtle}
+                        surfaceColor={theme.surfaceSecondary}
+                      />
+                    </View>
                   )}
 
-                  {/* Conversational Reply Text with Claude's Terracotta Block Cursor */}
+                  {/* Conversational Reply Text with Intelligent Markdown / Table Renderer */}
                   {(msg.content || (msg.isStreaming && !msg.isThinking)) ? (
-                    <Text style={[styles.messageText, { color: theme.textPrimary, marginTop: (msg.isThinking || msg.reasoningTrace) ? 8 : 0 }]}>
-                      {msg.content}
+                    <View style={{ marginTop: (msg.isThinking || msg.reasoningTrace) ? 8 : 4 }}>
+                      <IntelligentMessageRenderer
+                        content={msg.content}
+                        isStreaming={Boolean(msg.isStreaming)}
+                        textColor={theme.textPrimary}
+                      />
                       {msg.isStreaming && !msg.isThinking && (
                         <Animated.Text style={[styles.intelligentCursor, { opacity: cursorAnim, color: '#CC785C' }]}>
                           ▊
                         </Animated.Text>
                       )}
-                    </Text>
+                    </View>
                   ) : null}
+
+                  {/* Initial Welcome Quick Suggestions */}
+                  {msg.id === 'welcome_msg' && (
+                    <View style={styles.welcomeGrid}>
+                      <Pressable
+                        style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                        onPress={() => handleSendMessage('What is my current business overview and total receivables?')}
+                      >
+                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📊 Business Overview</Text>
+                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Live balance, receivables, and ledger summary</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                        onPress={() => handleSendMessage('List all overdue invoices and unpaid customer balances')}
+                      >
+                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>⏰ Check Overdue</Text>
+                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Find unpaid invoices and outstanding payments</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                        onPress={() => handleSendMessage('Draft a GST Tax Invoice for Acme Corp with 18% GST')}
+                      >
+                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>✦ GST Tax Invoice</Text>
+                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Compliant B2B invoice with CBIC tax calculations</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                        onPress={() => handleSendMessage('Create a salary slip for John Doe, Senior Architect, basic 65,000, HRA 25,000, PF 3,600 for October 2026')}
+                      >
+                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>💼 Salary Slip</Text>
+                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Official payslip with earnings & deductions breakdown</Text>
+                      </Pressable>
+                    </View>
+                  )}
 
                   {/* Compiling Draft Status Badge */}
                   {msg.isCompilingDraft && (
@@ -1642,6 +1728,91 @@ const styles = StyleSheet.create({
   },
   messageRowAssistant: {
     justifyContent: 'flex-start',
+  },
+  userBubbleContainer: {
+    maxWidth: Platform.OS === 'web' ? '78%' : '88%',
+    borderRadius: 16,
+    borderBottomRightRadius: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  userMessageText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '400',
+  },
+  messageTimestamp: {
+    fontSize: 10,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  assistantCardContainer: {
+    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  assistantHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: 4,
+  },
+  agentAvatarBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(204, 120, 92, 0.3)',
+  },
+  agentHeaderTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+  },
+  agentHeaderSubtitle: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  agentActiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  welcomeGrid: {
+    marginTop: 12,
+    gap: 8,
+  },
+  welcomeCard: {
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  welcomeCardTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  welcomeCardSubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
   },
   messageBubble: {
     maxWidth: Platform.OS === 'web' ? '88%' : '95%',
