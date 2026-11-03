@@ -1,12 +1,11 @@
 /**
  * CLAUDE THINKING INDICATOR & LIVE SUB-AGENT TASK RUNNER
  * 
- * Replicates Claude's exact thinking presentation:
- * 1. 12-spoke radial terracotta sunburst (#CC785C) with hardware-accelerated continuous rotation.
- * 2. Dynamic thinking state cycle: "Mulling", "Cogitating", "Reasoning", "Deliberating", "Synthesizing".
- * 3. Exact completed state: "Thinking for Xs ⌄" with toggle chevron.
- * 4. Real live sub-agent task checklist displaying authentic SQLite queries, RAG lookups, and BigInt checks.
- * 5. Minimalist left-bordered monologue block for real neural reasoning trace.
+ * Replicates Claude's exact, authentic thinking presentation:
+ * 1. Container-free, flat, seamless inline thinking trigger.
+ * 2. Subtle, organic pulsing indicator while reasoning (no cartoonish logos or jarring shifts).
+ * 3. Quiet, understated completed state: "Thought for Xs ⌵".
+ * 4. Smooth, left-bordered indented thought stream with genuine task checkpoints & reasoning.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -20,7 +19,6 @@ import {
   Platform,
   AccessibilityInfo,
 } from 'react-native';
-import Svg, { Line, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { ChevronDown, ChevronUp, Check } from 'lucide-react-native';
 import { AgentTaskStep } from '../../services/ai/AiDocumentAgent';
 
@@ -38,30 +36,13 @@ export interface ClaudeThinkingIndicatorProps {
   surfaceColor?: string;
 }
 
-// Claude's signature dynamic thinking vocabulary
+// Claude's refined thinking words
 const CLAUDE_THINKING_WORDS = [
-  'Mulling',
-  'Cogitating',
+  'Thinking',
   'Reasoning',
-  'Deliberating',
+  'Evaluating rules',
   'Synthesizing',
-  'Pondering',
 ];
-
-// Pre-computed 12-spoke radial rays for the Claude terracotta sunburst
-const SUNBURST_RAYS = Array.from({ length: 12 }, (_, i) => {
-  const angle = (i * 30 * Math.PI) / 180;
-  const r1 = 3.6; // Inner radius
-  const r2 = 9.2; // Outer radius
-  const cx = 10;
-  const cy = 10;
-  return {
-    x1: (cx + r1 * Math.cos(angle)).toFixed(2),
-    y1: (cy + r1 * Math.sin(angle)).toFixed(2),
-    x2: (cx + r2 * Math.cos(angle)).toFixed(2),
-    y2: (cy + r2 * Math.sin(angle)).toFixed(2),
-  };
-});
 
 export function ClaudeThinkingIndicator({
   isThinking,
@@ -72,16 +53,11 @@ export function ClaudeThinkingIndicator({
   isExpanded,
   onToggleExpand,
   textColor = '#F4F4F5',
-  textSecondaryColor = '#94A3B8',
-  borderColor = 'rgba(255, 255, 255, 0.12)',
-  surfaceColor = 'rgba(255, 255, 255, 0.04)',
+  textSecondaryColor = '#8E8E93',
 }: ClaudeThinkingIndicatorProps) {
-  // Continuous smooth rotation for the Claude sunburst
-  const spinAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(0.7)).current;
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const wordFadeAnim = useRef(new Animated.Value(1)).current;
-  const waveAnim = useRef(new Animated.Value(0)).current;
-  const mirrorSheenAnim = useRef(new Animated.Value(0.35)).current;
 
   const [activeWordIndex, setActiveWordIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -90,85 +66,55 @@ export function ClaudeThinkingIndicator({
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
   }, []);
 
-  // Rotate Claude Sunburst, Liquid Wave & Mirror Glassy Sheen
+  // Soft organic pulse animation for thinking dot
   useEffect(() => {
-    let spinLoop: Animated.CompositeAnimation | null = null;
     let pulseLoop: Animated.CompositeAnimation | null = null;
-    let waveLoop: Animated.CompositeAnimation | null = null;
-    let sheenLoop: Animated.CompositeAnimation | null = null;
 
     if (isThinking && !reduceMotion) {
-      spinLoop = Animated.loop(
-        Animated.timing(spinAnim, {
-          toValue: 1,
-          duration: 3500,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      );
-      spinLoop.start();
-
       pulseLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0.6,
-            duration: 800,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
+        Animated.parallel([
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 900,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 0.35,
+              duration: 900,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.25,
+              duration: 900,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 0.85,
+              duration: 900,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+          ]),
         ])
       );
       pulseLoop.start();
-
-      waveLoop = Animated.loop(
-        Animated.timing(waveAnim, {
-          toValue: 1,
-          duration: 2200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        })
-      );
-      waveLoop.start();
-
-      sheenLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(mirrorSheenAnim, {
-            toValue: 0.8,
-            duration: 1100,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(mirrorSheenAnim, {
-            toValue: 0.35,
-            duration: 1100,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      sheenLoop.start();
     } else {
-      spinAnim.setValue(0);
       pulseAnim.setValue(1);
-      waveAnim.setValue(0);
-      mirrorSheenAnim.setValue(0.3);
+      scaleAnim.setValue(1);
     }
 
     return () => {
-      if (spinLoop) spinLoop.stop();
       if (pulseLoop) pulseLoop.stop();
-      if (waveLoop) waveLoop.stop();
-      if (sheenLoop) sheenLoop.stop();
     };
-  }, [isThinking, spinAnim, pulseAnim, waveAnim, mirrorSheenAnim]);
+  }, [isThinking, pulseAnim, scaleAnim, reduceMotion]);
 
-  // Cycle thinking words ("Mulling" -> "Cogitating" -> "Reasoning" ...)
+  // Cycle thinking words smoothly
   useEffect(() => {
     let wordInterval: any = null;
 
@@ -188,7 +134,7 @@ export function ClaudeThinkingIndicator({
         ]).start();
 
         setActiveWordIndex((prev) => (prev + 1) % CLAUDE_THINKING_WORDS.length);
-      }, 2000);
+      }, 2400);
     } else {
       setActiveWordIndex(0);
       wordFadeAnim.setValue(1);
@@ -198,16 +144,6 @@ export function ClaudeThinkingIndicator({
       if (wordInterval) clearInterval(wordInterval);
     };
   }, [isThinking, wordFadeAnim]);
-
-  const spinInterpolate = spinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const waveTranslateX = waveAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-180, 240],
-  });
 
   const durationSec = Math.max(1, Math.round(thoughtDurationSeconds || elapsedSeconds || 1));
 
@@ -223,142 +159,84 @@ export function ClaudeThinkingIndicator({
 
   return (
     <View style={styles.container} accessibilityLiveRegion="polite">
-      {/* ── 1. Container-Free Mirror Glassy Thinking Header Pill ── */}
+      {/* ── 1. Container-Free Pure Inline Thinking Trigger ── */}
       <Pressable
-        style={[
-          styles.mirrorGlassPill,
-          isThinking ? styles.mirrorGlassPillThinking : styles.mirrorGlassPillCompleted,
-        ]}
+        style={styles.inlineThinkingTrigger}
         onPress={onToggleExpand}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={
           isThinking
-            ? 'Agent is reasoning'
-            : `Thinking complete in ${durationSec} seconds. Double tap to toggle reasoning trace.`
+            ? 'Model is thinking'
+            : `Thought for ${durationSec} seconds. Double tap to toggle reasoning trace.`
         }
       >
-        {/* Specular Liquid Wave Sweep Animation */}
-        {isThinking && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.waveSweepLayer,
-              {
-                transform: [{ translateX: waveTranslateX }],
-              },
-            ]}
-          >
-            <Svg width={180} height={36} viewBox="0 0 180 36">
-              <Defs>
-                <LinearGradient id="mirrorGlassWave" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
-                  <Stop offset="30%" stopColor="#FFFFFF" stopOpacity="0" />
-                  <Stop offset="48%" stopColor="#CC785C" stopOpacity="0.25" />
-                  <Stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.5" />
-                  <Stop offset="52%" stopColor="#CC785C" stopOpacity="0.25" />
-                  <Stop offset="70%" stopColor="#FFFFFF" stopOpacity="0" />
-                  <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-                </LinearGradient>
-              </Defs>
-              <Rect x="0" y="0" width={180} height={36} fill="url(#mirrorGlassWave)" />
-            </Svg>
-          </Animated.View>
-        )}
-
-        {/* Ambient Top Mirror Sheen Highlight */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.mirrorSheenOverlay,
-            { opacity: mirrorSheenAnim },
-          ]}
-        />
-
-        <View style={styles.headerLeft}>
+        <View style={styles.triggerContent}>
           {isThinking ? (
-            /* Claude Terracotta Sunburst (Spinning Asterisk) */
+            /* Soft Pulsing Amber Dot */
             <Animated.View
-              style={{
-                transform: [{ rotate: spinInterpolate }],
-                opacity: pulseAnim,
-                marginRight: 2,
-              }}
-            >
-              <Svg width={17} height={17} viewBox="0 0 20 20">
-                {SUNBURST_RAYS.map((ray, idx) => (
-                  <Line
-                    key={idx}
-                    x1={ray.x1}
-                    y1={ray.y1}
-                    x2={ray.x2}
-                    y2={ray.y2}
-                    stroke="#CC785C"
-                    strokeWidth={1.85}
-                    strokeLinecap="round"
-                  />
-                ))}
-              </Svg>
-            </Animated.View>
-          ) : (
-            /* Finished Thought Symbol */
-            <Text style={[styles.finishedAsterisk, { color: '#CC785C' }]}>✦</Text>
-          )}
+              style={[
+                styles.thinkingDot,
+                {
+                  opacity: pulseAnim,
+                  transform: [{ scale: scaleAnim }],
+                },
+              ]}
+            />
+          ) : null}
 
-          {/* Dynamic Thinking Word or Completed Duration */}
           {isThinking ? (
             <Animated.Text
               style={[
-                styles.headerText,
+                styles.thinkingLabel,
                 { color: textSecondaryColor, opacity: wordFadeAnim },
               ]}
             >
               {CLAUDE_THINKING_WORDS[activeWordIndex]}
-              {elapsedSeconds > 0 ? ` (${elapsedSeconds.toFixed(1)}s)` : ''}
+              {elapsedSeconds > 0 ? ` (${elapsedSeconds.toFixed(1)}s)` : '...'}
             </Animated.Text>
           ) : (
-            <Text style={[styles.headerText, { color: textSecondaryColor }]}>
-              {`Thinking for ${durationSec}s`}
+            <Text style={[styles.thoughtCompletedLabel, { color: textSecondaryColor }]}>
+              {`Thought for ${durationSec} second${durationSec === 1 ? '' : 's'}`}
             </Text>
           )}
-        </View>
 
-        {/* Minimalist Dropdown Chevron */}
-        <View style={{ marginLeft: 6 }}>
-          {isExpanded ? (
-            <ChevronUp size={13} color={textSecondaryColor} />
-          ) : (
-            <ChevronDown size={13} color={textSecondaryColor} />
-          )}
+          <View style={{ marginLeft: 3 }}>
+            {isExpanded ? (
+              <ChevronUp size={12} color={textSecondaryColor} />
+            ) : (
+              <ChevronDown size={12} color={textSecondaryColor} />
+            )}
+          </View>
         </View>
       </Pressable>
 
-      {/* ── 2. Container-Free Expanded Real Tasks & Reasoning Drawer ── */}
+      {/* ── 2. Container-Free Left-Bordered Reasoning Stream ── */}
       {isExpanded && (
-        <View style={styles.expandedDrawer}>
-          {/* Sub-Agent Real Task Checklist (Container-Free) */}
+        <View style={styles.expandedThoughtStream}>
+          {/* Sub-Agent Task Steps (if present) */}
           {taskSteps.length > 0 && (
-            <View style={styles.taskListContainer}>
+            <View style={styles.taskStepsBlock}>
               {taskSteps.map((step) => {
                 const isRunning = step.status === 'running';
                 const isDone = step.status === 'completed';
 
                 return (
                   <View key={step.id} style={styles.taskRow}>
-                    <View style={styles.taskStatusIcon}>
+                    <View style={styles.taskIconSlot}>
                       {isRunning ? (
                         <Animated.View style={{ opacity: pulseAnim }}>
-                          <Text style={{ fontSize: 10, color: '#CC785C' }}>●</Text>
+                          <Text style={{ fontSize: 9, color: '#CC785C' }}>●</Text>
                         </Animated.View>
                       ) : isDone ? (
                         <Check size={11} color="#10B981" strokeWidth={2.5} />
                       ) : (
-                        <Text style={{ fontSize: 10, color: textSecondaryColor }}>○</Text>
+                        <Text style={{ fontSize: 9, color: textSecondaryColor }}>○</Text>
                       )}
                     </View>
                     <Text
                       style={[
-                        styles.taskLabel,
+                        styles.taskLabelText,
                         {
                           color: isRunning ? textColor : textSecondaryColor,
                           fontWeight: isRunning ? '600' : '400',
@@ -374,30 +252,28 @@ export function ClaudeThinkingIndicator({
             </View>
           )}
 
-          {/* Real Neural Reasoning Monologue (Container-Free Left-Border Block) */}
-          {(thoughtParagraphs.length > 0 || (isThinking && taskSteps.length === 0)) && (
-            <View style={styles.monologueContainer}>
-              {isThinking && thoughtParagraphs.length === 0 ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Animated.Text style={{ opacity: pulseAnim, color: '#CC785C', fontSize: 12 }}>
-                    ●
-                  </Animated.Text>
-                  <Text style={[styles.monologueText, { color: textSecondaryColor, fontStyle: 'italic' }]}>
-                    Analyzing requirements and verifying accounting rules...
-                  </Text>
-                </View>
-              ) : (
-                thoughtParagraphs.map((paragraph, idx) => (
-                  <Text
-                    key={idx}
-                    style={[styles.monologueText, { color: textSecondaryColor, marginBottom: 6 }]}
-                  >
-                    {paragraph}
-                  </Text>
-                ))
-              )}
+          {/* Genuine Neural Monologue Text */}
+          {thoughtParagraphs.length > 0 ? (
+            <View style={styles.thoughtParagraphsBlock}>
+              {thoughtParagraphs.map((paragraph, idx) => (
+                <Text
+                  key={idx}
+                  style={[styles.thoughtBodyText, { color: textSecondaryColor }]}
+                >
+                  {paragraph}
+                </Text>
+              ))}
             </View>
-          )}
+          ) : isThinking && taskSteps.length === 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 }}>
+              <Animated.Text style={{ opacity: pulseAnim, color: '#CC785C', fontSize: 11 }}>
+                ●
+              </Animated.Text>
+              <Text style={[styles.thoughtBodyText, { color: textSecondaryColor, fontStyle: 'italic' }]}>
+                Analyzing query and grounding records...
+              </Text>
+            </View>
+          ) : null}
         </View>
       )}
     </View>
@@ -410,109 +286,73 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     width: '100%',
     backgroundColor: 'transparent',
-    borderWidth: 0,
   },
-  mirrorGlassPill: {
-    position: 'relative',
-    overflow: 'hidden',
+  inlineThinkingTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 5.5,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 7,
+    paddingVertical: 3,
+    paddingHorizontal: 0,
     alignSelf: 'flex-start',
+    backgroundColor: 'transparent',
   },
-  mirrorGlassPillThinking: {
-    backgroundColor: 'rgba(255, 255, 255, 0.045)',
-    borderColor: 'rgba(204, 120, 92, 0.38)',
-    borderTopColor: 'rgba(255, 255, 255, 0.3)', // Mirror specular highlight rim
-    shadowColor: '#CC785C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  mirrorGlassPillCompleted: {
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderTopColor: 'rgba(255, 255, 255, 0.22)',
-  },
-  waveSweepLayer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 180,
-  },
-  mirrorSheenOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  headerLeft: {
+  triggerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    zIndex: 1,
   },
-  finishedAsterisk: {
-    fontSize: 12,
-    fontWeight: '700',
+  thinkingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#CC785C',
   },
-  headerText: {
-    fontSize: 12.5,
+  thinkingLabel: {
+    fontSize: 13,
     fontWeight: '500',
     letterSpacing: 0.1,
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
   },
-  expandedDrawer: {
-    marginTop: 6,
-    paddingLeft: 4,
-    width: '100%',
-    backgroundColor: 'transparent',
-    borderWidth: 0,
+  thoughtCompletedLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0.1,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
   },
-  taskListContainer: {
-    paddingVertical: 4,
-    gap: 5,
-    marginBottom: 6,
+  expandedThoughtStream: {
+    marginTop: 6,
+    marginBottom: 4,
+    marginLeft: 2,
+    paddingLeft: 12,
+    borderLeftWidth: 1.5,
+    borderLeftColor: 'rgba(255, 255, 255, 0.14)',
     backgroundColor: 'transparent',
+  },
+  taskStepsBlock: {
+    gap: 4,
+    marginBottom: 6,
   },
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 6,
   },
-  taskStatusIcon: {
+  taskIconSlot: {
     width: 14,
     height: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  taskLabel: {
-    fontSize: 11.5,
-    lineHeight: 16,
+  taskLabelText: {
+    fontSize: 12,
+    lineHeight: 17,
     flex: 1,
   },
-  monologueContainer: {
-    borderLeftWidth: 2,
-    borderLeftColor: 'rgba(204, 120, 92, 0.35)',
-    paddingLeft: 10,
-    marginLeft: 6,
-    marginTop: 4,
-    marginBottom: 2,
-    backgroundColor: 'transparent',
+  thoughtParagraphsBlock: {
+    gap: 6,
   },
-  monologueText: {
-    fontSize: 12,
-    lineHeight: 18,
+  thoughtBodyText: {
+    fontSize: 12.5,
+    lineHeight: 18.5,
     letterSpacing: 0.1,
   },
 });

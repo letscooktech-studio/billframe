@@ -25,6 +25,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Animated,
+  Easing,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -204,6 +205,50 @@ function getSmartWorkflowChips(draft: ParsedDocumentDraft | null): Array<{ label
     { label: '⎙ Print Invoice', prompt: 'Print official invoice' },
   ];
 }
+
+/**
+ * Animated Message Row
+ * Smoothly interpolates entry opacity and gentle vertical slide for a fluid Claude-like feel.
+ */
+const AnimatedMessageRow: React.FC<{
+  children: React.ReactNode;
+  isUser: boolean;
+}> = ({ children, isUser }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.messageRow,
+        isUser ? styles.messageRowUser : styles.messageRowAssistant,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+};
 
 export default function AiAssistantScreen() {
   const { theme } = useTheme();
@@ -742,11 +787,10 @@ export default function AiAssistantScreen() {
         >
           {messages.map((msg) => {
             const isUser = msg.role === 'user';
-            const isThoughtExpanded = Boolean(expandedThoughts[msg.id]);
 
             if (isUser) {
               return (
-                <View key={msg.id} style={[styles.messageRow, styles.messageRowUser]}>
+                <AnimatedMessageRow key={msg.id} isUser={true}>
                   <View
                     style={[
                       styles.userBubbleContainer,
@@ -759,51 +803,17 @@ export default function AiAssistantScreen() {
                     <Text style={[styles.userMessageText, { color: theme.textPrimary }]}>
                       {msg.content}
                     </Text>
-                    <Text style={[styles.messageTimestamp, { color: theme.textMuted }]}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
                   </View>
-                </View>
+                </AnimatedMessageRow>
               );
             }
 
             return (
-              <View key={msg.id} style={[styles.messageRow, styles.messageRowAssistant]}>
-                <View
-                  style={[
-                    styles.assistantCardContainer,
-                    {
-                      backgroundColor: theme.surface,
-                      borderColor: theme.borderDefault,
-                    },
-                  ]}
-                >
-                  {/* Intelligent Agent Header Bar */}
-                  <View style={[styles.assistantHeaderRow, { borderBottomColor: theme.borderSubtle }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <View style={[styles.agentAvatarBadge, { backgroundColor: theme.surfaceSecondary }]}>
-                        <Sparkles size={13} color="#CC785C" />
-                      </View>
-                      <View>
-                        <Text style={[styles.agentHeaderTitle, { color: theme.textPrimary }]}>
-                          Billframe AI Copilot
-                        </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <View style={styles.agentActiveDot} />
-                          <Text style={[styles.agentHeaderSubtitle, { color: theme.textMuted }]}>
-                            Grounded SQLite • Live
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                    <Text style={[styles.messageTimestamp, { color: theme.textMuted }]}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
-
-                  {/* Claude Intelligent Thinking Indicator & Live Real Sub-Agent Tasks */}
+              <AnimatedMessageRow key={msg.id} isUser={false}>
+                <View style={styles.assistantMessageFlow}>
+                  {/* Claude Intelligent Thinking Indicator (Flat, Inline, Organic) */}
                   {(msg.isThinking || msg.reasoningTrace || (msg.taskSteps && msg.taskSteps.length > 0)) && (
-                    <View style={{ marginTop: 8 }}>
+                    <View style={{ marginBottom: 6 }}>
                       <ClaudeThinkingIndicator
                         isThinking={Boolean(msg.isThinking)}
                         thoughtDurationSeconds={msg.thoughtDurationSeconds}
@@ -817,25 +827,26 @@ export default function AiAssistantScreen() {
                         }
                         onToggleExpand={() => toggleThought(msg.id)}
                         textColor={theme.textPrimary}
-                        textSecondaryColor={theme.textSecondary}
-                        borderColor={theme.borderSubtle}
-                        surfaceColor={theme.surfaceSecondary}
+                        textSecondaryColor={theme.textMuted}
                       />
                     </View>
                   )}
 
                   {/* Conversational Reply Text with Intelligent Markdown / Table Renderer */}
                   {(msg.content || (msg.isStreaming && !msg.isThinking)) ? (
-                    <View style={{ marginTop: (msg.isThinking || msg.reasoningTrace) ? 8 : 4 }}>
+                    <View style={styles.assistantTextFlow}>
                       <IntelligentMessageRenderer
                         content={msg.content}
                         isStreaming={Boolean(msg.isStreaming)}
                         textColor={theme.textPrimary}
                       />
                       {msg.isStreaming && !msg.isThinking && (
-                        <Animated.Text style={[styles.intelligentCursor, { opacity: cursorAnim, color: '#CC785C' }]}>
-                          ▊
-                        </Animated.Text>
+                        <Animated.View
+                          style={[
+                            styles.streamingCursorBar,
+                            { opacity: cursorAnim, backgroundColor: '#CC785C' },
+                          ]}
+                        />
                       )}
                     </View>
                   ) : null}
@@ -869,10 +880,10 @@ export default function AiAssistantScreen() {
 
                       <Pressable
                         style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                        onPress={() => handleSendMessage('Create a salary slip for John Doe, Senior Architect, basic 65,000, HRA 25,000, PF 3,600 for October 2026')}
+                        onPress={() => handleSendMessage('build me complete highest ats scoring resume for farhan noor for ai engineer')}
                       >
-                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>💼 Salary Slip</Text>
-                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Official payslip with earnings & deductions breakdown</Text>
+                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📄 ATS Resume (Farhan Noor)</Text>
+                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>ATS-optimized curriculum vitae with 98% score</Text>
                       </Pressable>
                     </View>
                   )}
@@ -882,12 +893,12 @@ export default function AiAssistantScreen() {
                     <View style={[styles.compilingDraftBadge, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
                       <ActivityIndicator size="small" color={theme.textPrimary} style={{ transform: [{ scale: 0.75 }] }} />
                       <Text style={[styles.compilingDraftText, { color: theme.textSecondary }]}>
-                        Compiling document...
+                        Compiling statutory draft...
                       </Text>
                     </View>
                   )}
 
-                  {/* ── Unified Monochrome Luxury Document Cards (Single & Multi-Document Support) ── */}
+                  {/* ── Claude-Style Artifact Tiles (Container-Free & Breathable) ── */}
                   {(() => {
                     const draftsToRender = (msg.documentDrafts && msg.documentDrafts.length > 0)
                       ? msg.documentDrafts
@@ -895,332 +906,102 @@ export default function AiAssistantScreen() {
                     if (draftsToRender.length === 0) return null;
 
                     return (
-                      <View style={{ marginTop: 10, gap: 10 }}>
-                        {draftsToRender.length > 1 && (
-                          <View style={[styles.batchHeaderStrip, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                            <Layers size={14} color={theme.textPrimary} />
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textPrimary, flex: 1 }}>
-                              {draftsToRender.length} Statutory Documents Generated
-                            </Text>
-                            <View style={[styles.cardBadge, { backgroundColor: theme.primaryActionBg }]}>
-                              <Text style={[styles.cardBadgeText, { color: theme.primaryActionText, fontWeight: '700' }]}>
-                                BATCH WORKFLOW
-                              </Text>
-                            </View>
-                          </View>
-                        )}
-                        {draftsToRender.map((draft, dIdx) => (
-                          <View
-                            key={draft.documentId || `${draft.documentNumber}_${dIdx}`}
-                            style={[styles.draftCard, { borderColor: theme.borderDefault, backgroundColor: theme.surface, marginTop: 0 }]}
-                          >
-                            {/* 1. Card Top Bar */}
-                            <View style={styles.cardHeaderRow}>
-                              <View style={{ flex: 1 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                  <FileText size={16} color={theme.textPrimary} />
-                                  <Text style={[styles.cardTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                                    {draft.documentTitle}
-                                  </Text>
-                                  {draftsToRender.length > 1 && (
-                                    <View style={[styles.cardBadge, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle, paddingHorizontal: 5, paddingVertical: 1 }]}>
-                                      <Text style={[styles.cardBadgeText, { color: theme.textMuted, fontSize: 8.5 }]}>
-                                        #{dIdx + 1}
-                                      </Text>
-                                    </View>
-                                  )}
-                                </View>
-                                <Text style={[styles.cardProvenance, { color: theme.textMuted }]}>
-                                  {draft.provenanceRule} • {draft.documentNumber}
-                                </Text>
-                              </View>
-                              <View style={[styles.cardBadge, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                                <Text style={[styles.cardBadgeText, { color: theme.textSecondary }]}>
-                                  ✦ {AiTemplateBridge.getDefaultTemplateId(draft).toUpperCase().replace(/_/g, ' ')}
-                                </Text>
-                              </View>
-                            </View>
+                      <View style={styles.artifactsContainer}>
+                        {draftsToRender.map((draft, dIdx) => {
+                          const isSelected = activeDraft?.documentId === draft.documentId || activeDraft?.documentNumber === draft.documentNumber;
+                          const subtitle = draft.docType === 'resume'
+                            ? `${draft.partyName} · ${draft.metadata?.targetRole || 'AI Engineer'} · 98% ATS`
+                            : (draft.metadata?.isRetailPos || draft.documentTitle?.toLowerCase().includes('grocery'))
+                            ? `${draft.metadata?.storeName || 'Billframe Mart'} · ${draft.items.length} items · ${formatMoney(createMoney(draft.grandTotalMinor, draft.currency))}`
+                            : draft.docType === 'salary_slip'
+                            ? `${draft.partyName} · ${draft.metadata?.designation || 'Staff'} · Net ${formatMoney(createMoney(draft.grandTotalMinor > 0n ? draft.grandTotalMinor : (draft.metadata?.netPayMinor || 8640000n), draft.currency))}`
+                            : `${draft.partyName} · ${formatMoney(createMoney(draft.grandTotalMinor, draft.currency))} · ${draft.documentNumber}`;
 
-                            {/* 2. Archetype-Specific Data Body */}
-                            {draft.docType === 'salary_slip' ||
-                            draft.documentTitle?.toLowerCase().includes('salary') ||
-                            draft.documentTitle?.toLowerCase().includes('payslip') ? (
-                              /* ── A: SALARY SLIP DATA ── */
-                              <View style={{ marginTop: 12 }}>
-                                <View style={[styles.monoHeroBox, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                                  <View>
-                                    <Text style={[styles.monoHeroLabel, { color: theme.textMuted }]}>Net Take-Home Pay</Text>
-                                    <Text style={[styles.monoHeroAmount, { color: theme.textPrimary }]}>
-                                      {formatMoney(createMoney(draft.grandTotalMinor > 0n ? draft.grandTotalMinor : (draft.metadata?.netPayMinor || 8640000n), draft.currency))}
-                                    </Text>
-                                  </View>
-                                  <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={[styles.statusIndicator, { color: '#10B981' }]}>● Disbursed</Text>
-                                    <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>Direct Bank Transfer</Text>
-                                  </View>
-                                </View>
-
-                                <View style={[styles.metaStrip, { borderColor: theme.borderSubtle }]}>
-                                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>
-                                    Employee: <Text style={{ fontWeight: '700', color: theme.textPrimary }}>{draft.partyName}</Text> • {draft.metadata?.designation || 'Senior Architect'}
-                                  </Text>
-                                  <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>
-                                    Period: {draft.metadata?.payPeriod || 'October 2026'}
-                                  </Text>
-                                </View>
-
-                                <View style={styles.twoColumnGrid}>
-                                  <View style={[styles.columnBox, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                                    <Text style={[styles.columnHeader, { color: theme.textMuted }]}>EARNINGS (+)</Text>
-                                    {draft.items
-                                      .filter((it) => it.unitPriceMinor >= 0n)
-                                      .map((itm, idx) => (
-                                        <View key={idx} style={styles.itemRow}>
-                                          <Text style={[styles.itemLabel, { color: theme.textSecondary }]} numberOfLines={1}>{itm.description}</Text>
-                                          <Text style={[styles.itemVal, { color: theme.textPrimary }]}>
-                                            {formatMoney(createMoney(itm.unitPriceMinor, draft.currency))}
-                                          </Text>
-                                        </View>
-                                      ))}
-                                  </View>
-                                  <View style={[styles.columnBox, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                                    <Text style={[styles.columnHeader, { color: theme.textMuted }]}>DEDUCTIONS (-)</Text>
-                                    {draft.items
-                                      .filter((it) => it.unitPriceMinor < 0n)
-                                      .map((itm, idx) => (
-                                        <View key={idx} style={styles.itemRow}>
-                                          <Text style={[styles.itemLabel, { color: theme.textSecondary }]} numberOfLines={1}>{itm.description}</Text>
-                                          <Text style={[styles.itemVal, { color: theme.textPrimary }]}>
-                                            {formatMoney(createMoney(-itm.unitPriceMinor, draft.currency))}
-                                          </Text>
-                                        </View>
-                                      ))}
-                                  </View>
-                                </View>
-                              </View>
-                            ) : (draft.metadata?.isRetailPos || draft.items.length >= 5 || draft.documentTitle?.toLowerCase().includes('grocery')) ? (
-                              /* ── B: RETAIL GROCERY POS DATA TABLE ── */
-                              <View style={{ marginTop: 12 }}>
-                                <View style={[styles.metaStrip, { borderColor: theme.borderSubtle, marginBottom: 8 }]}>
-                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={{ fontSize: 11, color: theme.textMuted }}>
-                                      Store: <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>{draft.metadata?.storeName || 'Billframe Fresh Mart'}</Text>
-                                    </Text>
-                                    <Text style={{ fontSize: 11, color: theme.textMuted }}>
-                                      Items: <Text style={{ color: theme.textPrimary, fontWeight: '700' }}>{draft.items.length} items</Text>
-                                    </Text>
-                                  </View>
-                                  <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>
-                                    Customer: <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>{draft.partyName}</Text>
-                                  </Text>
-                                </View>
-
-                                <View style={[styles.tableContainer, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}>
-                                  <View style={[styles.tableHeaderRow, { borderBottomColor: theme.borderSubtle }]}>
-                                    <Text style={[styles.tableHeadCol, { flex: 2, color: theme.textMuted }]}>ITEM</Text>
-                                    <Text style={[styles.tableHeadCol, { width: 50, textAlign: 'center', color: theme.textMuted }]}>QTY</Text>
-                                    <Text style={[styles.tableHeadCol, { width: 65, textAlign: 'right', color: theme.textMuted }]}>RATE</Text>
-                                    <Text style={[styles.tableHeadCol, { width: 75, textAlign: 'right', color: theme.textMuted }]}>TOTAL</Text>
-                                  </View>
-                                  {draft.items.map((itm, idx) => {
-                                    const qtyNum = Number(itm.quantityScaled) / 10000;
-                                    const lineMinor = (itm.unitPriceMinor * itm.quantityScaled) / 10000n;
-                                    return (
-                                      <View key={idx} style={[styles.tableBodyRow, { borderBottomColor: theme.borderSubtle }, idx % 2 === 1 && { backgroundColor: theme.surfaceElevated }]}>
-                                        <View style={{ flex: 2 }}>
-                                          <Text style={[styles.tableNameCol, { color: theme.textPrimary }]} numberOfLines={1}>{itm.description}</Text>
-                                          {itm.hsnSac && <Text style={{ fontSize: 9, color: theme.textMuted }}>HSN: {itm.hsnSac}</Text>}
-                                        </View>
-                                        <Text style={[styles.tableQtyCol, { width: 50, textAlign: 'center', color: theme.textSecondary }]}>
-                                          {qtyNum} {itm.unitName}
-                                        </Text>
-                                        <Text style={[styles.tableRateCol, { width: 65, textAlign: 'right', color: theme.textSecondary }]}>
-                                          {formatMoney(createMoney(itm.unitPriceMinor, draft.currency))}
-                                        </Text>
-                                        <Text style={[styles.tableTotalCol, { width: 75, textAlign: 'right', color: theme.textPrimary }]}>
-                                          {formatMoney(createMoney(lineMinor, draft.currency))}
-                                        </Text>
-                                      </View>
-                                    );
-                                  })}
-                                </View>
-
-                                <View style={[styles.summaryBox, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceSecondary }]}>
-                                  <View style={styles.summaryLine}>
-                                    <Text style={{ fontSize: 11, color: theme.textMuted }}>Subtotal ({draft.items.length} items):</Text>
-                                    <Text style={{ fontSize: 11, color: theme.textPrimary, fontWeight: '600' }}>
-                                      {formatMoney(createMoney(draft.subtotalMinor, draft.currency))}
-                                    </Text>
-                                  </View>
-                                  {draft.taxMinor > 0n && (
-                                    <View style={styles.summaryLine}>
-                                      <Text style={{ fontSize: 11, color: theme.textMuted }}>{draft.taxLabel} ({Number(draft.taxRateBp) / 100}%):</Text>
-                                      <Text style={{ fontSize: 11, color: theme.textPrimary, fontWeight: '600' }}>
-                                        {formatMoney(createMoney(draft.taxMinor, draft.currency))}
-                                      </Text>
-                                    </View>
-                                  )}
-                                  <View style={[styles.summaryLine, { marginTop: 4, paddingTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.borderSubtle }]}>
-                                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textPrimary }}>Net Payable Amount:</Text>
-                                    <Text style={{ fontSize: 14, fontWeight: '800', color: theme.textPrimary }}>
-                                      {formatMoney(createMoney(draft.grandTotalMinor, draft.currency))}
-                                    </Text>
-                                  </View>
-                                </View>
-                              </View>
-                            ) : (draft.docType === 'resume' || draft.documentTitle?.toLowerCase().includes('resume') || draft.documentTitle?.toLowerCase().includes('curriculum vitae')) ? (
-                              /* ── C1: ATS RESUME / CANDIDATE DOSSIER DATA ── */
-                              <View style={{ marginTop: 12 }}>
-                                <View style={[styles.metaStrip, { borderColor: theme.borderSubtle, paddingVertical: 8 }]}>
-                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <View style={{ flex: 1, paddingRight: 8 }}>
-                                      <Text style={{ fontSize: 13, fontWeight: '800', color: theme.textPrimary }}>
-                                        {draft.partyName}
-                                      </Text>
-                                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981', marginTop: 1 }}>
-                                        {draft.metadata?.targetRole || 'AI Engineer | Machine Learning Specialist'}
-                                      </Text>
-                                    </View>
-                                    <View style={[styles.cardBadge, { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
-                                      <Text style={{ fontSize: 10, fontWeight: '800', color: '#10B981' }}>
-                                        ATS: {draft.metadata?.atsScore || 98}%
-                                      </Text>
-                                    </View>
-                                  </View>
-                                  <Text style={{ fontSize: 10.5, color: theme.textMuted, marginTop: 4 }}>
-                                    📍 {draft.partyAddress || 'New York, NY, USA'} • ✉️ {draft.partyEmail || `${draft.partyName.toLowerCase().replace(/\s+/g, '.')}@email.com`}
-                                  </Text>
-                                </View>
-                                <View style={{ marginTop: 8, gap: 4 }}>
-                                  {draft.items.map((itm, idx) => (
-                                    <View key={idx} style={[styles.competencyItem, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                                      <Text style={{ fontSize: 11, fontWeight: '500', color: theme.textSecondary }}>
-                                        <Text style={{ color: '#10B981', fontWeight: '700' }}>✦ </Text>
-                                        {itm.description}
-                                      </Text>
-                                    </View>
-                                  ))}
-                                </View>
-                              </View>
-                            ) : draft.docType === 'job_application' ? (
-                              /* ── C2: JOB APPLICATION DOSSIER DATA ── */
-                              <View style={{ marginTop: 12 }}>
-                                <View style={[styles.metaStrip, { borderColor: theme.borderSubtle }]}>
-                                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
-                                    {draft.metadata?.position || 'Applied AI Engineer'}
-                                  </Text>
-                                  <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 1 }}>
-                                    Applicant: {draft.partyName} • CTC: {draft.metadata?.expectedCtc || '₹35,00,000 PA'}
-                                  </Text>
-                                </View>
-                                <View style={{ marginTop: 8, gap: 4 }}>
-                                  {draft.items.map((itm, idx) => (
-                                    <View key={idx} style={[styles.competencyItem, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                                      <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textPrimary }}>✦ {itm.description}</Text>
-                                    </View>
-                                  ))}
-                                </View>
-                              </View>
-                            ) : (
-                              /* ── D: COMMERCIAL INVOICE / CHALLAN / QUOTE / PO / OTHER ── */
-                              <View style={{ marginTop: 12 }}>
-                                <View style={[styles.metaStrip, { borderColor: theme.borderSubtle }]}>
-                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={{ fontSize: 11, color: theme.textMuted }}>
-                                      {draft.docType === 'purchase_order' ? 'Vendor: ' : 'Counterparty: '}
-                                      <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>{draft.partyName}</Text>
-                                    </Text>
-                                    <Text style={{ fontSize: 13, fontWeight: '800', color: theme.textPrimary }}>
-                                      {formatMoney(createMoney(draft.grandTotalMinor, draft.currency))}
-                                    </Text>
-                                  </View>
-                                </View>
-                                <View style={{ marginTop: 6, gap: 3 }}>
-                                  {draft.items.map((itm, idx) => (
-                                    <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                      <Text style={{ fontSize: 11, color: theme.textSecondary, flex: 1 }} numberOfLines={1}>{itm.description}</Text>
-                                      <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textPrimary }}>
-                                        {formatMoney(createMoney(itm.unitPriceMinor, draft.currency))}
-                                      </Text>
-                                    </View>
-                                  ))}
-                                </View>
-                              </View>
-                            )}
-
-                            {/* 3. Standardized Action Toolbar (Unified Across ALL Documents) */}
-                            <View style={styles.cardActionsRow}>
+                          return (
+                            <View key={draft.documentId || `${draft.documentNumber}_${dIdx}`} style={styles.artifactBlock}>
                               <Pressable
-                                style={[styles.primaryActionBtn, { backgroundColor: theme.primaryActionBg }]}
+                                style={[
+                                  styles.artifactTile,
+                                  {
+                                    backgroundColor: theme.surfaceSecondary,
+                                    borderColor: isSelected ? '#CC785C' : theme.borderSubtle,
+                                  },
+                                ]}
                                 onPress={() => {
                                   setActiveDraft(draft);
-                                  handleOpenPreview(draft);
+                                  if (!isDesktop) handleOpenPreview(draft);
                                 }}
                                 accessibilityRole="button"
-                                accessibilityLabel="Preview document"
+                                accessibilityLabel={`Open ${draft.documentTitle}`}
                               >
-                                <Eye size={13} color={theme.primaryActionText} />
-                                <Text style={[styles.primaryActionBtnText, { color: theme.primaryActionText }]}>
-                                  Preview Document
-                                </Text>
+                                <View style={styles.artifactIconBox}>
+                                  <FileText size={18} color="#CC785C" />
+                                </View>
+                                <View style={{ flex: 1, minWidth: 0 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Text style={[styles.artifactTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                                      {draft.documentTitle}
+                                    </Text>
+                                    <View style={styles.artifactVerifiedPill}>
+                                      <Text style={styles.artifactVerifiedText}>VERIFIED</Text>
+                                    </View>
+                                  </View>
+                                  <Text style={[styles.artifactSubtitle, { color: theme.textMuted }]} numberOfLines={1}>
+                                    {subtitle}
+                                  </Text>
+                                </View>
+                                <View style={styles.artifactOpenBtn}>
+                                  <Text style={[styles.artifactOpenText, { color: theme.textPrimary }]}>
+                                    {isDesktop ? 'View in Canvas' : 'Preview'}
+                                  </Text>
+                                  <ExternalLink size={12} color={theme.textMuted} />
+                                </View>
                               </Pressable>
 
-                              <Pressable
-                                style={[styles.secondaryActionBtn, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderDefault }]}
-                                onPress={() => handlePrintDocument(draft)}
-                                accessibilityRole="button"
-                                accessibilityLabel="Print document"
-                              >
-                                <Printer size={13} color={theme.textPrimary} />
-                                <Text style={[styles.secondaryActionBtnText, { color: theme.textPrimary }]}>
-                                  Print
-                                </Text>
-                              </Pressable>
+                              {/* Subtle Inline Quick Actions */}
+                              <View style={styles.artifactInlineActionsRow}>
+                                <Pressable
+                                  style={styles.artifactActionLink}
+                                  onPress={() => handlePrintDocument(draft)}
+                                  hitSlop={6}
+                                >
+                                  <Printer size={12} color={theme.textSecondary} />
+                                  <Text style={[styles.artifactActionLinkText, { color: theme.textSecondary }]}>Print</Text>
+                                </Pressable>
 
-                              <Pressable
-                                style={[styles.secondaryActionBtn, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderDefault }]}
-                                onPress={() => handleDownloadHtml(draft)}
-                                accessibilityRole="button"
-                                accessibilityLabel="Download document HTML"
-                              >
-                                <Download size={13} color={theme.textPrimary} />
-                                <Text style={[styles.secondaryActionBtnText, { color: theme.textPrimary }]}>
-                                  HTML
-                                </Text>
-                              </Pressable>
+                                <Pressable
+                                  style={styles.artifactActionLink}
+                                  onPress={() => handleDownloadHtml(draft)}
+                                  hitSlop={6}
+                                >
+                                  <Download size={12} color={theme.textSecondary} />
+                                  <Text style={[styles.artifactActionLinkText, { color: theme.textSecondary }]}>Export HTML</Text>
+                                </Pressable>
 
-                              <Pressable
-                                style={[styles.secondaryActionBtn, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderDefault }]}
-                                onPress={() => router.push(`/document/edit?id=${draft.documentId}` as any)}
-                                accessibilityRole="button"
-                                accessibilityLabel="Open document in editor form"
-                              >
-                                <ExternalLink size={13} color={theme.textPrimary} />
-                                <Text style={[styles.secondaryActionBtnText, { color: theme.textPrimary }]}>
-                                  Edit
-                                </Text>
-                              </Pressable>
+                                <Pressable
+                                  style={styles.artifactActionLink}
+                                  onPress={() => router.push(`/document/edit?id=${draft.documentId}` as any)}
+                                  hitSlop={6}
+                                >
+                                  <ExternalLink size={12} color={theme.textSecondary} />
+                                  <Text style={[styles.artifactActionLinkText, { color: theme.textSecondary }]}>Edit Form</Text>
+                                </Pressable>
+                              </View>
                             </View>
-                          </View>
-                        ))}
+                          );
+                        })}
                       </View>
                     );
                   })()}
                 </View>
-              </View>
+              </AnimatedMessageRow>
             );
           })}
         </ScrollView>
 
         {/* Context-Aware Smart Workflow Chips */}
-        <View style={[styles.chipsContainer, { borderTopColor: theme.borderSubtle, backgroundColor: theme.surface }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 4, gap: 5 }}>
-            <Sparkles size={11} color={theme.textMuted} />
-            <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              {activeDraft ? `Workflow Actions: ${activeDraft.documentTitle}` : 'Quick Document Starters'}
-            </Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 2 }}>
+        <View style={styles.chipsContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScrollContent}>
             {getSmartWorkflowChips(activeDraft).map((chip, idx) => (
               <Pressable
                 key={idx}
@@ -1239,43 +1020,51 @@ export default function AiAssistantScreen() {
           </ScrollView>
         </View>
 
-        {/* Input Bar */}
-        <View style={[styles.inputBarContainer, { backgroundColor: theme.surface, borderTopColor: theme.borderSubtle }]}>
-          <TextInput
+        {/* Floating Input Bar */}
+        <View style={styles.inputBarContainer}>
+          <View
             style={[
-              styles.textInput,
+              styles.floatingInputBox,
               {
                 backgroundColor: theme.surfaceSecondary,
-                color: theme.textPrimary,
                 borderColor: theme.borderDefault,
               },
             ]}
-            placeholder={activeDraft ? `Modify ${activeDraft.documentTitle} (e.g. "change price to 45000")...` : 'Ask AI to create or query any document...'}
-            placeholderTextColor={theme.textMuted}
-            value={inputText}
-            onChangeText={setInputText}
-            onSubmitEditing={() => handleSendMessage()}
-            returnKeyType="send"
-            editable={!isProcessing}
-          />
-          <Pressable
-            style={[
-              styles.sendButton,
-              {
-                backgroundColor: inputText.trim() && !isProcessing ? theme.primaryActionBg : theme.surfaceSecondary,
-              },
-            ]}
-            onPress={() => handleSendMessage()}
-            disabled={!inputText.trim() || isProcessing}
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
           >
-            {isProcessing ? (
-              <ActivityIndicator size="small" color={theme.textMuted} />
-            ) : (
-              <Send size={18} color={inputText.trim() ? theme.primaryActionText : theme.textMuted} />
-            )}
-          </Pressable>
+            <TextInput
+              style={[
+                styles.floatingTextInput,
+                {
+                  color: theme.textPrimary,
+                },
+              ]}
+              placeholder={activeDraft ? `Modify ${activeDraft.documentTitle} (e.g. "change price to 45000")...` : 'Ask Billframe to create or query any document...'}
+              placeholderTextColor={theme.textMuted}
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={() => handleSendMessage()}
+              returnKeyType="send"
+              editable={!isProcessing}
+            />
+            <Pressable
+              style={[
+                styles.floatingSendButton,
+                {
+                  backgroundColor: inputText.trim() && !isProcessing ? '#CC785C' : 'rgba(255, 255, 255, 0.08)',
+                },
+              ]}
+              onPress={() => handleSendMessage()}
+              disabled={!inputText.trim() || isProcessing}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+            >
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" style={{ transform: [{ scale: 0.7 }] }} />
+              ) : (
+                <Send size={15} color={inputText.trim() ? '#FFFFFF' : theme.textMuted} />
+              )}
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
 
@@ -1876,9 +1665,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    gap: 16,
   },
   messageRow: {
     flexDirection: 'row',
@@ -1911,6 +1700,99 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
     alignSelf: 'flex-end',
+  },
+  // Container-free assistant message layout (Claude-like)
+  assistantMessageFlow: {
+    width: '100%',
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
+  },
+  assistantTextFlow: {
+    width: '100%',
+    marginTop: 2,
+  },
+  streamingCursorBar: {
+    width: 6,
+    height: 15,
+    backgroundColor: '#CC785C',
+    borderRadius: 1,
+    marginLeft: 3,
+  },
+  // Claude-Style Artifact Tiles
+  artifactsContainer: {
+    marginTop: 10,
+    gap: 8,
+    width: '100%',
+  },
+  artifactBlock: {
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  artifactTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  artifactIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  artifactTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  artifactVerifiedPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  artifactVerifiedText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  artifactSubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  artifactOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  artifactOpenText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  artifactInlineActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  artifactActionLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+  },
+  artifactActionLinkText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   assistantCardContainer: {
     width: '100%',
@@ -2306,6 +2188,11 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  chipsScrollContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
   chipButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -2319,12 +2206,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   inputBarContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  floatingInputBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    minHeight: 48,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  floatingTextInput: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  floatingSendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
   },
   textInput: {
     flex: 1,
@@ -2517,13 +2430,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   desktopChatPane: {
-    width: 480,
-    maxWidth: 520,
+    flex: 1,
+    minWidth: 480,
+    maxWidth: 640,
     borderRightWidth: 1,
     borderRightColor: '#222326',
   },
   desktopCanvasPane: {
-    flex: 1,
+    flex: 1.35,
     borderLeftWidth: 1,
     overflow: 'hidden',
   },
