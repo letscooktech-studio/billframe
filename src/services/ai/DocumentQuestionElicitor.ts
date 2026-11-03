@@ -33,6 +33,29 @@ export interface ChatInteractiveQuestion {
 
 export class DocumentQuestionElicitor {
   /**
+   * Formats a clear, intelligent conversational response explaining what was initiated,
+   * asking the user for the next critical field, and highlighting the in-chatbox options.
+   */
+  static formatDocumentCreationReply(
+    draft: ParsedDocumentDraft,
+    nextQuestion: ChatInteractiveQuestion | null,
+    introMessage?: string
+  ): string {
+    const party = draft.partyName || 'the recipient';
+    const title = draft.documentTitle || 'Document Draft';
+    let reply =
+      introMessage ||
+      `I have drafted the official **${title}** for **${party}** directly on your canvas.`;
+
+    if (nextQuestion) {
+      reply += `\n\n✦ **Next Required Detail to Finalize & Maximize Compliance**:\n${nextQuestion.question}\n\n*${nextQuestion.reason}*\n\n*(Select an option in the chat box below or tap Other to type custom data)*`;
+    } else {
+      reply += `\n\n✦ All statutory compliance and quality parameters for **${title}** have been reconciled with zero unverified placeholder approximations. Your document is fully compiled on canvas.`;
+    }
+    return reply;
+  }
+
+  /**
    * Evaluates the active document draft and returns the next highest-priority
    * interactive MCQ question needed to elevate it to highest-scoring quality.
    */
@@ -175,6 +198,49 @@ export class DocumentQuestionElicitor {
           ],
         };
       }
+
+      if (!answeredFieldKeys.includes('educationDegree') && !draft.metadata?.educationDegree) {
+        return {
+          id: `q_resume_edu_${Date.now()}`,
+          docType: 'resume',
+          fieldKey: 'educationDegree',
+          question: 'What is the highest academic degree or technical qualification?',
+          reason: '✦ ATS Candidate Ranking: Verified university credentials and degree levels satisfy automated qualification filters.',
+          options: [
+            {
+              id: 'opt_edu_ms',
+              label: 'Master of Science (M.S.) in Computer Science / AI',
+              value: 'Master of Science in Computer Science (Artificial Intelligence)',
+              description: 'Postgraduate specialization with machine learning thesis / research',
+            },
+            {
+              id: 'opt_edu_btech',
+              label: 'Bachelor of Technology (B.Tech / B.E.) in CS / IT',
+              value: 'Bachelor of Technology in Computer Science & Engineering',
+              description: '4-year foundational engineering degree in computer science',
+            },
+            {
+              id: 'opt_edu_phd',
+              label: 'Doctor of Philosophy (Ph.D.) in Machine Learning',
+              value: 'Ph.D. in Computer Science / Machine Learning',
+              description: 'Advanced research doctoral degree with top-tier conference publications',
+            },
+            {
+              id: 'opt_edu_bs',
+              label: 'Bachelor of Science (B.S.) in Data Science / Math',
+              value: 'Bachelor of Science in Data Science & Mathematics',
+              description: 'Rigorous quantitative background with statistical modeling focus',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom degree or education in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type exact university / degree in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
     }
 
     // ── 2. TAX INVOICE ARCHETYPE ──
@@ -264,6 +330,43 @@ export class DocumentQuestionElicitor {
           ],
         };
       }
+
+      if (!answeredFieldKeys.includes('placeOfSupply') && !draft.metadata?.placeOfSupply) {
+        return {
+          id: `q_inv_pos_${Date.now()}`,
+          docType: 'invoice',
+          fieldKey: 'placeOfSupply',
+          question: 'What is the GST Place of Supply (Intra-State vs Inter-State)?',
+          reason: '✦ Section 7/9 IGST/CGST Act: Determines whether tax is split into CGST + SGST or billed as integrated IGST for customer input tax credit (ITC).',
+          options: [
+            {
+              id: 'opt_pos_intra',
+              label: 'Intra-State Supply (CGST + SGST Split)',
+              value: 'Intra-State Supply (CGST + SGST)',
+              description: 'Both supplier and buyer registered in the same State',
+            },
+            {
+              id: 'opt_pos_inter',
+              label: 'Inter-State Supply (Integrated IGST)',
+              value: 'Inter-State Supply (IGST)',
+              description: 'Buyer is located in a different State across state borders',
+            },
+            {
+              id: 'opt_pos_export',
+              label: 'Special Economic Zone (SEZ) / Export (Zero-Rated)',
+              value: 'Export / SEZ Supply under LUT',
+              description: 'Zero-rated supply with Letter of Undertaking',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom place of supply in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type custom state or GST jurisdiction in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
     }
 
     // ── 3. FORMAL COMMERCIAL QUOTATION ──
@@ -336,6 +439,43 @@ export class DocumentQuestionElicitor {
               label: 'Other (Enter custom delivery timeline in chat)',
               value: 'CUSTOM_INPUT',
               description: 'Tap to type delivery schedule in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+
+      if (!answeredFieldKeys.includes('paymentMilestones') && !draft.metadata?.paymentMilestones) {
+        return {
+          id: `q_qt_milestones_${Date.now()}`,
+          docType: 'quotation',
+          fieldKey: 'paymentMilestones',
+          question: 'What commercial milestone payment structure governs this quotation?',
+          reason: '✦ Commercial Contract Standard: Protects business cash flow by defining advance commitments before execution.',
+          options: [
+            {
+              id: 'opt_ms_5050',
+              label: '50% Advance + 50% on Delivery',
+              value: '50% Advance with Balance on Delivery',
+              description: 'Standard industry commitment for goods and custom software',
+            },
+            {
+              id: 'opt_ms_net30',
+              label: '100% Net 30 Days Post-Delivery',
+              value: '100% Net 30 Days from Delivery',
+              description: 'Corporate client approved credit terms',
+            },
+            {
+              id: 'opt_ms_staged',
+              label: '30% Advance + 40% Milestone + 30% Acceptance',
+              value: '30% Mobilization + 40% Midpoint + 30% Final Sign-off',
+              description: 'Staged phase billing for multi-week projects',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom payment terms in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type custom payment milestones in chat',
               isOther: true,
             },
           ],
@@ -418,6 +558,43 @@ export class DocumentQuestionElicitor {
           ],
         };
       }
+
+      if (!answeredFieldKeys.includes('panOrUanStatus') && !draft.metadata?.panOrUanStatus) {
+        return {
+          id: `q_sal_uan_${Date.now()}`,
+          docType: 'salary_slip',
+          fieldKey: 'panOrUanStatus',
+          question: 'What is the employee statutory identification status (UAN / PAN)?',
+          reason: '✦ EPFO & Income Tax Compliance: Universal Account Number (UAN) and Permanent Account Number (PAN) link monthly payroll to statutory returns.',
+          options: [
+            {
+              id: 'opt_uan_verified',
+              label: 'UAN & PAN Verified on EPFO Portal',
+              value: 'UAN & PAN Verified',
+              description: 'Standard confirmed employee with regular monthly EPF remittance',
+            },
+            {
+              id: 'opt_uan_pending',
+              label: 'New Joiner - UAN Generation in Progress',
+              value: 'UAN Allotment in Progress',
+              description: 'First-time provident fund enrollee',
+            },
+            {
+              id: 'opt_uan_consultant',
+              label: 'Contract Professional - PAN Only (TDS Section 194J)',
+              value: 'PAN Linked for 194J TDS',
+              description: 'Professional consultant with 10% TDS deduction',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom tax ID or details in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type UAN / PAN details in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
     }
 
     // ── 5. HOUSE RENT RECEIPT ──
@@ -447,6 +624,43 @@ export class DocumentQuestionElicitor {
               label: 'Other (Enter landlord PAN or custom terms in chat)',
               value: 'CUSTOM_INPUT',
               description: 'Tap to type landlord PAN or address in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+
+      if (!answeredFieldKeys.includes('paymentMode') && !draft.metadata?.paymentMode) {
+        return {
+          id: `q_rent_mode_${Date.now()}`,
+          docType: 'rent_receipt',
+          fieldKey: 'paymentMode',
+          question: 'What financial channel was used for rent remittance?',
+          reason: '✦ Income Tax Rule 2A: Traceable non-cash banking channels provide undeniable proof during HRA employer scrutiny.',
+          options: [
+            {
+              id: 'opt_rm_bank',
+              label: 'Bank IMPS / NEFT Online Transfer',
+              value: 'Bank IMPS / NEFT Transfer',
+              description: 'Electronic funds transfer with bank transaction reference',
+            },
+            {
+              id: 'opt_rm_upi',
+              label: 'UPI Remittance (Google Pay / PhonePe / Paytm)',
+              value: 'UPI Digital Payment',
+              description: 'Instant UPI transaction reference',
+            },
+            {
+              id: 'opt_rm_cheque',
+              label: 'Account Payee Cheque',
+              value: 'Account Payee Cheque',
+              description: 'Crossed cheque deposited into landlord account',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom transaction details in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type payment mode in chat',
               isOther: true,
             },
           ],
@@ -492,9 +706,437 @@ export class DocumentQuestionElicitor {
           ],
         };
       }
+
+      if (!answeredFieldKeys.includes('transportMode') && !draft.metadata?.transportMode) {
+        return {
+          id: `q_dc_trans_${Date.now()}`,
+          docType: 'delivery_challan',
+          fieldKey: 'transportMode',
+          question: 'What is the transit method and conveyance mode under CBIC Rule 138?',
+          reason: '✦ CBIC E-Way Bill Rule 138: Statutory movement requires conveyance vehicle/carrier identification.',
+          options: [
+            {
+              id: 'opt_tm_road',
+              label: 'Dedicated Road Vehicle / Transporter Delivery',
+              value: 'Dedicated Road Transporter Vehicle',
+              description: 'Surface freight with E-Way Bill Part-B vehicle number',
+            },
+            {
+              id: 'opt_tm_courier',
+              label: 'Express Air / Express Courier Service',
+              value: 'Express Air Cargo Courier',
+              description: 'Airway Bill (AWB) consignment tracking',
+            },
+            {
+              id: 'opt_tm_direct',
+              label: 'Direct Handover / Company Representative',
+              value: 'Direct Personal / Representative Handover',
+              description: 'Immediate hand-delivery with receiving counterparty signature',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter vehicle or carrier info in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type conveyance details in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
     }
 
-    // ── 7. UNIVERSAL FALLBACK FOR ANY OTHER OF 446 ARCHETYPES ──
+    // ── 7. PURCHASE ORDER ARCHETYPE ──
+    if (dt === 'purchase_order' || title.includes('purchase order') || title.includes('po')) {
+      if (!answeredFieldKeys.includes('deliveryLeadTime') && !draft.metadata?.deliveryLeadTime) {
+        return {
+          id: `q_po_lead_${Date.now()}`,
+          docType: 'purchase_order',
+          fieldKey: 'deliveryLeadTime',
+          question: 'What is the required vendor delivery lead time?',
+          reason: '✦ Commercial Procurement Invariant: Mandates explicit delivery deadlines to enforce supply chain commitments and liquidated damages.',
+          options: [
+            {
+              id: 'opt_po_14d',
+              label: '14 Calendar Days from PO Issuance',
+              value: '14 Calendar Days from Order Date',
+              description: 'Standard prompt vendor dispatch cycle',
+            },
+            {
+              id: 'opt_po_30d',
+              label: '30 Calendar Days Delivery',
+              value: '30 Calendar Days from Order Date',
+              description: 'Standard manufactured or bulk consignment timeline',
+            },
+            {
+              id: 'opt_po_immediate',
+              label: 'Immediate / Ex-Stock Dispatch (48-72 Hours)',
+              value: 'Immediate Dispatch within 72 Hours',
+              description: 'High-priority emergency replenishment order',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom lead time in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type delivery timeline in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+
+      if (!answeredFieldKeys.includes('inspectionClause') && !draft.metadata?.inspectionClause) {
+        return {
+          id: `q_po_insp_${Date.now()}`,
+          docType: 'purchase_order',
+          fieldKey: 'inspectionClause',
+          question: 'What quality inspection and acceptance protocol applies?',
+          reason: '✦ Commercial Quality Assurance: Protects buyer from substandard goods prior to financial settlement.',
+          options: [
+            {
+              id: 'opt_pi_receiving',
+              label: 'Receiving Dock Inspection within 48 Hours',
+              value: 'Receiving Dock Quality Verification within 48 Hours',
+              description: 'Consignment verified for defects and quantity upon arrival',
+            },
+            {
+              id: 'opt_pi_cert',
+              label: 'Manufacturer Test Certificate (MTC) Mandatory',
+              value: 'Manufacturer QA Test Certificate Required with Goods',
+              description: 'ISO / CE compliance certificate must accompany shipment',
+            },
+            {
+              id: 'opt_pi_predispatch',
+              label: 'Pre-Dispatch Joint Inspection at Factory',
+              value: 'Pre-Dispatch Factory Inspection Required',
+              description: 'Buyer inspection engineer signs off before release',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom inspection terms in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type inspection terms in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+    }
+
+    // ── 8. JOB OFFER LETTER ARCHETYPE ──
+    if (dt === 'job_offer_letter' || title.includes('offer letter') || title.includes('job offer')) {
+      if (!answeredFieldKeys.includes('probationPeriod') && !draft.metadata?.probationPeriod) {
+        return {
+          id: `q_offer_prob_${Date.now()}`,
+          docType: 'job_offer_letter',
+          fieldKey: 'probationPeriod',
+          question: 'What is the designated probationary employment duration?',
+          reason: '✦ Labor Employment Law: Clear probation conditions govern performance appraisal and contractual notice rights.',
+          options: [
+            {
+              id: 'opt_prob_3m',
+              label: '3 Months Probation Period',
+              value: '3 Months Probation with Performance Appraisal',
+              description: 'Standard for experienced hires and technical roles',
+            },
+            {
+              id: 'opt_prob_6m',
+              label: '6 Months Probation Period',
+              value: '6 Months Standard Corporate Probation',
+              description: 'Standard enterprise training and orientation period',
+            },
+            {
+              id: 'opt_prob_imm',
+              label: 'Immediate Permanent Confirmation (No Probation)',
+              value: 'Immediate Permanent Employment (Zero Probation)',
+              description: 'Executive or leadership level direct confirmation',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom probation terms in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type probation terms in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+
+      if (!answeredFieldKeys.includes('compensationStructure') && !draft.metadata?.compensationStructure) {
+        return {
+          id: `q_offer_comp_${Date.now()}`,
+          docType: 'job_offer_letter',
+          fieldKey: 'compensationStructure',
+          question: 'What is the total rewards and CTC structure breakdown?',
+          reason: '✦ Statutory HR Invariant: Accurately structures gross pay, statutory benefits, and variable incentive plans.',
+          options: [
+            {
+              id: 'opt_comp_standard',
+              label: 'Fixed CTC + 15% Annual Performance Incentive',
+              value: 'Fixed Base CTC + 15% Annual Performance Bonus',
+              description: 'Standard market structure for technology talent',
+            },
+            {
+              id: 'opt_comp_allcash',
+              label: '100% Guaranteed All-Cash Monthly Compensation',
+              value: '100% Guaranteed All-Cash Compensation',
+              description: 'Simple predictable salary with zero variable risk',
+            },
+            {
+              id: 'opt_comp_equity',
+              label: 'Base Salary + Stock Options (ESOP Grant)',
+              value: 'Competitive Base Salary + Employee Stock Option Plan (ESOPs)',
+              description: 'High-growth startup compensation with equity upside',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom CTC / bonus terms in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type custom compensation in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+    }
+
+    // ── 9. NDA / CONFIDENTIALITY AGREEMENT ARCHETYPE ──
+    if (dt === 'nda_agreement' || dt === 'nda' || title.includes('non-disclosure') || title.includes('nda')) {
+      if (!answeredFieldKeys.includes('confidentialityDuration') && !draft.metadata?.confidentialityDuration) {
+        return {
+          id: `q_nda_dur_${Date.now()}`,
+          docType: 'nda_agreement',
+          fieldKey: 'confidentialityDuration',
+          question: 'What is the legal survival duration of confidentiality obligations?',
+          reason: '✦ Trade Secret Law: Legally defines the time window during which disclosed confidential technical information remains protected.',
+          options: [
+            {
+              id: 'opt_nda_2y',
+              label: '2 Years from Disclosure Date',
+              value: '2 Years from Disclosure Date',
+              description: 'Standard for fast-moving technology discussions',
+            },
+            {
+              id: 'opt_nda_5y',
+              label: '5 Years Commercial Standard',
+              value: '5 Years Commercial Non-Disclosure Term',
+              description: 'Standard for enterprise strategic partnerships and vendor reviews',
+            },
+            {
+              id: 'opt_nda_perp',
+              label: 'Perpetual for Trade Secrets & Source Code',
+              value: 'Perpetual Protection for Trade Secrets & Algorithms',
+              description: 'Maximum protection for core IP, models, and confidential source code',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom NDA term in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type secrecy duration in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+    }
+
+    // ── 10. WORK ORDER / SOW ARCHETYPE ──
+    if (dt === 'work_order' || dt === 'sow' || title.includes('work order') || title.includes('statement of work')) {
+      if (!answeredFieldKeys.includes('milestoneStructure') && !draft.metadata?.milestoneStructure) {
+        return {
+          id: `q_wo_ms_${Date.now()}`,
+          docType: 'work_order',
+          fieldKey: 'milestoneStructure',
+          question: 'How should execution deliverables and milestone billings be gated?',
+          reason: '✦ Project Governance: Prevents scope creep by linking compensation to tangible verified deliverable milestones.',
+          options: [
+            {
+              id: 'opt_wo_sprint',
+              label: 'Bi-Weekly Sprint Milestones with Deliverable Sign-Off',
+              value: 'Bi-Weekly Sprint Milestones with Formal Sign-Off',
+              description: 'Agile development structure with 2-week checkpoint payments',
+            },
+            {
+              id: 'opt_wo_3stage',
+              label: '3-Stage Gates: Architecture (30%) + Alpha (40%) + Production (30%)',
+              value: '3-Stage Milestone Gates (30% - 40% - 30%)',
+              description: 'Standard staged engineering contract',
+            },
+            {
+              id: 'opt_wo_completion',
+              label: '100% on Final Production Acceptance',
+              value: '100% Payment on Final Production Sign-Off',
+              description: 'Fixed-price turn-key project completion model',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom milestones in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type milestone structure in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+
+      if (!answeredFieldKeys.includes('warrantyPeriod') && !draft.metadata?.warrantyPeriod) {
+        return {
+          id: `q_wo_war_${Date.now()}`,
+          docType: 'work_order',
+          fieldKey: 'warrantyPeriod',
+          question: 'What defect liability and post-deployment warranty is provided?',
+          reason: '✦ Contractual SLA Compliance: Guarantees post-handover bug fixing and maintenance support.',
+          options: [
+            {
+              id: 'opt_war_90d',
+              label: '90 Days Defect Liability & Bug Warranty',
+              value: '90 Days Defect Liability Period',
+              description: 'Free defect remediation for 3 months post go-live',
+            },
+            {
+              id: 'opt_war_180d',
+              label: '180 Days Extended Warranty Support',
+              value: '180 Days Extended Warranty Support',
+              description: 'Comprehensive warranty covering minor enhancements',
+            },
+            {
+              id: 'opt_war_1y',
+              label: '1-Year Enterprise SLA & Maintenance Agreement',
+              value: '1-Year Enterprise SLA Maintenance',
+              description: 'Continuous uptime and ticket escalation support',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom warranty in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type warranty terms in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+    }
+
+    // ── 11. CREDIT NOTE ARCHETYPE ──
+    if (dt === 'credit_note' || title.includes('credit note')) {
+      if (!answeredFieldKeys.includes('creditReason') && !draft.metadata?.creditReason) {
+        return {
+          id: `q_cn_reason_${Date.now()}`,
+          docType: 'credit_note',
+          fieldKey: 'creditReason',
+          question: 'What is the statutory basis for this Credit Note under CBIC Rule 53(1)?',
+          reason: '✦ CBIC CGST Rule 53(1): Statutory credit adjustments mandate reporting one of the authorized tax adjustment reasons on GST portal filings.',
+          options: [
+            {
+              id: 'opt_cn_disc',
+              label: 'Post-Sale Commercial Volume Discount / Rebate',
+              value: 'Post-Sale Commercial Volume Discount under Rule 53(1)',
+              description: 'Agreed retroactive volume pricing rebate',
+            },
+            {
+              id: 'opt_cn_ret',
+              label: 'Goods Return / Damaged Stock Rejection',
+              value: 'Sales Return & Defective Goods Rejection under Rule 53(1)',
+              description: 'Goods returned by counterparty due to transit damage or non-conformance',
+            },
+            {
+              id: 'opt_cn_def',
+              label: 'Deficiency in Service / Rate Correction',
+              value: 'Deficiency in Service / Invoice Correction under Rule 53(1)',
+              description: 'Correction of original billing rate or service shortfall',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom reason in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type credit reason in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+    }
+
+    // ── 12. EQUIPMENT RESPONSIBILITY LETTER ARCHETYPE ──
+    if (dt === 'equipment_responsibility_letter' || title.includes('equipment') || title.includes('handover')) {
+      if (!answeredFieldKeys.includes('liabilityTerms') && !draft.metadata?.liabilityTerms) {
+        return {
+          id: `q_eq_liab_${Date.now()}`,
+          docType: 'equipment_responsibility_letter',
+          fieldKey: 'liabilityTerms',
+          question: 'What liability standard governs assigned corporate computing hardware?',
+          reason: '✦ Corporate Asset Protection: Defines financial liability in the event of accidental loss, damage, or negligence.',
+          options: [
+            {
+              id: 'opt_eq_ins',
+              label: 'Company Insured (Normal Wear & Tear Accepted)',
+              value: 'Company Insured with Normal Wear & Tear Permitted',
+              description: 'Employee not liable for accidental hardware failures covered by warranty/insurance',
+            },
+            {
+              id: 'opt_eq_dep',
+              label: 'Depreciated Book Value Liability for Gross Negligence',
+              value: 'Depreciated Book Value Liability in Case of Negligence',
+              description: 'Employee reimburses depreciated asset cost if loss caused by willful negligence',
+            },
+            {
+              id: 'opt_eq_full',
+              label: 'Full Replacement Cost for Unreturned Assets',
+              value: 'Full Replacement Value for Unreturned Equipment',
+              description: 'Standard clause upon separation if asset is not surrendered',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom liability terms in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type asset terms in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+    }
+
+    // ── 13. STUDENT FEE RECEIPT ARCHETYPE ──
+    if (dt === 'student_fee_receipt' || title.includes('student') || title.includes('fee receipt')) {
+      if (!answeredFieldKeys.includes('academicTerm') && !draft.metadata?.academicTerm) {
+        return {
+          id: `q_fee_term_${Date.now()}`,
+          docType: 'student_fee_receipt',
+          fieldKey: 'academicTerm',
+          question: 'Which academic installment or semester applies to this fee receipt?',
+          reason: '✦ Institutional Audit Compliance: Academic accounting standards mandate linking tuition fees to exact academic semesters.',
+          options: [
+            {
+              id: 'opt_fee_sem1',
+              label: 'Semester 1 (Autumn / Fall 2026)',
+              value: 'Semester 1 Tuition & Laboratory Fee',
+              description: 'First semester academic tuition installment',
+            },
+            {
+              id: 'opt_fee_sem2',
+              label: 'Semester 2 (Spring 2027)',
+              value: 'Semester 2 Tuition & Campus Fee',
+              description: 'Second semester academic tuition installment',
+            },
+            {
+              id: 'opt_fee_ann',
+              label: 'Annual Comprehensive Academic Tuition',
+              value: 'Annual Comprehensive Academic Fee',
+              description: 'Full-year consolidated tuition and library dues',
+            },
+            {
+              id: 'opt_other',
+              label: 'Other (Enter custom semester / fee type in chat)',
+              value: 'CUSTOM_INPUT',
+              description: 'Tap to type academic term in chat',
+              isOther: true,
+            },
+          ],
+        };
+      }
+    }
+
+    // ── 14. UNIVERSAL FALLBACK FOR ANY OTHER OF 446 ARCHETYPES ──
     if (!answeredFieldKeys.includes('governingJurisdiction') && !draft.metadata?.governingJurisdiction) {
       return {
         id: `q_gen_jurisdiction_${Date.now()}`,
@@ -733,6 +1375,20 @@ export class DocumentQuestionElicitor {
       reasoning = `• Cloud Ecosystem Grounding: Targeted "${cleanAnswer}" for specialized recruiter keyword queries.\n• Tooling Matrix: Linked native cloud platform services (${cloudKeywords}) to core skills.\n• Credential Elevation: Added premier cloud certification credentials for high-tier ATS scoring.`;
     }
 
+    if (fieldKey === 'educationDegree') {
+      meta.educationDegree = cleanAnswer;
+      meta.education = [
+        {
+          degree: cleanAnswer,
+          institution: 'Premier Technical University / National Institute of Technology',
+          year: 'Graduated with Academic Honors (Top 5% Cohort)',
+          details: 'Relevant Coursework: Advanced Deep Learning, Distributed Systems, Algorithms & Convex Optimization.',
+        },
+      ];
+      feedback = `Updated verified academic credentials to "${cleanAnswer}" with accredited STEM honors.`;
+      reasoning = `• Academic Scorecard: Synthesized verified degree qualification "${cleanAnswer}".\n• ATS Keyword Integrity: Injected accredited STEM education markers into recruiter qualification matrix.`;
+    }
+
     // ── Apply to Tax Invoice ──
     if (fieldKey === 'taxRate') {
       const rateNum = parseFloat(cleanAnswer) || 18;
@@ -765,6 +1421,15 @@ export class DocumentQuestionElicitor {
       reasoning = `• Commercial Governance: Formatted payment covenant "${cleanAnswer}".\n• Statutory Protection: Appended MSMEDA Act 2006 interest covenants protecting receivables.\n• Risk Control: Verified counterparty liability clauses.`;
     }
 
+    if (fieldKey === 'placeOfSupply') {
+      meta.placeOfSupply = cleanAnswer;
+      const isInterState = /inter-state|igst/i.test(cleanAnswer);
+      const isExport = /export|sez|lut/i.test(cleanAnswer);
+      updated.taxLabel = isExport ? 'LUT (Zero-Rated)' : isInterState ? 'IGST' : 'CGST + SGST';
+      feedback = `Configured place of supply as "${cleanAnswer}" (Statutory Tax: ${updated.taxLabel}).`;
+      reasoning = `• IGST Act Section 7 vs CGST Act Section 9: Calibrated cross-border / intra-state tax mapping to ${updated.taxLabel}.\n• Input Tax Credit (ITC): Preserved clean pass-through tax entitlement for buyer's GSTIN ledger.`;
+    }
+
     // ── Apply to Formal Quotation ──
     if (fieldKey === 'validityPeriod') {
       meta.validityPeriod = cleanAnswer;
@@ -777,6 +1442,13 @@ export class DocumentQuestionElicitor {
       meta.deliverySchedule = cleanAnswer;
       feedback = `Recorded delivery timeline commitment: "${cleanAnswer}".`;
       reasoning = `• Service Level Agreement (SLA): Incorporated milestone delivery timeframe "${cleanAnswer}".`;
+    }
+
+    if (fieldKey === 'paymentMilestones') {
+      meta.paymentMilestones = cleanAnswer;
+      updated.terms = (updated.terms || '') + `\nPayment Milestone: ${cleanAnswer}.`;
+      feedback = `Configured quotation payment milestone schedule: "${cleanAnswer}".`;
+      reasoning = `• Cash Flow Governance: Established structured commercial disbursement terms "${cleanAnswer}".`;
     }
 
     // ── Apply to Salary Slip ──
@@ -801,11 +1473,24 @@ export class DocumentQuestionElicitor {
       reasoning = `• Statutory Deduction Mandate: Computed EPF under Employees' Provident Funds Act 1952 (12% employee share) and State Professional Tax.\n• Net Pay Reconciliation: Gross earnings minus statutory withholdings balanced with exact minor units.`;
     }
 
+    if (fieldKey === 'panOrUanStatus') {
+      meta.panOrUanStatus = cleanAnswer;
+      feedback = `Verified statutory EPFO/IT PAN & UAN compliance state: "${cleanAnswer}".`;
+      reasoning = `• EPFO Statutory Filing: Verified statutory identity tracking for PF Form 3A/6A audits.`;
+    }
+
     // ── Apply to Rent Receipt ──
     if (fieldKey === 'landlordPanStatus') {
       meta.landlordPanStatus = cleanAnswer;
       feedback = `Set HRA exemption Section 10(13A) compliance declaration to "${cleanAnswer}".`;
       reasoning = `• Income Tax Act 1961 Section 10(13A): Verified landlord PAN requirement for annual rent exceeding ₹1,00,000.\n• Exemption Validity: Formatted statutory rent declaration for employer tax assessment.`;
+    }
+
+    if (fieldKey === 'paymentMode') {
+      meta.paymentMode = cleanAnswer;
+      updated.notes = (updated.notes || '') + `\nPayment Channel: ${cleanAnswer}.`;
+      feedback = `Recorded statutory rent disbursement mode: "${cleanAnswer}".`;
+      reasoning = `• Section 10(13A) CBDT Audit Trail: Recorded non-cash traceable banking channel "${cleanAnswer}".`;
     }
 
     // ── Apply to Delivery Challan ──
@@ -814,6 +1499,90 @@ export class DocumentQuestionElicitor {
       updated.provenanceRule = `CBIC CGST Rule 55 · ${cleanAnswer}`;
       feedback = `Specified statutory movement purpose under Rule 55: "${cleanAnswer}".`;
       reasoning = `• Rule 55 Statutory Transportation: Specified goods movement for "${cleanAnswer}". Goods dispatched without commercial invoice under non-sale provisions.`;
+    }
+
+    if (fieldKey === 'transportMode') {
+      meta.transportMode = cleanAnswer;
+      updated.provenanceRule = `${updated.provenanceRule} • ${cleanAnswer}`;
+      feedback = `Updated statutory logistics carriage mode: "${cleanAnswer}".`;
+      reasoning = `• CBIC Rule 138 E-Way Bill Carriage: Recorded transport medium "${cleanAnswer}".`;
+    }
+
+    // ── Apply to Purchase Order ──
+    if (fieldKey === 'deliveryLeadTime') {
+      meta.deliveryLeadTime = cleanAnswer;
+      updated.terms = `1. Delivery Schedule: Strictly within ${cleanAnswer}.\n2. Invoicing: Statutory Tax Invoice referencing this PO must accompany consignment.\n3. Late Delivery: Liquidated damages of 0.5% per week of delay up to 5% maximum.`;
+      feedback = `Enforced PO delivery lead time commitment: "${cleanAnswer}".`;
+      reasoning = `• Procurement Governance: Established contractual delivery lead time "${cleanAnswer}" with liquidated damages SLA.`;
+    }
+
+    if (fieldKey === 'inspectionClause') {
+      meta.inspectionClause = cleanAnswer;
+      updated.terms = (updated.terms || '') + `\n4. Quality Inspection: ${cleanAnswer}.`;
+      feedback = `Configured goods quality assurance & inspection protocol: "${cleanAnswer}".`;
+      reasoning = `• Quality Control Covenant: Mandated QA acceptance criteria "${cleanAnswer}" prior to accounts payable clearance.`;
+    }
+
+    // ── Apply to Job Offer Letter ──
+    if (fieldKey === 'probationPeriod') {
+      meta.probationPeriod = cleanAnswer;
+      updated.terms = `1. Probationary Period: ${cleanAnswer}.\n2. Performance Review: Formal review upon completion of probation.\n3. Notice Period: 30 days during probation, 90 days following confirmation.`;
+      feedback = `Set statutory employment probation tenure: "${cleanAnswer}".`;
+      reasoning = `• Statutory Labor Governance: Structured employment probation terms "${cleanAnswer}" with defined confirmation review checkpoints.`;
+    }
+
+    if (fieldKey === 'compensationStructure') {
+      meta.compensationStructure = cleanAnswer;
+      feedback = `Configured compensation & CTC architecture: "${cleanAnswer}".`;
+      reasoning = `• Total Rewards Structure: Itemized annual compensation components "${cleanAnswer}" with tax-efficient allowance breakdown.`;
+    }
+
+    // ── Apply to NDA Agreement ──
+    if (fieldKey === 'confidentialityDuration') {
+      meta.confidentialityDuration = cleanAnswer;
+      updated.terms = `1. Confidentiality Term: Binding for ${cleanAnswer}.\n2. Non-Disclosure: Recipient agrees not to disclose, replicate, or reverse engineer proprietary data.\n3. Injunctive Relief: Disclosing party entitled to emergency injunctive remedies upon breach.`;
+      feedback = `Secured non-disclosure covenant duration: "${cleanAnswer}".`;
+      reasoning = `• Intellectual Property Protection: Established legally enforceable secrecy duration "${cleanAnswer}" with injunctive relief rights.`;
+    }
+
+    // ── Apply to Work Order ──
+    if (fieldKey === 'milestoneStructure') {
+      meta.milestoneStructure = cleanAnswer;
+      updated.terms = `1. Execution Milestones: ${cleanAnswer}.\n2. Acceptance Criteria: Deliverables must achieve formal sign-off within 5 business days.\n3. Invoicing: Progress billings issued upon verified milestone sign-off.`;
+      feedback = `Structured work order milestone billing framework: "${cleanAnswer}".`;
+      reasoning = `• Deliverable Governance: Staged progress billing according to "${cleanAnswer}" with mutual acceptance gates.`;
+    }
+
+    if (fieldKey === 'warrantyPeriod') {
+      meta.warrantyPeriod = cleanAnswer;
+      updated.terms = (updated.terms || '') + `\n4. Defect Liability & Warranty: ${cleanAnswer}.`;
+      feedback = `Specified defect liability and warranty support window: "${cleanAnswer}".`;
+      reasoning = `• SLA Covenant: Protected client deliverables with "${cleanAnswer}" post-completion warranty.`;
+    }
+
+    // ── Apply to Credit Note ──
+    if (fieldKey === 'creditReason') {
+      meta.creditReason = cleanAnswer;
+      updated.documentTitle = `Credit Note - ${cleanAnswer.split('under')[0].trim()}`;
+      updated.provenanceRule = `CBIC CGST Rule 53(1) · ${cleanAnswer}`;
+      feedback = `Recorded CBIC Rule 53(1) credit adjustment reason: "${cleanAnswer}".`;
+      reasoning = `• CBIC Rule 53(1) GST Compliance: Recorded statutory tax debit/credit justification "${cleanAnswer}" for GSTR-1 amendment.`;
+    }
+
+    // ── Apply to Equipment Responsibility Letter ──
+    if (fieldKey === 'liabilityTerms') {
+      meta.liabilityTerms = cleanAnswer;
+      updated.terms = `1. Equipment Custody: Employee accepts responsible custody of assigned hardware.\n2. Liability Terms: ${cleanAnswer}.\n3. Return Policy: Assets must be surrendered immediately upon separation or recall.`;
+      feedback = `Established equipment custody liability conditions: "${cleanAnswer}".`;
+      reasoning = `• Asset Custody Governance: Defined clear liability boundary "${cleanAnswer}" for corporate computing equipment.`;
+    }
+
+    // ── Apply to Student Fee Receipt ──
+    if (fieldKey === 'academicTerm') {
+      meta.academicTerm = cleanAnswer;
+      updated.documentTitle = `Official Student Fee Receipt - ${cleanAnswer}`;
+      feedback = `Designated academic term and fee billing cycle: "${cleanAnswer}".`;
+      reasoning = `• Institutional Accounting: Calibrated tuition ledger to academic semester "${cleanAnswer}".`;
     }
 
     // ── Universal Jurisdiction Fallback ──

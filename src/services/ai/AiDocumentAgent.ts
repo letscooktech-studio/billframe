@@ -559,6 +559,9 @@ export class AiDocumentAgent {
       if (/aws|gcp|azure|cloud|vertex|sagemaker/i.test(candidateText)) {
         return { fieldKey: 'cloudPlatform', answerValue: candidateText };
       }
+      if (/master|bachelor|b\.tech|b\.e\.|ph\.d\.|degree|university/i.test(candidateText)) {
+        return { fieldKey: 'educationDegree', answerValue: candidateText };
+      }
     }
 
     if (dt === 'invoice' || dt === 'tax_invoice') {
@@ -567,6 +570,9 @@ export class AiDocumentAgent {
       }
       if (/\b(?:net\s*\d+|due on receipt|advance)\b/i.test(candidateText)) {
         return { fieldKey: 'paymentTerms', answerValue: candidateText };
+      }
+      if (/intra.?state|inter.?state|igst|cgst|sez|lut/i.test(candidateText)) {
+        return { fieldKey: 'placeOfSupply', answerValue: candidateText };
       }
     }
 
@@ -577,11 +583,89 @@ export class AiDocumentAgent {
       if (/\b(?:immediate|2 to 4 weeks|phased)\b/i.test(candidateText)) {
         return { fieldKey: 'deliverySchedule', answerValue: candidateText };
       }
+      if (/50% advance|milestone|staged|net 30 days/i.test(candidateText)) {
+        return { fieldKey: 'paymentMilestones', answerValue: candidateText };
+      }
     }
 
     if (dt === 'salary_slip') {
       if (/(?:january|february|march|april|may|june|july|august|september|october|november|december)\s*\d{4}/i.test(candidateText)) {
         return { fieldKey: 'payPeriod', answerValue: candidateText };
+      }
+      if (/epf|provident fund|professional tax|retainer/i.test(candidateText)) {
+        return { fieldKey: 'deductionsScheme', answerValue: candidateText };
+      }
+      if (/uan|pan/i.test(candidateText)) {
+        return { fieldKey: 'panOrUanStatus', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'rent_receipt') {
+      if (/landlord pan|threshold|lakh|8,333/i.test(candidateText)) {
+        return { fieldKey: 'landlordPanStatus', answerValue: candidateText };
+      }
+      if (/imps|neft|cheque|upi|bank/i.test(candidateText)) {
+        return { fieldKey: 'paymentMode', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'delivery_challan') {
+      if (/approval|return|job work|exhibition|demo/i.test(candidateText)) {
+        return { fieldKey: 'dispatchPurpose', answerValue: candidateText };
+      }
+      if (/road|courier|airway|handover|vehicle/i.test(candidateText)) {
+        return { fieldKey: 'transportMode', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'purchase_order') {
+      if (/lead time|14 days|30 days|72 hours/i.test(candidateText)) {
+        return { fieldKey: 'deliveryLeadTime', answerValue: candidateText };
+      }
+      if (/inspection|dock|receiving|certificate/i.test(candidateText)) {
+        return { fieldKey: 'inspectionClause', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'job_offer_letter') {
+      if (/probation|3 months|6 months/i.test(candidateText)) {
+        return { fieldKey: 'probationPeriod', answerValue: candidateText };
+      }
+      if (/ctc|bonus|esop|equity|all-cash/i.test(candidateText)) {
+        return { fieldKey: 'compensationStructure', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'nda_agreement' || dt === 'nda') {
+      if (/confidentiality|survival|2 years|5 years|perpetual/i.test(candidateText)) {
+        return { fieldKey: 'confidentialityDuration', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'work_order' || dt === 'sow') {
+      if (/sprint|3-stage|stage gate|100% on final/i.test(candidateText)) {
+        return { fieldKey: 'milestoneStructure', answerValue: candidateText };
+      }
+      if (/warranty|defect liability|sla|90 days|180 days/i.test(candidateText)) {
+        return { fieldKey: 'warrantyPeriod', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'credit_note') {
+      if (/discount|rebate|sales return|deficiency/i.test(candidateText)) {
+        return { fieldKey: 'creditReason', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'equipment_responsibility_letter') {
+      if (/insured|wear and tear|negligence|replacement value/i.test(candidateText)) {
+        return { fieldKey: 'liabilityTerms', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'student_fee_receipt') {
+      if (/semester|annual comprehensive|tuition/i.test(candidateText)) {
+        return { fieldKey: 'academicTerm', answerValue: candidateText };
       }
     }
 
@@ -659,7 +743,12 @@ export class AiDocumentAgent {
         const reasoning =
           applied.reasoningTrace ||
           `Applied verified user input for "${answeredField.fieldKey}": ${answeredField.answerValue}. Recalculated statutory values without placeholder data.`;
-        const reply = applied.feedbackMessage;
+        let reply = applied.feedbackMessage;
+        if (nextQuestion) {
+          reply += `\n\n✦ **Next Question to Finalize Your Document**:\n${nextQuestion.question}\n\n*${nextQuestion.reason}*\n\n*(Select an option in the chat box below or tap Other to type custom details)*`;
+        } else {
+          reply += `\n\n✦ All statutory compliance and quality parameters for **${updatedDraft.documentTitle}** have been reconciled with zero unverified placeholder approximations. Your document is fully compiled on canvas.`;
+        }
 
         onEvent({
           type: 'reasoning',
@@ -736,9 +825,10 @@ CORE AGENTIC INVARIANTS:
 2. Multi-Document Workflows:
    - When the user requests creating multiple documents (e.g. "create an invoice and a delivery challan", "quote and PO", "salary slips for Alice and Bob", "invoice, challan, and receipt"), INVOKE the "create_multiple_document_drafts" tool containing all requested document objects, OR invoke "create_or_update_document_draft" multiple times!
 
-3. Multi-Turn Context Grounding:
+3. Multi-Turn Context Grounding & Conversational Elicitation:
    - When the user prompt refers to prior conversation (e.g. "in document build resume", "draft it", "build this"), you MUST inspect previous messages in the conversation history to extract candidate name, job title, counterparty, line items, and requirements!
    - MANDATORY: Whenever the user asks to build, draft, create, write, or generate ANY document, you MUST invoke the "create_or_update_document_draft" tool! DO NOT just output markdown text in chat without creating the document draft!
+   - Active Data Elicitation: In your replyExplanation, state clearly that the official document has been drafted on canvas for the person or business, and explicitly ask for the next required parameter (e.g. target technical domain for resume, statutory GST rate or terms for invoice, wage cycle for salary slip). Never assume or hallucinate unverified details when you can ask!
 
 4. When the user asks a question, requests financial/tax advice, or inquires about statutory rules (e.g. "What is GST rate on IT services?"), INVOKE the "answer_business_question" tool. DO NOT create a dummy bill when the user merely asked a question!
 
@@ -856,23 +946,28 @@ CORE AGENTIC INVARIANTS:
                 });
                 onEvent({ type: 'step', taskSteps: [...taskSteps] });
 
+                const nextQuestion = DocumentQuestionElicitor.getNextQuestion(allDrafts[0]);
+                const formattedReply = DocumentQuestionElicitor.formatDocumentCreationReply(
+                  allDrafts[0],
+                  nextQuestion,
+                  reply
+                );
+
                 onEvent({
                   type: 'content',
-                  contentChunk: reply,
-                  fullContent: reply,
-                  displayText: reply,
+                  contentChunk: formattedReply,
+                  fullContent: formattedReply,
+                  displayText: formattedReply,
                   isCompilingDraft: false,
                   taskSteps: [...taskSteps],
                 });
-
-                const nextQuestion = DocumentQuestionElicitor.getNextQuestion(allDrafts[0]);
 
                 onEvent({
                   type: 'done',
                   draft: allDrafts[0],
                   drafts: allDrafts,
                   question: nextQuestion || undefined,
-                  replyText: reply,
+                  replyText: formattedReply,
                   fullReasoning: reasoning,
                   taskSteps: [...taskSteps],
                 });
@@ -923,23 +1018,28 @@ CORE AGENTIC INVARIANTS:
                 status: 'completed',
               };
 
+              const nextQuestion = DocumentQuestionElicitor.getNextQuestion(verified);
+              const formattedReply = DocumentQuestionElicitor.formatDocumentCreationReply(
+                verified,
+                nextQuestion,
+                reply
+              );
+
               onEvent({
                 type: 'content',
-                contentChunk: reply,
-                fullContent: reply,
-                displayText: reply,
+                contentChunk: formattedReply,
+                fullContent: formattedReply,
+                displayText: formattedReply,
                 isCompilingDraft: false,
                 taskSteps: [...taskSteps],
               });
-
-              const nextQuestion = DocumentQuestionElicitor.getNextQuestion(verified);
 
               onEvent({
                 type: 'done',
                 draft: verified,
                 drafts: [verified],
                 question: nextQuestion || undefined,
-                replyText: reply,
+                replyText: formattedReply,
                 fullReasoning: reasoning,
                 taskSteps: [...taskSteps],
               });
@@ -1197,12 +1297,25 @@ CORE AGENTIC INVARIANTS:
                 status: 'completed',
               });
               const nextQuestion = DocumentQuestionElicitor.getNextQuestion(verified);
+              const formattedReply = DocumentQuestionElicitor.formatDocumentCreationReply(
+                verified,
+                nextQuestion,
+                `I have compiled the official ATS-optimized Curriculum Vitae for **${verified.partyName}** directly on your document canvas.`
+              );
+              onEvent({
+                type: 'content',
+                contentChunk: formattedReply,
+                fullContent: formattedReply,
+                displayText: formattedReply,
+                isCompilingDraft: false,
+                taskSteps: [...taskSteps],
+              });
               onEvent({
                 type: 'done',
                 draft: verified,
                 drafts: [verified],
                 question: nextQuestion || undefined,
-                replyText: content,
+                replyText: formattedReply,
                 fullReasoning: genResume.reasoning,
                 taskSteps: [...taskSteps],
               });
@@ -1684,10 +1797,16 @@ ${userPrompt}
         reasonings.push(gen.reasoning);
       }
 
+      const nextQuestion = DocumentQuestionElicitor.getNextQuestion(generatedDrafts[0] as ParsedDocumentDraft);
+      let reply = `I have generated **${generatedDrafts.length} statutory documents** for your workflow:\n${summaries
+        .map((s, idx) => `• **[${idx + 1}]** ${s}`)
+        .join('\n')}\n\nYou can review, switch between, and export each document below.`;
+      if (nextQuestion) {
+        reply += `\n\n✦ **Next Required Detail for ${generatedDrafts[0].documentTitle}**:\n${nextQuestion.question}\n\n*${nextQuestion.reason}*\n\n*(Select an option in the chat box below or tap Other to type custom details)*`;
+      }
+
       return {
-        reply: `I have generated **${generatedDrafts.length} statutory documents** for your workflow:\n${summaries
-          .map((s, idx) => `• **[${idx + 1}]** ${s}`)
-          .join('\n')}\n\nYou can review, switch between, and export each document below.`,
+        reply,
         reasoning: `1. Multi-Document Intent Detection: User requested ${generatedDrafts.length} documents (${multiReq.archetypes
           .map((a) => a.name)
           .join(', ')}).\n2. Generated discrete statutory drafts conforming to respective legal frameworks.\n3. Verified all arithmetic balances in integer minor units.`,
@@ -1700,9 +1819,15 @@ ${userPrompt}
     const matchedArchetypes = AiRagRegistry.retrieve(prompt);
     const primaryId = isRetailRequest ? 'grocery' : (matchedArchetypes[0]?.id || 'invoice');
     const gen = this.generateDeterministicDraftForArchetype(primaryId, prompt, undefined, context, history);
+    const nextQuestion = DocumentQuestionElicitor.getNextQuestion(gen.draft as ParsedDocumentDraft);
+    const reply = DocumentQuestionElicitor.formatDocumentCreationReply(
+      gen.draft as ParsedDocumentDraft,
+      nextQuestion,
+      `I have drafted your official **${gen.draft.documentTitle}** for **${gen.draft.partyName}** directly on your document canvas.`
+    );
 
     return {
-      reply: `I have drafted your official **${gen.draft.documentTitle}** for **${gen.draft.partyName}**.\n\nYou can preview the draft directly below, customize details in the editor, or export as PDF.`,
+      reply,
       reasoning: gen.reasoning,
       draft: gen.draft,
       drafts: [gen.draft],

@@ -187,4 +187,126 @@ describe('DocumentQuestionElicitor & Interactive Chat Guided Elicitation', () =>
     expect(qRent).not.toBeNull();
     expect(qRent?.options[qRent.options.length - 1].isOther).toBe(true);
   });
+
+  it('formats intelligent conversational document creation replies with embedded question and reason', () => {
+    const q = DocumentQuestionElicitor.getNextQuestion(baseResumeDraft);
+    const replyWithQuestion = DocumentQuestionElicitor.formatDocumentCreationReply(baseResumeDraft, q);
+    expect(replyWithQuestion).toContain('Farhan Noor');
+    expect(replyWithQuestion).toContain('Next Required Detail');
+    expect(replyWithQuestion).toContain(q?.question || '');
+    expect(replyWithQuestion).toContain('Select an option in the chat box below');
+
+    const replyDone = DocumentQuestionElicitor.formatDocumentCreationReply(baseResumeDraft, null);
+    expect(replyDone).toContain('All statutory compliance and quality parameters');
+    expect(replyDone).toContain('fully compiled on canvas');
+  });
+
+  it('handles purchase order delivery lead time and inspection questions', () => {
+    const poDraft: ParsedDocumentDraft = {
+      ...baseInvoiceDraft,
+      docType: 'purchase_order',
+      documentTitle: 'Formal Purchase Order',
+      partyName: 'Global Microchips Inc',
+    };
+
+    const qLead = DocumentQuestionElicitor.getNextQuestion(poDraft);
+    expect(qLead).not.toBeNull();
+    expect(qLead?.fieldKey).toBe('deliveryLeadTime');
+    expect(qLead?.options[qLead.options.length - 1].isOther).toBe(true);
+
+    const { updatedDraft, feedbackMessage } = DocumentQuestionElicitor.applyAnswerToDraft(
+      poDraft,
+      'deliveryLeadTime',
+      '14 Calendar Days from Order Date'
+    );
+    expect(updatedDraft.metadata?.deliveryLeadTime).toBe('14 Calendar Days from Order Date');
+    expect(updatedDraft.terms).toContain('14 Calendar Days');
+    expect(feedbackMessage).toContain('14 Calendar Days');
+
+    const qInsp = DocumentQuestionElicitor.getNextQuestion(updatedDraft, ['deliveryLeadTime']);
+    expect(qInsp).not.toBeNull();
+    expect(qInsp?.fieldKey).toBe('inspectionClause');
+    expect(qInsp?.options[qInsp.options.length - 1].isOther).toBe(true);
+  });
+
+  it('handles job offer letter probation and compensation structure', () => {
+    const offerDraft: ParsedDocumentDraft = {
+      ...baseInvoiceDraft,
+      docType: 'job_offer_letter',
+      documentTitle: 'Executive Employment Offer',
+      partyName: 'Dr. Sarah Connor',
+    };
+
+    const qProb = DocumentQuestionElicitor.getNextQuestion(offerDraft);
+    expect(qProb?.fieldKey).toBe('probationPeriod');
+
+    const { updatedDraft } = DocumentQuestionElicitor.applyAnswerToDraft(
+      offerDraft,
+      'probationPeriod',
+      '3 Months Probation with Performance Appraisal'
+    );
+    expect(updatedDraft.terms).toContain('3 Months Probation');
+
+    const qComp = DocumentQuestionElicitor.getNextQuestion(updatedDraft, ['probationPeriod']);
+    expect(qComp?.fieldKey).toBe('compensationStructure');
+  });
+
+  it('handles NDA agreement confidentiality duration', () => {
+    const ndaDraft: ParsedDocumentDraft = {
+      ...baseInvoiceDraft,
+      docType: 'nda_agreement',
+      documentTitle: 'Mutual Non-Disclosure Agreement',
+      partyName: 'Neural Research Labs',
+    };
+
+    const qNda = DocumentQuestionElicitor.getNextQuestion(ndaDraft);
+    expect(qNda?.fieldKey).toBe('confidentialityDuration');
+    const { updatedDraft } = DocumentQuestionElicitor.applyAnswerToDraft(
+      ndaDraft,
+      'confidentialityDuration',
+      'Perpetual Protection for Trade Secrets & Algorithms'
+    );
+    expect(updatedDraft.terms).toContain('Perpetual Protection');
+  });
+
+  it('handles Work Order milestones and warranty periods', () => {
+    const woDraft: ParsedDocumentDraft = {
+      ...baseInvoiceDraft,
+      docType: 'work_order',
+      documentTitle: 'Statement of Work & Work Order',
+      partyName: 'CloudScale Enterprises',
+    };
+
+    const qWo = DocumentQuestionElicitor.getNextQuestion(woDraft);
+    expect(qWo?.fieldKey).toBe('milestoneStructure');
+
+    const { updatedDraft } = DocumentQuestionElicitor.applyAnswerToDraft(
+      woDraft,
+      'milestoneStructure',
+      'Bi-Weekly Sprint Milestones with Formal Sign-Off'
+    );
+    expect(updatedDraft.terms).toContain('Bi-Weekly Sprint');
+
+    const qWar = DocumentQuestionElicitor.getNextQuestion(updatedDraft, ['milestoneStructure']);
+    expect(qWar?.fieldKey).toBe('warrantyPeriod');
+  });
+
+  it('handles Credit Note statutory reason under Rule 53(1)', () => {
+    const cnDraft: ParsedDocumentDraft = {
+      ...baseInvoiceDraft,
+      docType: 'credit_note',
+      documentTitle: 'Statutory Credit Note',
+      partyName: 'Apex Distributors',
+    };
+
+    const qCn = DocumentQuestionElicitor.getNextQuestion(cnDraft);
+    expect(qCn?.fieldKey).toBe('creditReason');
+
+    const { updatedDraft } = DocumentQuestionElicitor.applyAnswerToDraft(
+      cnDraft,
+      'creditReason',
+      'Post-Sale Commercial Volume Discount under Rule 53(1)'
+    );
+    expect(updatedDraft.provenanceRule).toContain('Rule 53(1)');
+  });
 });

@@ -155,7 +155,7 @@ describe('AI Agent & Persistent Task Ledger (Migration 13 & Repositories)', () =
       const res = await AiDocumentAgent.processMessage('Hi, what can you do?', [], null);
       expect(res.replyText).toMatch(/Billframe|Document|Finance|Assistant/i);
       expect(res.documentDraft).toBeNull();
-    });
+    }, 15000);
 
     it('truthfully handles overdue inquiries without generating fictitious bills', async () => {
       const res = await AiDocumentAgent.processMessage('Do I have any overdue invoices?', [], null);

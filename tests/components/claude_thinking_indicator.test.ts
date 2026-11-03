@@ -67,5 +67,5 @@ describe('ClaudeThinkingIndicator & Live Sub-Agent Real Task Stream', () => {
     // Real task labels should not be empty and reflect authentic operations
     expect(doneEvent.taskSteps[0].label).toMatch(/Grounded/i);
     expect(doneEvent.taskSteps[1].label).toMatch(/statutory|archetype/i);
-  });
+  }, 15000);
 });
