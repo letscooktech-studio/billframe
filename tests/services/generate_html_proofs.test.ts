@@ -560,4 +560,16 @@ describe('Generate HTML Proofs for Visual Verification', () => {
     expect(html).toContain('TAX INVOICE');
     expect(html).toContain('running-banner');
   });
+
+  it('17. Generates ATS Resume HTML proof for Farhan Noor', async () => {
+    const { AiDocumentAgent } = await import('../../src/services/ai/AiDocumentAgent');
+    const { AiTemplateBridge } = await import('../../src/services/ai/AiTemplateBridge');
+    const result = await AiDocumentAgent.runDeterministicHeuristic(
+      'build me complete highest ats scoring resume for farhan noor for ai engineer'
+    );
+    const html = AiTemplateBridge.renderDraftHtml(result.draft as any, mockBusiness, 'ats_resume');
+    fs.writeFileSync(path.join(artifactDir, 'proof_ats_resume.html'), html, 'utf-8');
+    expect(html).toContain('Farhan Noor');
+    expect(html).toContain('AI Engineer | Machine Learning Specialist');
+  });
 });

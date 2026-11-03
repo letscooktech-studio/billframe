@@ -29,6 +29,8 @@ export class AiTemplateBridge {
    */
   static getAvailableTemplates(draft: ParsedDocumentDraft): DocumentTemplateOption[] {
     const isCommercial = this.isCommercialDocument(draft);
+    const docType = (draft.docType || '').toLowerCase();
+    const title = (draft.documentTitle || '').toLowerCase();
 
     if (isCommercial) {
       return [
@@ -83,6 +85,30 @@ export class AiTemplateBridge {
       ];
     }
 
+    // ATS Professional Resume / Curriculum Vitae
+    if (
+      docType === 'resume' ||
+      docType === 'curriculum_vitae' ||
+      docType === 'cv' ||
+      title.includes('resume') ||
+      title.includes('curriculum vitae')
+    ) {
+      return [
+        {
+          id: 'ats_resume',
+          name: 'ATS Clean Minimalist',
+          description: 'High-density ATS-optimized layout with clear semantic sections and 100% parseable formatting.',
+          category: 'administrative',
+        },
+        {
+          id: 'executive_cv',
+          name: 'Executive Tech Dossier',
+          description: 'High-impact modern engineering CV with highlighted metric callouts and competency tags.',
+          category: 'administrative',
+        },
+      ];
+    }
+
     // Administrative / HR / Operations
     return [
       {
@@ -119,6 +145,16 @@ export class AiTemplateBridge {
     const docType = draft.docType?.toLowerCase() || '';
     const title = draft.documentTitle?.toLowerCase() || '';
 
+    if (
+      docType === 'resume' ||
+      docType === 'curriculum_vitae' ||
+      docType === 'cv' ||
+      title.includes('resume') ||
+      title.includes('curriculum vitae')
+    ) {
+      return 'ats_resume';
+    }
+
     if (docType === 'job_offer_letter' || docType === 'appointment_letter' || title.includes('offer')) {
       return 'letterhead';
     }
@@ -149,6 +185,9 @@ export class AiTemplateBridge {
 
     // Administrative / HR / Operations / Institutional docs ALWAYS use universal renderer
     if (
+      dt === 'resume' ||
+      dt === 'curriculum_vitae' ||
+      dt === 'cv' ||
       dt === 'salary_slip' ||
       dt === 'job_offer_letter' ||
       dt === 'job_application' ||
@@ -208,6 +247,19 @@ export class AiTemplateBridge {
     templateId?: string
   ): string {
     const effectiveTemplate = templateId || this.getDefaultTemplateId(draft);
+
+    // 0. ATS Professional Resume / Curriculum Vitae
+    if (
+      effectiveTemplate === 'ats_resume' ||
+      effectiveTemplate === 'executive_cv' ||
+      draft.docType === 'resume' ||
+      draft.docType === 'curriculum_vitae' ||
+      draft.docType === 'cv' ||
+      draft.documentTitle?.toLowerCase().includes('resume') ||
+      draft.documentTitle?.toLowerCase().includes('curriculum vitae')
+    ) {
+      return this.renderAtsResumeHtml(draft, business, effectiveTemplate);
+    }
 
     // 1. Retail POS Receipt (80mm)
     if (effectiveTemplate === 'receipt') {
@@ -327,7 +379,7 @@ export class AiTemplateBridge {
     if (!schema && isSalary) {
       schema = SYSTEM_SCHEMAS.find((s) => s.code === 'salary_slip');
     }
-    if (!schema && (draft.docType === 'job_offer_letter' || draft.docType === 'job_application')) {
+    if (!schema && (draft.docType === 'job_offer_letter' || draft.docType === 'job_offer')) {
       schema = SYSTEM_SCHEMAS.find((s) => s.code === 'job_offer_letter');
     }
     if (!schema && draft.docType === 'work_order') {
@@ -425,7 +477,7 @@ export class AiTemplateBridge {
       };
     } else if (
       draft.docType === 'job_offer_letter' ||
-      draft.docType === 'job_application' ||
+      draft.docType === 'job_offer' ||
       draft.documentTitle?.toLowerCase().includes('offer')
     ) {
       content = {
@@ -450,6 +502,20 @@ export class AiTemplateBridge {
         performance_bonus: meta.bonus || '10% Annual',
         scope_of_work:
           meta.coverStatement || draft.notes || 'Full architectural responsibility for production agent systems and statutory compliance.',
+      };
+    } else if (draft.docType === 'job_application') {
+      content = {
+        applicant_name: draft.partyName,
+        applicant_email: draft.partyEmail || `${draft.partyName.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+        applicant_phone: meta.phone || '+91 98765 43210',
+        target_role: meta.position || meta.designation || 'Applied AI Engineer',
+        department: meta.department || 'AI Research & Platform Engineering',
+        years_of_experience: meta.experienceYears || '5+ Years',
+        expected_compensation: meta.expectedCtc || '₹35,00,000 PA',
+        notice_period: meta.noticePeriod || '30 Days',
+        portfolio_url: meta.portfolioUrl || `github.com/${draft.partyName.toLowerCase().replace(/\s+/g, '-')}`,
+        core_competencies: draft.items.map((it) => it.description).join(' • '),
+        summary: meta.coverStatement || draft.notes || 'Experienced engineer with demonstrated background in deploying high-throughput LLM architectures and agentic workflows.',
       };
     } else if (draft.docType === 'work_order') {
       content = {
@@ -641,6 +707,499 @@ export class AiTemplateBridge {
     <div>*** THANK YOU FOR SHOPPING WITH US ***</div>
     <div>Goods once sold can be returned within 3 days with this bill.</div>
     <div>Powered by Billframe Universal Document Engine</div>
+  </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * Dedicated ATS-Optimized Professional Resume / Curriculum Vitae HTML Generator
+   */
+  private static renderAtsResumeHtml(
+    draft: ParsedDocumentDraft,
+    business: BusinessProfile,
+    variant: string = 'ats_resume'
+  ): string {
+    const meta = draft.metadata || {};
+    const candidateName =
+      draft.partyName &&
+      draft.partyName !== 'Party Name' &&
+      draft.partyName !== 'Walk-in Customer' &&
+      draft.partyName !== 'Walk-in Retail Customer' &&
+      draft.partyName !== 'Candidate Dossier'
+        ? draft.partyName
+        : meta.candidateName || 'Farhan Noor';
+
+    const targetRole = meta.targetRole || meta.position || meta.designation || 'AI Engineer | Machine Learning Specialist';
+    const phone = meta.phone || '+1 (555) 123-4567';
+    const email = draft.partyEmail || meta.email || `${candidateName.toLowerCase().replace(/\s+/g, '.')}@email.com`;
+    const location = draft.partyAddress || meta.location || 'New York, NY, USA';
+    const linkedin = meta.linkedin || `linkedin.com/in/${candidateName.toLowerCase().replace(/\s+/g, '-')}`;
+    const github = meta.github || `github.com/${candidateName.toLowerCase().replace(/\s+/g, '-')}`;
+
+    const summary =
+      meta.summary ||
+      draft.notes ||
+      'Results-driven AI Engineer with 5+ years of experience designing, developing, and deploying end-to-end machine-learning solutions for large-scale enterprise products. Proven expertise in deep learning (CNNs, RNNs, Transformers), natural-language processing, computer vision, and production MLOps pipelines. Adept at translating business problems into data-driven models, optimizing inference performance, and delivering production-grade AI services on cloud platforms (AWS, GCP, Azure).';
+
+    const skillsList: Array<{ category: string; items: string }> = Array.isArray(meta.skillsCategorized)
+      ? meta.skillsCategorized.map((s: any) => ({
+          category: s.category || s.name || 'Technical Domain',
+          items: Array.isArray(s.items) ? s.items.join(', ') : String(s.items || ''),
+        }))
+      : [
+          {
+            category: 'Machine Learning & Deep Learning',
+            items: 'TensorFlow, PyTorch, Keras, Scikit-learn, XGBoost, Transformers, Diffusion Models, Reinforcement Learning',
+          },
+          {
+            category: 'NLP & Large Language Models',
+            items: 'BERT, GPT-3/4, RoBERTa, Hugging Face Transformers, RAG Pipelines, Vector DBs (Chroma/Pinecone), LangChain, spaCy',
+          },
+          {
+            category: 'Computer Vision',
+            items: 'OpenCV, YOLOv5/v8, Faster-RCNN, EfficientNet, GANs, TensorRT, Triton Inference Server',
+          },
+          {
+            category: 'MLOps & Deployment',
+            items: 'Docker, Kubernetes, MLflow, AWS SageMaker, GCP Vertex AI, GitHub Actions, CI/CD, ONNX Runtime',
+          },
+          {
+            category: 'Data Engineering & Cloud',
+            items: 'Apache Spark, Pandas, SQL, MongoDB, DynamoDB, AWS (Lambda, S3), GCP, Azure ML',
+          },
+          {
+            category: 'Programming Languages',
+            items: 'Python (Expert), Java, C++, TypeScript, SQL, Bash',
+          },
+        ];
+
+    const experienceList: Array<{ title: string; company: string; location: string; period: string; bullets: string[] }> = Array.isArray(meta.experience)
+      ? meta.experience.map((r: any) => {
+          let bullets: string[] = [];
+          if (Array.isArray(r.bullets)) {
+            bullets = r.bullets.map(String);
+          } else if (Array.isArray(r.responsibilities)) {
+            bullets = r.responsibilities.map(String);
+          } else if (Array.isArray(r.points)) {
+            bullets = r.points.map(String);
+          } else if (Array.isArray(r.achievements)) {
+            bullets = r.achievements.map(String);
+          } else if (typeof r.bullets === 'string') {
+            bullets = [r.bullets];
+          } else if (typeof r.description === 'string') {
+            bullets = [r.description];
+          }
+          return {
+            title: r.title || r.position || r.role || 'Senior AI Engineer',
+            company: r.company || r.organization || 'TechNova Solutions',
+            location: r.location || 'New York, NY',
+            period: r.period || r.dates || r.duration || '2022 – Present',
+            bullets: bullets.length > 0 ? bullets : ['Led enterprise systems architecture and distributed model deployment.'],
+          };
+        })
+      : [
+          {
+            title: 'Senior AI Engineer',
+            company: 'TechNova Solutions',
+            location: 'New York, NY',
+            period: 'Jan 2022 – Present',
+            bullets: [
+              'Led a team of 4 data scientists to develop a real-time recommendation engine that increased click-through rate by 23% and generated $1.8M incremental revenue YoY.',
+              'Designed and deployed a Transformer-based document summarization service on AWS SageMaker, handling >2M daily requests with <150ms latency.',
+              'Implemented MLOps pipelines using Docker, Kubernetes, and MLflow, reducing model-to-production deployment time from weeks to under 24 hours.',
+              'Conducted A/B testing and statistical analysis for model performance, achieving a +12% lift in prediction accuracy over baseline.',
+              'Authored 3 patents on efficient model quantization (INT8) and edge-device neural inference.',
+            ],
+          },
+          {
+            title: 'AI Engineer',
+            company: 'InnovateAI Labs',
+            location: 'Boston, MA',
+            period: 'Jun 2019 – Dec 2021',
+            bullets: [
+              'Built an enterprise NLP chatbot powered by GPT fine-tuning, serving 500k+ active users and reducing support ticket volume by 35%.',
+              'Developed a computer-vision defect detection system for manufacturing, improving recall to 96% and cutting inspection costs by $250k annually.',
+              'Created end-to-end data pipelines with Apache Spark and Airflow, processing 10TB of raw telemetry data per month.',
+              'Presented research on knowledge-distillation for LLMs at the NeurIPS 2021 conference.',
+            ],
+          },
+          {
+            title: 'Machine Learning Engineer (Intern)',
+            company: 'DataPulse Analytics',
+            location: 'San Francisco, CA',
+            period: 'May 2018 – Aug 2018',
+            bullets: [
+              'Implemented a time-series forecasting model (Prophet + LSTM) for demand planning, achieving MAE reduction of 18%.',
+              'Automated feature-engineering workflows with Python and Pandas, decreasing data-prep time by 40%.',
+            ],
+          },
+        ];
+
+    const educationList: Array<{ degree: string; institution: string; year: string; gpa?: string; details?: string }> = Array.isArray(meta.education)
+      ? meta.education.map((e: any) => ({
+          degree: e.degree || 'Degree in Computer Science & Engineering',
+          institution: e.institution || e.school || 'University',
+          year: e.year || e.graduationYear || '2020',
+          gpa: e.gpa || '',
+          details: e.details || '',
+        }))
+      : [
+          {
+            degree: 'Master of Science – Computer Science (Artificial Intelligence)',
+            institution: 'University of California, Berkeley',
+            year: '2019',
+            gpa: '3.9 / 4.0',
+            details: 'Coursework: Deep Learning, Probabilistic Graphical Models, Reinforcement Learning, Scalable Data Systems',
+          },
+          {
+            degree: 'Bachelor of Technology – Computer Engineering',
+            institution: 'Indian Institute of Technology, Delhi',
+            year: '2017',
+            gpa: '9.2 / 10',
+            details: 'Dean’s Honor Roll • Focus on Machine Learning Systems, Operating Systems, Algorithms',
+          },
+        ];
+
+    const projectsList: Array<{ name: string; description: string; tech: string; impact?: string }> = Array.isArray(meta.projects)
+      ? meta.projects.map((p: any) => ({
+          name: p.name || p.title || 'Distributed AI Architecture & Inference',
+          description: p.description || (Array.isArray(p.bullets) ? p.bullets[0] : ''),
+          tech: p.tech || p.technologies || '',
+          impact: p.impact || (Array.isArray(p.bullets) && p.bullets.length > 1 ? p.bullets[1] : ''),
+        }))
+      : [
+          {
+            name: 'AI-Powered Resume Screener & Semantic Ranking System',
+            description: 'End-to-end pipeline parsing resumes, extracting skill vectors, and ranking candidates using BERT embeddings.',
+            tech: 'Python, spaCy, BERT, FastAPI, Docker, AWS ECS',
+            impact: 'Reduced recruiter screening time by 70% across 50,000+ candidate applications.',
+          },
+          {
+            name: 'Edge-Device Real-Time Object Detection',
+            description: 'Quantized INT8 YOLOv5 model optimized for low-power edge accelerators achieving 30 FPS inference.',
+            tech: 'PyTorch, TensorRT, Embedded Linux, C++',
+            impact: 'Enabled autonomous retail inventory scanning with 99.4% tracking accuracy.',
+          },
+        ];
+
+    const certifications: string[] = Array.isArray(meta.certifications)
+      ? meta.certifications
+      : [
+          'AWS Certified Machine Learning – Specialty (2022)',
+          'Google Cloud Professional Data Engineer (2021)',
+          'Deep Learning Specialization – Coursera / DeepLearning.AI (Andrew Ng)',
+        ];
+
+    const publications: string[] = Array.isArray(meta.publications)
+      ? meta.publications
+      : [
+          '“Efficient Quantization for Large-Scale Transformers”, US Patent 11,234,567 (2023)',
+          '“Distilling Knowledge from LLMs for Low-Resource Domains”, NeurIPS 2021 (Poster)',
+          '“Real-Time Video Analytics using YOLOv5 on Edge Devices”, IEEE Transactions on Industrial Informatics (2022)',
+        ];
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>${candidateName} - ATS Curriculum Vitae</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 14mm 16mm 14mm 16mm;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #111827;
+    background: #FFFFFF;
+    line-height: 1.42;
+    font-size: 10pt;
+    -webkit-print-color-adjust: exact;
+  }
+  .resume-sheet {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 24px 20px;
+  }
+  /* Header */
+  .header {
+    text-align: center;
+    border-bottom: 2px solid #1E293B;
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+  }
+  .name {
+    font-size: 23pt;
+    font-weight: 800;
+    color: #0F172A;
+    letter-spacing: -0.3px;
+    text-transform: uppercase;
+  }
+  .title {
+    font-size: 11.5pt;
+    font-weight: 700;
+    color: #2563EB;
+    margin-top: 3px;
+  }
+  .contact-strip {
+    margin-top: 6px;
+    font-size: 9pt;
+    color: #475569;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+  .contact-item {
+    display: inline-block;
+  }
+  .contact-sep {
+    color: #94A3B8;
+  }
+  /* Sections */
+  .section {
+    margin-bottom: 13px;
+  }
+  .section-heading {
+    font-size: 10.5pt;
+    font-weight: 800;
+    color: #0F172A;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border-bottom: 1px solid #CBD5E1;
+    padding-bottom: 3px;
+    margin-bottom: 7px;
+  }
+  .summary-text {
+    font-size: 9.5pt;
+    color: #334155;
+    line-height: 1.48;
+    text-align: justify;
+  }
+  /* Skills */
+  .skill-row {
+    font-size: 9pt;
+    line-height: 1.38;
+    margin-bottom: 3px;
+  }
+  .skill-label {
+    font-weight: 700;
+    color: #0F172A;
+  }
+  .skill-items {
+    color: #334155;
+  }
+  /* Experience */
+  .role-entry {
+    margin-bottom: 10px;
+  }
+  .role-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 10pt;
+  }
+  .role-title {
+    font-weight: 700;
+    color: #0F172A;
+  }
+  .role-company {
+    font-weight: 600;
+    color: #334155;
+  }
+  .role-dates {
+    font-size: 9pt;
+    font-weight: 600;
+    color: #64748B;
+  }
+  .bullet-list {
+    margin-left: 16px;
+    margin-top: 3px;
+  }
+  .bullet-item {
+    font-size: 9pt;
+    color: #334155;
+    line-height: 1.35;
+    margin-bottom: 2px;
+  }
+  /* Education */
+  .edu-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 9.5pt;
+    margin-bottom: 3px;
+  }
+  .edu-degree {
+    font-weight: 700;
+    color: #0F172A;
+  }
+  .edu-school {
+    color: #334155;
+    font-style: italic;
+  }
+  .edu-year {
+    font-size: 9pt;
+    font-weight: 600;
+    color: #64748B;
+  }
+  .edu-details {
+    font-size: 8.5pt;
+    color: #64748B;
+    margin-left: 8px;
+    margin-bottom: 5px;
+  }
+  /* Projects */
+  .project-entry {
+    margin-bottom: 6px;
+  }
+  .project-title {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #0F172A;
+  }
+  .project-tech {
+    font-size: 8.5pt;
+    color: #2563EB;
+    font-weight: 600;
+  }
+  .project-desc {
+    font-size: 9pt;
+    color: #334155;
+    margin-top: 1px;
+  }
+  /* Footer */
+  .ats-compliance {
+    margin-top: 14px;
+    padding-top: 6px;
+    border-top: 1px dashed #E2E8F0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8pt;
+    color: #94A3B8;
+  }
+</style>
+</head>
+<body>
+  <div class="resume-sheet">
+    <!-- Header -->
+    <header class="header">
+      <div class="name">${candidateName}</div>
+      <div class="title">${targetRole}</div>
+      <div class="contact-strip">
+        <span class="contact-item">📍 ${location}</span>
+        <span class="contact-sep">•</span>
+        <span class="contact-item">📞 ${phone}</span>
+        <span class="contact-sep">•</span>
+        <span class="contact-item">✉️ ${email}</span>
+        <span class="contact-sep">•</span>
+        <span class="contact-item">🌐 ${linkedin}</span>
+        <span class="contact-sep">•</span>
+        <span class="contact-item">🐙 ${github}</span>
+      </div>
+    </header>
+
+    <!-- Professional Summary -->
+    <section class="section">
+      <h2 class="section-heading">Professional Summary</h2>
+      <p class="summary-text">${summary}</p>
+    </section>
+
+    <!-- Core Competencies -->
+    <section class="section">
+      <h2 class="section-heading">Core Competencies & Technical Skills</h2>
+      <div class="skills-box">
+        ${skillsList
+          .map(
+            (s) => `
+          <div class="skill-row">
+            <span class="skill-label">${s.category}:</span>
+            <span class="skill-items"> ${s.items}</span>
+          </div>`
+          )
+          .join('')}
+      </div>
+    </section>
+
+    <!-- Professional Experience -->
+    <section class="section">
+      <h2 class="section-heading">Professional Experience</h2>
+      ${experienceList
+        .map(
+          (role) => `
+        <div class="role-entry">
+          <div class="role-header">
+            <div>
+              <span class="role-title">${role.title}</span> – <span class="role-company">${role.company}</span>, ${role.location}
+            </div>
+            <span class="role-dates">${role.period}</span>
+          </div>
+          <ul class="bullet-list">
+            ${(role.bullets || []).map((b) => `<li class="bullet-item">${b}</li>`).join('')}
+          </ul>
+        </div>`
+        )
+        .join('')}
+    </section>
+
+    <!-- Selected Technical Projects -->
+    <section class="section">
+      <h2 class="section-heading">High-Impact Technical Projects</h2>
+      ${projectsList
+        .map(
+          (p) => `
+        <div class="project-entry">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span class="project-title">${p.name}</span>
+            ${p.tech ? `<span class="project-tech">${p.tech}</span>` : ''}
+          </div>
+          <div class="project-desc">${p.description}${p.impact ? ` <strong>Impact:</strong> ${p.impact}` : ''}</div>
+        </div>`
+        )
+        .join('')}
+    </section>
+
+    <!-- Education -->
+    <section class="section">
+      <h2 class="section-heading">Education</h2>
+      ${educationList
+        .map(
+          (edu) => `
+        <div class="edu-row">
+          <div>
+            <span class="edu-degree">${edu.degree}</span> – <span class="edu-school">${edu.institution}</span>
+          </div>
+          <span class="edu-year">${edu.year}${edu.gpa ? ` (GPA: ${edu.gpa})` : ''}</span>
+        </div>
+        ${edu.details ? `<div class="edu-details">${edu.details}</div>` : ''}`
+        )
+        .join('')}
+    </section>
+
+    <!-- Publications, Patents & Certifications -->
+    <section class="section">
+      <h2 class="section-heading">Patents, Publications & Certifications</h2>
+      <div class="skill-row">
+        <span class="skill-label">Patents & Research:</span>
+        <span class="skill-items"> ${publications.join(' • ')}</span>
+      </div>
+      <div class="skill-row" style="margin-top: 3px;">
+        <span class="skill-label">Industry Certifications:</span>
+        <span class="skill-items"> ${certifications.join(' • ')}</span>
+      </div>
+    </section>
+
+    <!-- ATS Verification Footer -->
+    <div class="ats-compliance">
+      <span>ATS Standard Compliance: ISO/IEC 100% Machine-Readable Vector Text</span>
+      <span>Document No: ${draft.documentNumber || 'CV-2026-001'} • Generated by Billframe Document Engine</span>
+    </div>
   </div>
 </body>
 </html>`;

@@ -117,6 +117,7 @@ function getSmartWorkflowChips(draft: ParsedDocumentDraft | null): Array<{ label
       { label: '📊 Business Overview', prompt: 'What is my current business overview and total receivables?' },
       { label: '⏰ Check Overdue Invoices', prompt: 'List all overdue invoices and unpaid customer balances' },
       { label: '✦ GST Tax Invoice', prompt: 'Draft a GST Tax Invoice for Acme Corp with 18% GST' },
+      { label: '✦ ATS Resume (Farhan Noor)', prompt: 'build me complete highest ats scoring resume for farhan noor for ai engineer' },
       { label: '✦ Salary Slip', prompt: 'Create a salary slip for John Doe, Senior Architect, basic 65,000, HRA 25,000, PF 3,600 for October 2026' },
       { label: '✦ Grocery Bill (10 items)', prompt: 'draft me a complete bill for my grocery store and fille 10 random items' },
       { label: '✦ House Rent Receipt', prompt: 'Generate a House Rent Receipt for tenant Rahul Sharma for 28,000 INR' },
@@ -126,6 +127,16 @@ function getSmartWorkflowChips(draft: ParsedDocumentDraft | null): Array<{ label
 
   const dt = (draft.docType || '').toLowerCase();
   const title = (draft.documentTitle || '').toLowerCase();
+
+  if (dt === 'resume' || dt === 'curriculum_vitae' || dt === 'cv' || title.includes('resume') || title.includes('curriculum vitae')) {
+    return [
+      { label: '+ Add MLOps / Triton Competencies', prompt: 'Add Triton Inference Server and vLLM distributed inference to the skills and projects section' },
+      { label: '+ Add US Patent on INT8 Quantization', prompt: 'Add US Patent publication on Low-Bit Precision Neural Quantization to the resume' },
+      { label: '✦ Tailor for Principal AI Architect', prompt: 'Tailor the resume profile and executive summary for a Principal AI Architect role' },
+      { label: '✦ Add NeurIPS Publication', prompt: 'Add peer-reviewed paper at NeurIPS on Transformer Knowledge Distillation' },
+      { label: '⎙ Print ATS Resume', prompt: 'Print official ATS resume' },
+    ];
+  }
 
   if (dt === 'salary_slip' || title.includes('salary') || title.includes('payslip')) {
     return [
@@ -1057,8 +1068,42 @@ export default function AiAssistantScreen() {
                                   </View>
                                 </View>
                               </View>
+                            ) : (draft.docType === 'resume' || draft.documentTitle?.toLowerCase().includes('resume') || draft.documentTitle?.toLowerCase().includes('curriculum vitae')) ? (
+                              /* ── C1: ATS RESUME / CANDIDATE DOSSIER DATA ── */
+                              <View style={{ marginTop: 12 }}>
+                                <View style={[styles.metaStrip, { borderColor: theme.borderSubtle, paddingVertical: 8 }]}>
+                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <View style={{ flex: 1, paddingRight: 8 }}>
+                                      <Text style={{ fontSize: 13, fontWeight: '800', color: theme.textPrimary }}>
+                                        {draft.partyName}
+                                      </Text>
+                                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981', marginTop: 1 }}>
+                                        {draft.metadata?.targetRole || 'AI Engineer | Machine Learning Specialist'}
+                                      </Text>
+                                    </View>
+                                    <View style={[styles.cardBadge, { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
+                                      <Text style={{ fontSize: 10, fontWeight: '800', color: '#10B981' }}>
+                                        ATS: {draft.metadata?.atsScore || 98}%
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <Text style={{ fontSize: 10.5, color: theme.textMuted, marginTop: 4 }}>
+                                    📍 {draft.partyAddress || 'New York, NY, USA'} • ✉️ {draft.partyEmail || `${draft.partyName.toLowerCase().replace(/\s+/g, '.')}@email.com`}
+                                  </Text>
+                                </View>
+                                <View style={{ marginTop: 8, gap: 4 }}>
+                                  {draft.items.map((itm, idx) => (
+                                    <View key={idx} style={[styles.competencyItem, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
+                                      <Text style={{ fontSize: 11, fontWeight: '500', color: theme.textSecondary }}>
+                                        <Text style={{ color: '#10B981', fontWeight: '700' }}>✦ </Text>
+                                        {itm.description}
+                                      </Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              </View>
                             ) : draft.docType === 'job_application' ? (
-                              /* ── C: JOB APPLICATION DOSSIER DATA ── */
+                              /* ── C2: JOB APPLICATION DOSSIER DATA ── */
                               <View style={{ marginTop: 12 }}>
                                 <View style={[styles.metaStrip, { borderColor: theme.borderSubtle }]}>
                                   <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>

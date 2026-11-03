@@ -243,6 +243,74 @@ export const RAG_DOCUMENT_ARCHETYPES: DocumentArchetypeInfo[] = [
 
   // ── 5. HR, CAREERS & TALENT ──
   {
+    id: 'resume',
+    name: 'ATS Professional Curriculum Vitae (Resume)',
+    family: 'hr',
+    familyLabel: 'HR & Talent Acquisition',
+    statutoryRule: 'Standard ISO/IEC ATS-Compliant Candidate Dossier & Resume Structure',
+    partyRoleLabel: 'Candidate',
+    samplePartyName: 'Farhan Noor',
+    keywords: [
+      'resume',
+      'cv',
+      'curriculum vitae',
+      'ats resume',
+      'biodata',
+      'candidate profile',
+      'professional resume',
+      'engineer resume',
+      'ats scoring resume',
+      'technical resume',
+      'work experience resume',
+      'developer resume',
+    ],
+    intentPhrases: [
+      'build resume',
+      'build me resume',
+      'create resume',
+      'generate resume',
+      'draft resume',
+      'make resume',
+      'ats resume for',
+      'resume for',
+      'cv for',
+      'in document build resume',
+      'curriculum vitae for',
+      'highest ats scoring resume',
+    ],
+    requiredFields: [
+      'candidateName',
+      'targetRole',
+      'email',
+      'phone',
+      'location',
+      'summary',
+      'coreSkills',
+      'experience',
+      'education',
+      'projects',
+      'certifications',
+    ],
+    sampleStructure: {
+      candidateName: 'Farhan Noor',
+      targetRole: 'AI Engineer | Machine Learning Specialist',
+      email: 'farhan.noor@email.com',
+      phone: '+1 (555) 123-4567',
+      location: 'New York, NY, USA',
+      summary: 'Results-driven AI Engineer with 5+ years of experience designing, developing, and deploying end-to-end machine learning and LLM solutions.',
+      skills: ['TensorFlow', 'PyTorch', 'Transformers', 'RAG Pipelines', 'MLflow', 'Docker', 'Kubernetes', 'AWS SageMaker', 'Python', 'TypeScript'],
+      experience: [
+        {
+          title: 'Senior AI Engineer',
+          company: 'TechNova Solutions',
+          period: 'Jan 2022 – Present',
+          highlights: ['Architected enterprise RAG and multi-agent pipelines with <150ms latency.', 'Led team of 4 data scientists delivering $1.8M incremental YoY revenue.'],
+        },
+      ],
+      education: 'M.S. Computer Science (AI), UC Berkeley',
+    },
+  },
+  {
     id: 'job_application',
     name: 'Employment Application / Candidate Dossier',
     family: 'hr',
@@ -250,7 +318,7 @@ export const RAG_DOCUMENT_ARCHETYPES: DocumentArchetypeInfo[] = [
     statutoryRule: 'Equal Opportunity / Labor Employment Dossier',
     partyRoleLabel: 'Applicant',
     samplePartyName: 'Candidate',
-    keywords: ['job application', 'apply', 'applicant', 'candidate', 'resume', 'cv', 'job opening', 'career application', 'position apply', 'engineer application'],
+    keywords: ['job application', 'apply', 'applicant', 'candidate', 'job opening', 'career application', 'position apply', 'engineer application'],
     intentPhrases: ['draft me a complete job application', 'job application for', 'apply for role', 'candidate application'],
     requiredFields: ['applicantName', 'position', 'department', 'experienceYears', 'expectedCompensation', 'skills', 'education', 'portfolioUrl', 'availabilityNotice'],
     sampleStructure: {
@@ -579,6 +647,20 @@ export class AiRagRegistry {
         if (arch.id === 'goods_received_note') score += 60;
       }
 
+      // If user asks for Resume / Curriculum Vitae
+      if (
+        text.includes('resume') ||
+        /\bcv\b/i.test(text) ||
+        text.includes('curriculum vitae') ||
+        text.includes('biodata') ||
+        text.includes('candidate profile')
+      ) {
+        if (arch.id === 'invoice') score -= 100;
+        if (arch.id === 'job_offer' || arch.id === 'job_offer_letter') score -= 90;
+        if (arch.id === 'job_application') score -= 80;
+        if (arch.id === 'resume') score += 120;
+      }
+
       // If user asks for Packing List
       if (text.includes('packing list') || text.includes('packing slip') || text.includes('manifest')) {
         if (arch.id === 'invoice') score -= 90;
@@ -644,6 +726,9 @@ export class AiRagRegistry {
       { key: 'receipt', matches: ['payment receipt', 'money receipt', 'cash receipt', 'receipt'] },
       { key: 'purchase_order', matches: ['purchase order', 'po'] },
       { key: 'credit_note', matches: ['credit note', 'credit memo'] },
+      { key: 'resume', matches: ['resume', 'cv', 'curriculum vitae', 'biodata'] },
+      { key: 'job_application', matches: ['job application', 'candidate application'] },
+      { key: 'job_offer', matches: ['job offer', 'offer letter', 'appointment letter'] },
       { key: 'salary_slip', matches: ['salary slip', 'payslip', 'salary'] },
       { key: 'rent_receipt', matches: ['rent receipt', 'rent'] },
       { key: 'work_order', matches: ['work order', 'job card'] },
