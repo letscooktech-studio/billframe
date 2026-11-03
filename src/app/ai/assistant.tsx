@@ -74,6 +74,7 @@ import { IntelligentMessageRenderer } from '../../components/ai/IntelligentMessa
 import { FluidStreamingText } from '../../components/ai/FluidStreamingText';
 import { AnimatedArtifactTile } from '../../components/ai/AnimatedArtifactTile';
 import { ChatQuestionOption } from '../../services/ai/DocumentQuestionElicitor';
+import { ChatboxAnimatedMcq } from '../../components/ai/ChatboxAnimatedMcq';
 
 /**
  * Transforms raw neural reasoning thoughts into clean, high-elegance cognitive steps.
@@ -1081,64 +1082,14 @@ export default function AiAssistantScreen() {
 
         {/* Floating Input Bar & In-Chatbox Question Elicitor */}
         <View style={[styles.inputBarContainer, { backgroundColor: theme.surface, borderTopColor: theme.borderSubtle }]}>
-          {/* Active Interactive Question Elicited Directly Inside Chatbox */}
+          {/* Animated Guided MCQ Question Card Rises Up Animately in Chatbox */}
           {activeQuestion && (
-            <View style={[styles.chatboxQuestionCard, { backgroundColor: 'rgba(204, 120, 92, 0.06)', borderColor: 'rgba(204, 120, 92, 0.2)' }]}>
-              <View style={styles.chatboxQuestionHeaderRow}>
-                <View style={styles.chatboxQuestionTitleBox}>
-                  <Sparkles size={13} color="#CC785C" />
-                  <Text style={[styles.chatboxQuestionPromptText, { color: theme.textPrimary }]} numberOfLines={1}>
-                    {activeQuestion.question}
-                  </Text>
-                </View>
-                {activeQuestion.reason && (
-                  <View style={styles.chatboxReasonPill}>
-                    <Text style={styles.chatboxReasonText} numberOfLines={1}>
-                      {activeQuestion.reason.split(':')[0]}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Horizontal Choice Chips directly inside the chatbox */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chatboxOptionsScroll}
-              >
-                {activeQuestion.options.map((opt, oIdx) => {
-                  const letterBadge = opt.isOther ? '✎' : String.fromCharCode(65 + oIdx);
-                  return (
-                    <Pressable
-                      key={opt.id}
-                      style={({ pressed }) => [
-                        styles.chatboxOptionChip,
-                        opt.isOther ? styles.chatboxOptionChipOther : { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderDefault },
-                        pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
-                      ]}
-                      onPress={() => {
-                        if (opt.isOther) {
-                          handleSelectQuestionOther();
-                        } else {
-                          handleSelectQuestionOption(opt);
-                        }
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={opt.label}
-                    >
-                      <View style={[styles.chatboxLetterBadge, opt.isOther ? styles.chatboxLetterBadgeOther : { backgroundColor: 'rgba(255, 255, 255, 0.08)' }]}>
-                        <Text style={[styles.chatboxLetterText, opt.isOther ? { color: '#CC785C' } : { color: theme.textPrimary }]}>
-                          {letterBadge}
-                        </Text>
-                      </View>
-                      <Text style={[styles.chatboxOptionLabel, { color: theme.textPrimary }]}>
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
+            <ChatboxAnimatedMcq
+              question={activeQuestion}
+              theme={theme}
+              onSelectOption={handleSelectQuestionOption}
+              onSelectOther={handleSelectQuestionOther}
+            />
           )}
 
           <View
