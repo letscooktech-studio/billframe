@@ -23,6 +23,11 @@ import { BusinessProfileRepository } from '../../data/repositories/BusinessProfi
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DocumentType } from '../../domain/documents/types';
 import { createMoney, formatMoney } from '../../domain/money/Money';
+import {
+  ChatInteractiveQuestion,
+  ChatQuestionOption,
+  DocumentQuestionElicitor,
+} from './DocumentQuestionElicitor';
 
 export interface AgentTaskStep {
   id: string;
@@ -44,6 +49,7 @@ export interface AgentChatMessage {
   isCompilingDraft?: boolean;
   thoughtDurationSeconds?: number;
   taskSteps?: AgentTaskStep[];
+  interactiveQuestion?: ChatInteractiveQuestion;
 }
 
 export interface AgentStreamEvent {
@@ -59,6 +65,7 @@ export interface AgentStreamEvent {
   replyText?: string;
   error?: string;
   taskSteps?: AgentTaskStep[];
+  question?: ChatInteractiveQuestion;
 }
 
 export type AgentStreamCallback = (event: AgentStreamEvent) => void;
@@ -394,6 +401,38 @@ export const AGENT_DOCUMENT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'ask_document_question',
+      description: 'Ask the user an interactive multiple-choice question (MCQ) in chat to elicit critical data needed to achieve the highest possible score or statutory compliance for a document, instead of inserting dummy sample data. Each question MUST provide options with labels and descriptions, and MUST ALWAYS include an "Other (Enter custom in chat)" option as the final choice.',
+      parameters: {
+        type: 'object',
+        properties: {
+          docType: { type: 'string', description: 'Document archetype (resume, invoice, quotation, salary_slip, rent_receipt, etc.)' },
+          fieldKey: { type: 'string', description: 'Key of the field being clarified (e.g. targetDomain, experienceYears, taxRate, paymentTerms, payPeriod)' },
+          question: { type: 'string', description: 'Clear question to present to the user' },
+          reason: { type: 'string', description: 'Statutory or ATS compliance justification explaining why this field is necessary' },
+          options: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                label: { type: 'string' },
+                value: { type: 'string' },
+                description: { type: 'string' },
+                isOther: { type: 'boolean' },
+              },
+              required: ['label', 'value'],
+            },
+          },
+          replyExplanation: { type: 'string', description: 'Conversational 1-2 sentence response accompanying the question' },
+          reasoning: { type: 'string', description: 'Step-by-step thinking trace explaining why this question is being asked' },
+        },
+        required: ['docType', 'fieldKey', 'question', 'reason', 'options', 'replyExplanation', 'reasoning'],
+      },
+    },
+  },
 ];
 
 export class AiDocumentAgent {
@@ -467,6 +506,89 @@ export class AiDocumentAgent {
   }
 
   /**
+   * Identifies whether the user prompt is confirming or typing an answer to an interactive question.
+   */
+  static detectAnsweredField(
+    userPrompt: string,
+    activeDraft: ParsedDocumentDraft,
+    history: AgentChatMessage[]
+  ): { fieldKey: string; answerValue: string } | null {
+    const cleanPrompt = userPrompt.trim();
+
+    // 1. Check if user tapped an option formatted as "Selected: ..."
+    const selectedMatch = cleanPrompt.match(/^selected:\s*(.+)$/i);
+    const candidateText = selectedMatch ? selectedMatch[1].trim() : cleanPrompt;
+
+    // 2. Check if user typed "Custom <fieldKey>: <value>"
+    const customMatch = candidateText.match(/^custom\s*([a-zA-Z0-9_]+)\s*:\s*(.+)$/i);
+    if (customMatch) {
+      return { fieldKey: customMatch[1].trim(), answerValue: customMatch[2].trim() };
+    }
+
+    // 3. Find the most recent unanswered interactive question from history
+    const lastMsgWithQuestion = [...history]
+      .reverse()
+      .find((m) => m.interactiveQuestion && !m.interactiveQuestion.isAnswered);
+
+    if (lastMsgWithQuestion?.interactiveQuestion) {
+      const q = lastMsgWithQuestion.interactiveQuestion;
+      q.isAnswered = true;
+      q.selectedValue = candidateText;
+
+      const matchedOpt = q.options.find(
+        (o) =>
+          o.value.toLowerCase() === candidateText.toLowerCase() ||
+          o.label.toLowerCase() === candidateText.toLowerCase() ||
+          candidateText.toLowerCase().includes(o.label.toLowerCase()) ||
+          candidateText.toLowerCase().includes(o.value.toLowerCase())
+      );
+
+      const finalValue = matchedOpt && !matchedOpt.isOther ? matchedOpt.value : candidateText;
+      return { fieldKey: q.fieldKey, answerValue: finalValue };
+    }
+
+    // 4. Archetype keyword heuristics
+    const dt = (activeDraft.docType || '').toLowerCase();
+    if (dt === 'resume' || dt === 'cv') {
+      if (/genai|llm|rag|language model|vision|computer vision|mlops|full.?stack/i.test(candidateText)) {
+        return { fieldKey: 'targetDomain', answerValue: candidateText };
+      }
+      if (/\b\d+\+?\s*(years?|yrs?)\b|\b(junior|senior|lead|architect|staff)\b/i.test(candidateText)) {
+        return { fieldKey: 'experienceYears', answerValue: candidateText };
+      }
+      if (/aws|gcp|azure|cloud|vertex|sagemaker/i.test(candidateText)) {
+        return { fieldKey: 'cloudPlatform', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'invoice' || dt === 'tax_invoice') {
+      if (/\b(?:18|12|5|0)\s*%/i.test(candidateText) && !/discount/i.test(candidateText)) {
+        return { fieldKey: 'taxRate', answerValue: candidateText.match(/\b(?:18|12|5|0)\b/)?.[0] || '18' };
+      }
+      if (/\b(?:net\s*\d+|due on receipt|advance)\b/i.test(candidateText)) {
+        return { fieldKey: 'paymentTerms', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'quotation' || dt === 'estimate') {
+      if (/\b(?:15|30|60)\s*(?:days?|calendar)\b/i.test(candidateText)) {
+        return { fieldKey: 'validityPeriod', answerValue: candidateText };
+      }
+      if (/\b(?:immediate|2 to 4 weeks|phased)\b/i.test(candidateText)) {
+        return { fieldKey: 'deliverySchedule', answerValue: candidateText };
+      }
+    }
+
+    if (dt === 'salary_slip') {
+      if (/(?:january|february|march|april|may|june|july|august|september|october|november|december)\s*\d{4}/i.test(candidateText)) {
+        return { fieldKey: 'payPeriod', answerValue: candidateText };
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * True Codex-Style Live Streaming: Emits real AI reasoning tokens and reply chunks
    */
   static async streamMessage(
@@ -513,6 +635,66 @@ export class AiDocumentAgent {
       status: 'running',
     });
     onEvent({ type: 'step', taskSteps: [...taskSteps] });
+
+    // ── Check if user is answering or refining an active interactive question ──
+    if (activeDraft) {
+      const answeredField = this.detectAnsweredField(userPrompt, activeDraft, history);
+      if (answeredField) {
+        const applied = DocumentQuestionElicitor.applyAnswerToDraft(
+          activeDraft,
+          answeredField.fieldKey,
+          answeredField.answerValue
+        );
+        const updatedDraft = await this.commitAndVerifyDraft(applied.updatedDraft, localContext);
+
+        const answeredKeys = [answeredField.fieldKey];
+        for (const m of history) {
+          if (m.interactiveQuestion?.fieldKey) {
+            answeredKeys.push(m.interactiveQuestion.fieldKey);
+          }
+        }
+
+        const nextQuestion = DocumentQuestionElicitor.getNextQuestion(updatedDraft, answeredKeys);
+
+        const reasoning = `Applied verified user input for "${answeredField.fieldKey}": ${answeredField.answerValue}. Recalculated statutory values without placeholder data.`;
+        const reply = applied.feedbackMessage;
+
+        onEvent({
+          type: 'reasoning',
+          reasoningChunk: reasoning,
+          fullReasoning: reasoning,
+          taskSteps: [...taskSteps],
+        });
+
+        taskSteps[0].status = 'completed';
+        taskSteps.push({
+          id: 'field_applied',
+          label: `Field updated: ${answeredField.fieldKey} (${answeredField.answerValue.slice(0, 32)})`,
+          status: 'completed',
+        });
+        onEvent({ type: 'step', taskSteps: [...taskSteps] });
+
+        onEvent({
+          type: 'content',
+          contentChunk: reply,
+          fullContent: reply,
+          displayText: reply,
+          isCompilingDraft: false,
+          taskSteps: [...taskSteps],
+        });
+
+        onEvent({
+          type: 'done',
+          draft: updatedDraft,
+          drafts: [updatedDraft],
+          question: nextQuestion || undefined,
+          replyText: reply,
+          fullReasoning: reasoning,
+          taskSteps: [...taskSteps],
+        });
+        return;
+      }
+    }
 
     const effectiveApiKey = config.apiKey || (config.provider === 'groq' ? DEFAULT_GROQ_KEY : '');
 
@@ -681,10 +863,13 @@ CORE AGENTIC INVARIANTS:
                   taskSteps: [...taskSteps],
                 });
 
+                const nextQuestion = DocumentQuestionElicitor.getNextQuestion(allDrafts[0]);
+
                 onEvent({
                   type: 'done',
                   draft: allDrafts[0],
                   drafts: allDrafts,
+                  question: nextQuestion || undefined,
                   replyText: reply,
                   fullReasoning: reasoning,
                   taskSteps: [...taskSteps],
@@ -745,9 +930,13 @@ CORE AGENTIC INVARIANTS:
                 taskSteps: [...taskSteps],
               });
 
+              const nextQuestion = DocumentQuestionElicitor.getNextQuestion(verified);
+
               onEvent({
                 type: 'done',
                 draft: verified,
+                drafts: [verified],
+                question: nextQuestion || undefined,
                 replyText: reply,
                 fullReasoning: reasoning,
                 taskSteps: [...taskSteps],
@@ -755,7 +944,58 @@ CORE AGENTIC INVARIANTS:
               return;
             }
 
-            // Case B: General Business / Compliance Question Answered
+            // Case B: Interactive Document Data Elicitation (MCQ with 'Other')
+            if (toolName === 'ask_document_question') {
+              const reasoning = args.reasoning || 'Eliciting critical field data in MCQ format for statutory/ATS perfection.';
+              const reply = args.replyExplanation || args.question;
+              const options = Array.isArray(args.options) ? args.options : [];
+              if (!options.some((o: any) => o.isOther || o.value === 'CUSTOM_INPUT')) {
+                options.push({
+                  id: 'opt_other',
+                  label: 'Other (Enter your custom data in chat)',
+                  value: 'CUSTOM_INPUT',
+                  description: 'Tap to type custom value in chat',
+                  isOther: true,
+                });
+              }
+
+              const question: ChatInteractiveQuestion = {
+                id: `q_${Date.now()}`,
+                docType: args.docType || activeDraft?.docType || 'general',
+                fieldKey: args.fieldKey || 'custom',
+                question: args.question,
+                reason: args.reason || '',
+                options,
+              };
+
+              onEvent({
+                type: 'reasoning',
+                reasoningChunk: reasoning,
+                fullReasoning: reasoning,
+                taskSteps: [...taskSteps],
+              });
+
+              onEvent({
+                type: 'content',
+                contentChunk: reply,
+                fullContent: reply,
+                displayText: reply,
+                isCompilingDraft: false,
+                taskSteps: [...taskSteps],
+              });
+
+              onEvent({
+                type: 'done',
+                draft: activeDraft,
+                question,
+                replyText: reply,
+                fullReasoning: reasoning,
+                taskSteps: [...taskSteps],
+              });
+              return;
+            }
+
+            // Case C: General Business / Compliance Question Answered
             if (toolName === 'answer_business_question') {
               const reasoning = args.reasoning || 'Analyzed statutory regulations and compliance standards.';
               const answer = args.answer || 'Here is the requested financial guidance.';
@@ -954,10 +1194,12 @@ CORE AGENTIC INVARIANTS:
                 label: `Verified: ${verified.documentTitle} for ${verified.partyName}`,
                 status: 'completed',
               });
+              const nextQuestion = DocumentQuestionElicitor.getNextQuestion(verified);
               onEvent({
                 type: 'done',
                 draft: verified,
                 drafts: [verified],
+                question: nextQuestion || undefined,
                 replyText: content,
                 fullReasoning: genResume.reasoning,
                 taskSteps: [...taskSteps],
@@ -1048,10 +1290,13 @@ CORE AGENTIC INVARIANTS:
       taskSteps: [...taskSteps],
     });
 
+    const nextQuestion = verified ? DocumentQuestionElicitor.getNextQuestion(verified) : null;
+
     onEvent({
       type: 'done',
       draft: verified,
       drafts: verifiedDrafts,
+      question: nextQuestion || undefined,
       replyText: heuristicResult.reply,
       fullReasoning: trace,
       taskSteps: [...taskSteps],

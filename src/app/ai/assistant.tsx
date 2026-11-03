@@ -72,6 +72,7 @@ import { ClaudeThinkingIndicator } from '../../components/animations/ClaudeThink
 import { IntelligentMessageRenderer } from '../../components/ai/IntelligentMessageRenderer';
 import { FluidStreamingText } from '../../components/ai/FluidStreamingText';
 import { AnimatedArtifactTile } from '../../components/ai/AnimatedArtifactTile';
+import { ChatInteractiveQuestionCard } from '../../components/ai/ChatInteractiveQuestionCard';
 
 /**
  * Transforms raw neural reasoning thoughts into clean, high-elegance cognitive steps.
@@ -347,6 +348,7 @@ export default function AiAssistantScreen() {
   }, [activeDraft, selectedPreviewTemplate]);
 
   const scrollViewRef = useRef<ScrollView>(null);
+  const textInputRef = useRef<TextInput>(null);
 
   // Hydrate persistent AI session and recommendations from SQLite on Mount
   useEffect(() => {
@@ -570,6 +572,7 @@ export default function AiAssistantScreen() {
               documentDraft: event.draft || (allDrafts.length > 0 ? allDrafts[0] : null),
               documentDrafts: allDrafts,
               taskSteps: event.taskSteps,
+              interactiveQuestion: event.question,
               isStreaming: true, // Keep streaming alive for silky token reveal
               isThinking: false,
               isCompilingDraft: false,
@@ -882,7 +885,7 @@ export default function AiAssistantScreen() {
                   )}
 
                   {/* Conversational Reply Text & Materialized Artifacts with Claude-Style Motion */}
-                  {(msg.content || (msg.documentDrafts && msg.documentDrafts.length > 0) || msg.documentDraft) && !msg.isThinking ? (
+                  {(msg.content || msg.interactiveQuestion || (msg.documentDrafts && msg.documentDrafts.length > 0) || msg.documentDraft) && !msg.isThinking ? (
                     <AnimatedResponseBody>
                       {msg.content ? (
                         <View style={styles.assistantTextFlow}>
@@ -964,6 +967,24 @@ export default function AiAssistantScreen() {
                           </View>
                         );
                       })()}
+
+                      {/* ── Interactive Guided Elicitation Question Card (MCQ + Other) ── */}
+                      {msg.interactiveQuestion && !msg.interactiveQuestion.isAnswered && (
+                        <ChatInteractiveQuestionCard
+                          question={msg.interactiveQuestion}
+                          theme={theme}
+                          onSelectOption={(option) => {
+                            msg.interactiveQuestion!.isAnswered = true;
+                            msg.interactiveQuestion!.selectedValue = option.value;
+                            handleSendMessage(`Selected: ${option.value}`);
+                          }}
+                          onSelectOther={(fieldKey) => {
+                            msg.interactiveQuestion!.isAnswered = true;
+                            setInputText(`Custom ${fieldKey}: `);
+                            setTimeout(() => textInputRef.current?.focus(), 100);
+                          }}
+                        />
+                      )}
                     </AnimatedResponseBody>
                   ) : (msg.isStreaming && !msg.isThinking) ? (
                     <View style={styles.assistantTextFlow}>
@@ -1013,6 +1034,7 @@ export default function AiAssistantScreen() {
             ]}
           >
             <TextInput
+              ref={textInputRef}
               style={[
                 styles.floatingTextInput,
                 {
