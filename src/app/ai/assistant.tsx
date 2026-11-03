@@ -11,7 +11,7 @@
  * - Integrated Live Document Preview Modal with zero-popup-blocker Print & Direct Download
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import {
   Platform,
   Alert,
   KeyboardAvoidingView,
+  Keyboard,
   Animated,
   Easing,
   useWindowDimensions,
@@ -72,7 +73,7 @@ import { ClaudeThinkingIndicator } from '../../components/animations/ClaudeThink
 import { IntelligentMessageRenderer } from '../../components/ai/IntelligentMessageRenderer';
 import { FluidStreamingText } from '../../components/ai/FluidStreamingText';
 import { AnimatedArtifactTile } from '../../components/ai/AnimatedArtifactTile';
-import { ChatInteractiveQuestionCard } from '../../components/ai/ChatInteractiveQuestionCard';
+import { ChatQuestionOption } from '../../services/ai/DocumentQuestionElicitor';
 
 /**
  * Transforms raw neural reasoning thoughts into clean, high-elegance cognitive steps.
@@ -443,6 +444,59 @@ export default function AiAssistantScreen() {
       if (timerInterval) clearInterval(timerInterval);
     };
   }, [isProcessing, pulseAnim]);
+
+  // Android soft keyboard elevation listener
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow',
+      () => {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 50);
+      }
+    );
+    return () => {
+      showSub.remove();
+    };
+  }, []);
+
+  // Compute active pending question for in-chatbox guided elicitation
+  const activeQuestion = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const q = messages[i].interactiveQuestion;
+      if (q && !q.isAnswered) return q;
+    }
+    return null;
+  }, [messages]);
+
+  const handleSelectQuestionOption = (opt: ChatQuestionOption) => {
+    if (!activeQuestion) return;
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.interactiveQuestion && !m.interactiveQuestion.isAnswered) {
+          return {
+            ...m,
+            interactiveQuestion: {
+              ...m.interactiveQuestion,
+              isAnswered: true,
+              selectedValue: opt.value,
+            },
+          };
+        }
+        return m;
+      })
+    );
+    handleSendMessage(`Selected: ${opt.value}`);
+  };
+
+  const handleSelectQuestionOther = () => {
+    if (!activeQuestion) return;
+    const fieldKey = activeQuestion.fieldKey;
+    setInputText(`Custom ${fieldKey}: `);
+    setTimeout(() => {
+      textInputRef.current?.focus();
+    }, 100);
+  };
 
   // Expose test helper for programmatic verification
   useEffect(() => {
@@ -968,22 +1022,23 @@ export default function AiAssistantScreen() {
                         );
                       })()}
 
-                      {/* ── Interactive Guided Elicitation Question Card (MCQ + Other) ── */}
+                      {/* ── Subtle In-Message Question Status (Prompted in Chatbox below) ── */}
                       {msg.interactiveQuestion && !msg.interactiveQuestion.isAnswered && (
-                        <ChatInteractiveQuestionCard
-                          question={msg.interactiveQuestion}
-                          theme={theme}
-                          onSelectOption={(option) => {
-                            msg.interactiveQuestion!.isAnswered = true;
-                            msg.interactiveQuestion!.selectedValue = option.value;
-                            handleSendMessage(`Selected: ${option.value}`);
-                          }}
-                          onSelectOther={(fieldKey) => {
-                            msg.interactiveQuestion!.isAnswered = true;
-                            setInputText(`Custom ${fieldKey}: `);
-                            setTimeout(() => textInputRef.current?.focus(), 100);
-                          }}
-                        />
+                        <View style={[styles.chatboxPromptBanner, { backgroundColor: 'rgba(204, 120, 92, 0.08)' }]}>
+                          <Sparkles size={12} color="#CC785C" />
+                          <Text style={[styles.chatboxPromptBannerText, { color: theme.textSecondary }]}>
+                            Guided Field: <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>{msg.interactiveQuestion.question}</Text> (Choose in chat box below)
+                          </Text>
+                        </View>
+                      )}
+
+                      {msg.interactiveQuestion?.isAnswered && msg.interactiveQuestion.selectedValue && (
+                        <View style={styles.inMessageAnsweredBadge}>
+                          <Check size={11} color="#34C759" />
+                          <Text style={[styles.inMessageAnsweredText, { color: theme.textMuted }]}>
+                            Answered: {msg.interactiveQuestion.selectedValue}
+                          </Text>
+                        </View>
                       )}
                     </AnimatedResponseBody>
                   ) : (msg.isStreaming && !msg.isThinking) ? (
@@ -1001,35 +1056,97 @@ export default function AiAssistantScreen() {
           })}
         </ScrollView>
 
-        {/* Context-Aware Smart Workflow Chips */}
-        <View style={styles.chipsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScrollContent}>
-            {getSmartWorkflowChips(activeDraft).map((chip, idx) => (
-              <Pressable
-                key={idx}
-                style={[styles.chipButton, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                onPress={() => {
-                  if (chip.label.startsWith('⎙')) {
-                    if (activeDraft) handlePrintDocument(activeDraft);
-                  } else {
-                    handleSendMessage(chip.prompt);
-                  }
-                }}
-              >
-                <Text style={[styles.chipText, { color: theme.textSecondary }]}>{chip.label}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+        {/* Context-Aware Smart Workflow Chips (Hidden when question active) */}
+        {!activeQuestion && (
+          <View style={styles.chipsContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScrollContent}>
+              {getSmartWorkflowChips(activeDraft).map((chip, idx) => (
+                <Pressable
+                  key={idx}
+                  style={[styles.chipButton, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                  onPress={() => {
+                    if (chip.label.startsWith('⎙')) {
+                      if (activeDraft) handlePrintDocument(activeDraft);
+                    } else {
+                      handleSendMessage(chip.prompt);
+                    }
+                  }}
+                >
+                  <Text style={[styles.chipText, { color: theme.textSecondary }]}>{chip.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
-        {/* Floating Input Bar */}
-        <View style={styles.inputBarContainer}>
+        {/* Floating Input Bar & In-Chatbox Question Elicitor */}
+        <View style={[styles.inputBarContainer, { backgroundColor: theme.surface, borderTopColor: theme.borderSubtle }]}>
+          {/* Active Interactive Question Elicited Directly Inside Chatbox */}
+          {activeQuestion && (
+            <View style={[styles.chatboxQuestionCard, { backgroundColor: 'rgba(204, 120, 92, 0.06)', borderColor: 'rgba(204, 120, 92, 0.2)' }]}>
+              <View style={styles.chatboxQuestionHeaderRow}>
+                <View style={styles.chatboxQuestionTitleBox}>
+                  <Sparkles size={13} color="#CC785C" />
+                  <Text style={[styles.chatboxQuestionPromptText, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {activeQuestion.question}
+                  </Text>
+                </View>
+                {activeQuestion.reason && (
+                  <View style={styles.chatboxReasonPill}>
+                    <Text style={styles.chatboxReasonText} numberOfLines={1}>
+                      {activeQuestion.reason.split(':')[0]}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Horizontal Choice Chips directly inside the chatbox */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chatboxOptionsScroll}
+              >
+                {activeQuestion.options.map((opt, oIdx) => {
+                  const letterBadge = opt.isOther ? '✎' : String.fromCharCode(65 + oIdx);
+                  return (
+                    <Pressable
+                      key={opt.id}
+                      style={({ pressed }) => [
+                        styles.chatboxOptionChip,
+                        opt.isOther ? styles.chatboxOptionChipOther : { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderDefault },
+                        pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
+                      ]}
+                      onPress={() => {
+                        if (opt.isOther) {
+                          handleSelectQuestionOther();
+                        } else {
+                          handleSelectQuestionOption(opt);
+                        }
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={opt.label}
+                    >
+                      <View style={[styles.chatboxLetterBadge, opt.isOther ? styles.chatboxLetterBadgeOther : { backgroundColor: 'rgba(255, 255, 255, 0.08)' }]}>
+                        <Text style={[styles.chatboxLetterText, opt.isOther ? { color: '#CC785C' } : { color: theme.textPrimary }]}>
+                          {letterBadge}
+                        </Text>
+                      </View>
+                      <Text style={[styles.chatboxOptionLabel, { color: theme.textPrimary }]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           <View
             style={[
               styles.floatingInputBox,
               {
                 backgroundColor: theme.surfaceSecondary,
-                borderColor: theme.borderDefault,
+                borderColor: activeQuestion ? '#CC785C' : theme.borderDefault,
               },
             ]}
           >
@@ -2212,6 +2329,106 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  chatboxQuestionCard: {
+    marginBottom: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 10,
+  },
+  chatboxQuestionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    gap: 8,
+  },
+  chatboxQuestionTitleBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  chatboxQuestionPromptText: {
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+  chatboxReasonPill: {
+    backgroundColor: 'rgba(204, 120, 92, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(204, 120, 92, 0.3)',
+  },
+  chatboxReasonText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#CC785C',
+  },
+  chatboxOptionsScroll: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  chatboxOptionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 6,
+  },
+  chatboxOptionChipOther: {
+    backgroundColor: 'rgba(204, 120, 92, 0.12)',
+    borderColor: '#CC785C',
+  },
+  chatboxLetterBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatboxLetterBadgeOther: {
+    backgroundColor: 'rgba(204, 120, 92, 0.25)',
+  },
+  chatboxLetterText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  chatboxOptionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chatboxPromptBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  chatboxPromptBannerText: {
+    fontSize: 12,
+  },
+  inMessageAnsweredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(52, 199, 89, 0.1)',
+  },
+  inMessageAnsweredText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   floatingInputBox: {
     flexDirection: 'row',

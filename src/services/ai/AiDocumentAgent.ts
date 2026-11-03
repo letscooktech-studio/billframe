@@ -656,7 +656,9 @@ export class AiDocumentAgent {
 
         const nextQuestion = DocumentQuestionElicitor.getNextQuestion(updatedDraft, answeredKeys);
 
-        const reasoning = `Applied verified user input for "${answeredField.fieldKey}": ${answeredField.answerValue}. Recalculated statutory values without placeholder data.`;
+        const reasoning =
+          applied.reasoningTrace ||
+          `Applied verified user input for "${answeredField.fieldKey}": ${answeredField.answerValue}. Recalculated statutory values without placeholder data.`;
         const reply = applied.feedbackMessage;
 
         onEvent({
