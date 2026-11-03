@@ -146,10 +146,55 @@ export class AiTemplateBridge {
   static isCommercialDocument(draft: ParsedDocumentDraft): boolean {
     const dt = draft.docType?.toLowerCase() || '';
     const title = draft.documentTitle?.toLowerCase() || '';
-    if (dt === 'invoice' || dt === 'tax_invoice' || dt === 'bill' || dt === 'receipt') return true;
-    if (title.includes('invoice') || title.includes('tax') || title.includes('bill') || title.includes('grocery')) return true;
-    if (dt === 'salary_slip' || dt === 'job_offer_letter' || dt === 'job_application' || dt === 'work_order' || dt === 'nda_agreement') {
+
+    // Administrative / HR / Operations / Institutional docs ALWAYS use universal renderer
+    if (
+      dt === 'salary_slip' ||
+      dt === 'job_offer_letter' ||
+      dt === 'job_application' ||
+      dt === 'work_order' ||
+      dt === 'nda_agreement' ||
+      dt === 'rent_receipt' ||
+      dt === 'student_fee_receipt' ||
+      dt === 'meeting_minutes' ||
+      dt === 'equipment_responsibility' ||
+      dt === 'equipment_responsibility_letter' ||
+      dt === 'site_inspection' ||
+      dt === 'site_inspection_report' ||
+      dt === 'experience_cert' ||
+      dt === 'experience_certificate'
+    ) {
       return false;
+    }
+
+    if (
+      dt === 'invoice' ||
+      dt === 'tax_invoice' ||
+      dt === 'bill' ||
+      dt === 'receipt' ||
+      dt === 'quotation' ||
+      dt === 'estimate' ||
+      dt === 'proforma' ||
+      dt === 'delivery_challan' ||
+      dt === 'credit_note' ||
+      dt === 'debit_note' ||
+      dt === 'purchase_order' ||
+      dt === 'sales_order' ||
+      dt === 'payment_voucher' ||
+      title.includes('invoice') ||
+      title.includes('tax') ||
+      title.includes('bill') ||
+      title.includes('quote') ||
+      title.includes('quotation') ||
+      title.includes('estimate') ||
+      title.includes('proforma') ||
+      title.includes('challan') ||
+      title.includes('credit note') ||
+      title.includes('debit note') ||
+      title.includes('order') ||
+      title.includes('receipt')
+    ) {
+      return true;
     }
     return false;
   }
@@ -204,6 +249,7 @@ export class AiTemplateBridge {
       business_profile_id: business.id,
       job_id: null,
       doc_type: docType,
+      document_title: draft.documentTitle,
       sequence_number: 1,
       document_number: draft.documentNumber,
       customer_id: null,
@@ -292,6 +338,27 @@ export class AiTemplateBridge {
     }
     if (!schema && draft.docType === 'rent_receipt') {
       schema = SYSTEM_SCHEMAS.find((s) => s.code === 'rent_receipt');
+    }
+    if (!schema && (draft.docType === 'equipment_responsibility' || draft.docType === 'equipment_responsibility_letter')) {
+      schema = SYSTEM_SCHEMAS.find((s) => s.code === 'equipment_responsibility');
+    }
+    if (!schema && (draft.docType === 'meeting_minutes' || draft.documentTitle?.toLowerCase().includes('minutes'))) {
+      schema = SYSTEM_SCHEMAS.find((s) => s.code === 'meeting_minutes');
+    }
+    if (!schema && (draft.docType === 'site_inspection' || draft.docType === 'site_inspection_report')) {
+      schema = SYSTEM_SCHEMAS.find((s) => s.code === 'site_inspection_report');
+    }
+    if (!schema && (draft.docType === 'customer_statement' || draft.docType === 'customer_account_statement')) {
+      schema = SYSTEM_SCHEMAS.find((s) => s.code === 'customer_account_statement');
+    }
+    if (!schema && (draft.docType === 'student_fee_receipt' || draft.documentTitle?.toLowerCase().includes('student'))) {
+      schema = SYSTEM_SCHEMAS.find((s) => s.code === 'student_fee_receipt');
+    }
+    if (!schema && (draft.docType === 'experience_cert' || draft.docType === 'experience_certificate')) {
+      schema = SYSTEM_SCHEMAS.find((s) => s.code === 'experience_certificate');
+    }
+    if (!schema && draft.docType === 'delivery_challan') {
+      schema = SYSTEM_SCHEMAS.find((s) => s.code === 'delivery_challan');
     }
 
     if (!schema) {

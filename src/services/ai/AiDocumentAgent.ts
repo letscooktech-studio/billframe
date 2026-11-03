@@ -37,6 +37,7 @@ export interface AgentChatMessage {
   timestamp: number;
   reasoningTrace?: string;
   documentDraft?: ParsedDocumentDraft | null;
+  documentDrafts?: ParsedDocumentDraft[];
   quickActions?: Array<{ label: string; action: string; payload?: any }>;
   isStreaming?: boolean;
   isThinking?: boolean;
@@ -54,6 +55,7 @@ export interface AgentStreamEvent {
   displayText?: string;
   isCompilingDraft?: boolean;
   draft?: ParsedDocumentDraft | null;
+  drafts?: ParsedDocumentDraft[];
   replyText?: string;
   error?: string;
   taskSteps?: AgentTaskStep[];
@@ -218,6 +220,88 @@ export const AGENT_DOCUMENT_TOOLS = [
           },
         },
         required: ['docType', 'documentTitle', 'partyName', 'items', 'replyExplanation', 'reasoning'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_multiple_document_drafts',
+      description: 'Draft or create MULTIPLE statutory, commercial, or operational documents in a single workflow (e.g. quote + invoice, invoice + delivery challan, quote + PO, salary slips for multiple staff members, invoice + payment receipt, etc.). Use whenever the user requests 2 or more documents.',
+      parameters: {
+        type: 'object',
+        properties: {
+          documents: {
+            type: 'array',
+            description: 'List of individual document specifications to draft',
+            items: {
+              type: 'object',
+              properties: {
+                docType: {
+                  type: 'string',
+                  description: 'Statutory document archetype: quotation, invoice, delivery_challan, proforma, purchase_order, credit_note, debit_note, receipt, salary_slip, rent_receipt, work_order, etc.',
+                },
+                documentTitle: {
+                  type: 'string',
+                  description: 'Formal title (e.g. "Formal Commercial Quotation", "Delivery Challan", "GST Tax Invoice", "Payment Receipt")',
+                },
+                provenanceRule: {
+                  type: 'string',
+                  description: 'Statutory provenance rule or legal act',
+                },
+                partyName: {
+                  type: 'string',
+                  description: 'Customer, vendor, consignee, employee, or counterparty name',
+                },
+                partyRole: {
+                  type: 'string',
+                  enum: ['Client', 'Vendor', 'Employee', 'Tenant', 'Candidate', 'Applicant', 'Consignee', 'Other'],
+                },
+                partyTaxId: { type: 'string' },
+                partyAddress: { type: 'string' },
+                partyEmail: { type: 'string' },
+                currency: { type: 'string' },
+                items: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      description: { type: 'string' },
+                      quantity: { type: 'number' },
+                      unitName: { type: 'string' },
+                      unitPrice: { type: 'number' },
+                      itemNotes: { type: 'string' },
+                      hsnSac: { type: 'string' },
+                    },
+                    required: ['description', 'quantity', 'unitName', 'unitPrice'],
+                  },
+                },
+                discountType: { type: 'string', enum: ['none', 'percentage', 'fixed'] },
+                discountValue: { type: 'number' },
+                taxType: { type: 'string', enum: ['none', 'exclusive', 'inclusive'] },
+                taxRatePercent: { type: 'number' },
+                taxLabel: { type: 'string' },
+                notes: { type: 'string' },
+                terms: { type: 'string' },
+                metadata: { type: 'object' },
+              },
+              required: ['docType', 'documentTitle', 'partyName', 'items'],
+            },
+          },
+          workflowTitle: {
+            type: 'string',
+            description: 'Name of the workflow bundle, e.g. "Quotation & Delivery Challan Package"',
+          },
+          replyExplanation: {
+            type: 'string',
+            description: 'Conversational 1-2 sentence response explaining all documents created',
+          },
+          reasoning: {
+            type: 'string',
+            description: 'Step-by-step thinking trace explaining multi-document intent classification and calculations',
+          },
+        },
+        required: ['documents', 'replyExplanation', 'reasoning'],
       },
     },
   },
@@ -442,11 +526,31 @@ export class AiDocumentAgent {
 Billframe has a master registry of 446 statutory document types across 25 industry families (HR/Talent, Legal/Institutional, Commercial Billing, Procurement, Real Estate, Logistics).
 
 CORE AGENTIC INVARIANTS:
-1. When the user requests creating, drafting, or modifying any financial or statutory document (invoice, bill, estimate, quote, salary slip, rent receipt, job offer, job application, etc.), INVOKE the "create_or_update_document_draft" tool with realistic items, quantities, and prices.
-2. When the user asks a question, requests financial/tax advice, or inquires about statutory rules (e.g. "What is GST rate on IT services?"), INVOKE the "answer_business_question" tool. DO NOT create a dummy bill when the user merely asked a question!
-3. If an active draft is provided in context and user requests edits or adjustments, preserve existing items and fields while applying requested changes.
-4. Always provide realistic line items, quantities, realistic market prices, and statutory tax rates.
-5. In your tool arguments, always provide a detailed "reasoning" step-by-step trace explaining your thought process and calculations.`;
+1. Exact Archetype Identification:
+   - When the user asks for a Quotation or Estimate, draft a "quotation" with title "Formal Commercial Quotation" (NEVER a generic Tax Invoice!).
+   - When the user asks for a Proforma Invoice, draft a "proforma" (docType: "proforma").
+   - When the user asks for a Delivery Challan / Dispatch Note, draft a "delivery_challan" under CBIC Rule 55.
+   - When the user asks for a Purchase Order, draft a "purchase_order" (partyRole: "Vendor").
+   - When the user asks for a Credit Note, draft a "credit_note" under CBIC Rule 53(1).
+   - When the user asks for a Debit Note, draft a "debit_note" under CBIC Rule 53(2).
+   - When the user asks for a Payment Receipt, draft a "receipt".
+   - When the user asks for a Job Application / Candidate Dossier, draft a "job_application".
+   - When the user asks for a Job Offer, draft a "job_offer_letter".
+   - When the user asks for a Salary Slip, draft a "salary_slip".
+   - When the user asks for a Rent Receipt, draft a "rent_receipt" under Section 10(13A).
+   - When the user asks for a Work Order, draft a "work_order".
+   - When the user asks for Meeting Minutes, draft a "meeting_minutes".
+   - When the user asks for an Equipment Handover, draft an "equipment_responsibility_letter".
+   - Only when the user specifically asks for a Tax Invoice, sales bill, or commercial bill, draft an "invoice".
+
+2. Multi-Document Workflows:
+   - When the user requests creating multiple documents (e.g. "create an invoice and a delivery challan", "quote and PO", "salary slips for Alice and Bob", "invoice, challan, and receipt"), INVOKE the "create_multiple_document_drafts" tool containing all requested document objects, OR invoke "create_or_update_document_draft" multiple times!
+
+3. When the user asks a question, requests financial/tax advice, or inquires about statutory rules (e.g. "What is GST rate on IT services?"), INVOKE the "answer_business_question" tool. DO NOT create a dummy bill when the user merely asked a question!
+
+4. If an active draft is provided in context and user requests edits or adjustments, preserve existing items and fields while applying requested changes.
+
+5. Always provide realistic line items, quantities, realistic market prices, and statutory tax rates. In your tool arguments, always provide a detailed "reasoning" step-by-step trace explaining your thought process and calculations.`;
 
         const apiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
           { role: 'system', content: systemInstructions },
@@ -485,9 +589,94 @@ CORE AGENTIC INVARIANTS:
         if (res.ok) {
           const data = await res.json();
           const choice = data.choices?.[0];
-          const toolCall = choice?.message?.tool_calls?.[0];
+          const toolCalls = choice?.message?.tool_calls;
 
-          if (toolCall) {
+          if (toolCalls && toolCalls.length > 0) {
+            // Check if any toolCall is document creation
+            const docCalls = toolCalls.filter(
+              (tc: any) =>
+                tc.function?.name === 'create_or_update_document_draft' ||
+                tc.function?.name === 'create_multiple_document_drafts'
+            );
+
+            if (docCalls.length > 0) {
+              const allDrafts: ParsedDocumentDraft[] = [];
+              let combinedReasoning = '';
+              let combinedReply = '';
+
+              for (const tc of docCalls) {
+                let args: any = {};
+                try {
+                  args = JSON.parse(tc.function.arguments);
+                } catch {
+                  args = {};
+                }
+
+                if (tc.function.name === 'create_multiple_document_drafts') {
+                  const docList = Array.isArray(args.documents) ? args.documents : [];
+                  for (const docItem of docList) {
+                    const verified = await this.commitAndVerifyDraft(docItem, localContext);
+                    allDrafts.push(verified);
+                  }
+                  if (args.reasoning) combinedReasoning += (combinedReasoning ? '\n\n' : '') + args.reasoning;
+                  if (args.replyExplanation) combinedReply += (combinedReply ? '\n\n' : '') + args.replyExplanation;
+                } else if (tc.function.name === 'create_or_update_document_draft') {
+                  const verified = await this.commitAndVerifyDraft(args, localContext);
+                  allDrafts.push(verified);
+                  if (args.reasoning) combinedReasoning += (combinedReasoning ? '\n\n' : '') + args.reasoning;
+                  if (args.replyExplanation) combinedReply += (combinedReply ? '\n\n' : '') + args.replyExplanation;
+                }
+              }
+
+              if (allDrafts.length > 0) {
+                const reasoning =
+                  combinedReasoning ||
+                  `Derived ${allDrafts.length} statutory document(s) adhering to CBIC GST & statutory compliance rules.`;
+                const reply =
+                  combinedReply ||
+                  `I have drafted ${allDrafts.length} document(s): ${allDrafts.map((d) => d.documentTitle).join(', ')}.`;
+
+                onEvent({
+                  type: 'reasoning',
+                  reasoningChunk: reasoning,
+                  fullReasoning: reasoning,
+                  taskSteps: [...taskSteps],
+                });
+
+                taskSteps[2] = {
+                  id: 'neural_reasoning',
+                  label: `Neural agent reasoned: ${allDrafts.length} document(s) generated`,
+                  status: 'completed',
+                };
+                taskSteps.push({
+                  id: 'financial_calc',
+                  label: `Verified ${allDrafts.length} document(s) with BigInt integer minor units`,
+                  status: 'completed',
+                });
+                onEvent({ type: 'step', taskSteps: [...taskSteps] });
+
+                onEvent({
+                  type: 'content',
+                  contentChunk: reply,
+                  fullContent: reply,
+                  displayText: reply,
+                  isCompilingDraft: false,
+                  taskSteps: [...taskSteps],
+                });
+
+                onEvent({
+                  type: 'done',
+                  draft: allDrafts[0],
+                  drafts: allDrafts,
+                  replyText: reply,
+                  fullReasoning: reasoning,
+                  taskSteps: [...taskSteps],
+                });
+                return;
+              }
+            }
+
+            const toolCall = toolCalls[0];
             const toolName = toolCall.function.name;
             let args: any = {};
             try {
@@ -754,13 +943,27 @@ CORE AGENTIC INVARIANTS:
 
     // 2. Deterministic RAG Heuristic Engine Fallback with Progressive Live Animation
     const heuristicResult = await this.runDeterministicHeuristic(userPrompt, activeDraft, localContext);
-    const verified = heuristicResult.draft ? await this.commitAndVerifyDraft(heuristicResult.draft, localContext) : null;
-    const trace = heuristicResult.reasoning || (verified ? this.synthesizeReasoning(userPrompt, verified) : 'Local assistant processed query.');
+    const verifiedDrafts: ParsedDocumentDraft[] = [];
+    if (heuristicResult.drafts && heuristicResult.drafts.length > 0) {
+      for (const d of heuristicResult.drafts) {
+        if (d) {
+          const v = await this.commitAndVerifyDraft(d, localContext);
+          verifiedDrafts.push(v);
+        }
+      }
+    } else if (heuristicResult.draft) {
+      const v = await this.commitAndVerifyDraft(heuristicResult.draft, localContext);
+      verifiedDrafts.push(v);
+    }
+    const verified = verifiedDrafts[0] || null;
+    const trace =
+      heuristicResult.reasoning ||
+      (verified ? this.synthesizeReasoning(userPrompt, verified) : 'Local assistant processed query.');
 
-    if (verified) {
+    if (verifiedDrafts.length > 0) {
       taskSteps[3] = {
         id: 'financial_calc',
-        label: `Verified: ${verified.documentTitle} · Total: ${verified.currency} ${(Number(verified.grandTotalMinor) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        label: `Verified: ${verifiedDrafts.map((d) => d.documentTitle).join(' & ')} · Total: ${verified.currency} ${(Number(verified.grandTotalMinor) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
         status: 'completed',
       };
     } else {
@@ -791,6 +994,7 @@ CORE AGENTIC INVARIANTS:
     onEvent({
       type: 'done',
       draft: verified,
+      drafts: verifiedDrafts,
       replyText: heuristicResult.reply,
       fullReasoning: trace,
       taskSteps: [...taskSteps],
@@ -1014,11 +1218,11 @@ ${userPrompt}
   /**
    * Deterministic Offline Rule Parser & Semantic Disambiguator (Zero Network Required)
    */
-  private static async runDeterministicHeuristic(
+  public static async runDeterministicHeuristic(
     prompt: string,
-    activeDraft: ParsedDocumentDraft | null,
-    context: any
-  ): Promise<{ reply: string; reasoning: string; draft: Partial<ParsedDocumentDraft> }> {
+    activeDraft: ParsedDocumentDraft | null = null,
+    context: any = {}
+  ): Promise<{ reply: string; reasoning: string; draft: Partial<ParsedDocumentDraft> | null; drafts?: Partial<ParsedDocumentDraft>[] }> {
     const text = prompt.toLowerCase();
     const defaultCurrency = context.businessProfile?.currency || 'USD';
 
@@ -1151,76 +1355,227 @@ ${userPrompt}
       };
     }
 
-    // 4. Classify Document Archetype using Semantic RAG Scoring
-    const matchedArchetypes = AiRagRegistry.retrieve(prompt);
-    const primary = matchedArchetypes[0] || { id: 'invoice', name: 'Tax Invoice' };
+    // 4. Multi-Document Workflow vs Single Document Archetype Resolution
+    const isRetailRequest =
+      text.includes('grocery') ||
+      text.includes('supermarket') ||
+      text.includes('kirana') ||
+      text.includes('provision') ||
+      (text.includes('10') && (text.includes('item') || text.includes('product') || text.includes('random')));
 
-    // ── CASE A: JOB APPLICATION / CANDIDATE DOSSIER ──
-    if (primary.id === 'job_application') {
-      const roleMatch = prompt.match(
-        /(?:job application|application|apply|role|position)\s+(?:for\s+)?(?:an?\s+)?([A-Za-z0-9\s\+\#\.\/]+?)(?:\s+with|\s+at|\s+dated|\.|$)/i
-      );
-      const rawRole = roleMatch ? roleMatch[1].trim() : 'Applied AI Engineer';
-      const targetRole = rawRole
-        .split(' ')
-        .map((w) => {
-          const lower = w.toLowerCase();
-          if (lower === 'ai' || lower === 'llm' || lower === 'ml' || lower === 'rag') return lower.toUpperCase();
-          return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-        })
-        .join(' ');
+    const multiReq = AiRagRegistry.detectMultiDocumentRequest(prompt);
 
-      const candidateName = 'Candidate Dossier';
-      const items = [
-        {
-          description: `Core Competency: LLM Architectures, Fine-Tuning & Multi-Agent Orchestration`,
-          quantityScaled: 10000n,
-          unitName: 'Track',
-          unitPriceMinor: 0n,
-          itemNotes: 'Advanced agentic systems, tool routing, structured output validation',
-        },
-        {
-          description: `Production Infrastructure: RAG Pipelines, Vector DBs & Low-Latency Inference`,
-          quantityScaled: 10000n,
-          unitName: 'Track',
-          unitPriceMinor: 0n,
-          itemNotes: 'Groq LPU acceleration, semantic chunking, embedding index optimization',
-        },
-        {
-          description: `Engineering Foundations: TypeScript, Python, PyTorch & Local-First SQLite`,
-          quantityScaled: 10000n,
-          unitName: 'Track',
-          unitPriceMinor: 0n,
-          itemNotes: 'Enterprise application engineering, deterministic state management',
-        },
-      ];
+    if (multiReq.isMulti && multiReq.archetypes.length >= 2 && !isRetailRequest) {
+      const generatedDrafts: Partial<ParsedDocumentDraft>[] = [];
+      const summaries: string[] = [];
+      const reasonings: string[] = [];
 
-      const metadata = {
-        position: targetRole,
-        department: 'AI Engineering & Research',
-        experienceYears: 4,
-        expectedCtc: '₹35,00,000 PA',
-        noticePeriod: '30 Days',
-        skills: ['LLMs', 'Agentic Workflows', 'RAG Pipelines', 'Vector Search', 'TypeScript', 'PyTorch'],
-        coverStatement: `Applied AI Engineer with extensive experience developing resilient autonomous agents, structured retrieval-augmented generation pipelines, and high-performance local-first business applications.`,
-      };
-
-      const reasoning = `1. Semantic Intent: Detected candidate job application request for "${targetRole}".
-2. Disambiguation Gate: Heavily penalized commercial sales invoice (score 0), selected statutory Candidate Dossier (score 95).
-3. Statutory Rule: Labor Employment Dossier / Equal Opportunity Regulations.
-4. Local SQLite Grounding: Linked organization profile "${context.businessProfile?.name || 'Apex Studio Enterprises'}".
-5. Synthesized 3 core technical competency modules, expected compensation structure, and professional cover statement.`;
+      for (let i = 0; i < multiReq.archetypes.length; i++) {
+        const arch = multiReq.archetypes[i];
+        const partyOverride = multiReq.parties?.[i];
+        const gen = this.generateDeterministicDraftForArchetype(arch.id, prompt, partyOverride, context);
+        generatedDrafts.push(gen.draft);
+        summaries.push(gen.summary);
+        reasonings.push(gen.reasoning);
+      }
 
       return {
-        reply: `I have drafted a complete **Employment Application & Candidate Competency Dossier** for the **${targetRole}** position. You can preview the qualification matrix and cover statement below or export as an official PDF.`,
-        reasoning,
+        reply: `I have generated **${generatedDrafts.length} statutory documents** for your workflow:\n${summaries
+          .map((s, idx) => `• **[${idx + 1}]** ${s}`)
+          .join('\n')}\n\nYou can review, switch between, and export each document below.`,
+        reasoning: `1. Multi-Document Intent Detection: User requested ${generatedDrafts.length} documents (${multiReq.archetypes
+          .map((a) => a.name)
+          .join(', ')}).\n2. Generated discrete statutory drafts conforming to respective legal frameworks.\n3. Verified all arithmetic balances in integer minor units.`,
+        draft: generatedDrafts[0],
+        drafts: generatedDrafts,
+      };
+    }
+
+    // 5. Single Document Request: Match exact archetype
+    const matchedArchetypes = AiRagRegistry.retrieve(prompt);
+    const primaryId = isRetailRequest ? 'grocery' : (matchedArchetypes[0]?.id || 'invoice');
+    const gen = this.generateDeterministicDraftForArchetype(primaryId, prompt, undefined, context);
+
+    return {
+      reply: `I have drafted your official **${gen.draft.documentTitle}** for **${gen.draft.partyName}**.\n\nYou can preview the draft directly below, customize details in the editor, or export as PDF.`,
+      reasoning: gen.reasoning,
+      draft: gen.draft,
+      drafts: [gen.draft],
+    };
+  }
+
+  /**
+   * Universal deterministic generator for 22 statutory archetypes
+   * Eliminates generic invoice fallback and generates exact requested documents.
+   */
+  private static generateDeterministicDraftForArchetype(
+    archetypeId: string,
+    prompt: string,
+    partyNameOverride?: string,
+    context?: any
+  ): { draft: Partial<ParsedDocumentDraft>; summary: string; reasoning: string } {
+    const text = prompt.toLowerCase();
+    const defaultCurrency =
+      prompt.includes('₹') || prompt.toLowerCase().includes('rs') || prompt.toLowerCase().includes('inr')
+        ? 'INR'
+        : prompt.includes('$') || prompt.toLowerCase().includes('usd')
+        ? 'USD'
+        : context?.businessProfile?.currency || 'INR';
+
+    // Helper: Extract party name
+    const extractParty = (fallback: string): string => {
+      if (partyNameOverride) return partyNameOverride.trim();
+      const forMatch = prompt.match(
+        /\b(?:for|to|client|vendor|consignee|customer|employee|tenant|student|payee|applicant)\s+([A-Za-z0-9\s\.\,\'\-]+?)(?:\s+(?:with|basic|salary|amount|buying|at|on|for|dated|\$|₹|rs|\d|and\b)|$)/i
+      );
+      if (forMatch && forMatch[1]) {
+        const candidate = forMatch[1].trim();
+        if (
+          candidate.length > 1 &&
+          !candidate.toLowerCase().includes('invoice') &&
+          !candidate.toLowerCase().includes('document') &&
+          !candidate.toLowerCase().includes('bill') &&
+          !candidate.toLowerCase().includes('store') &&
+          !candidate.toLowerCase().includes('grocery')
+        ) {
+          return candidate;
+        }
+      }
+      if (context?.matchedCustomers?.length > 0) {
+        return context.matchedCustomers[0].name;
+      }
+      return fallback;
+    };
+
+    // Helper: Extract items and quantities
+    const extractItems = (defaultDesc: string, defaultPrice: number = 10000): any[] => {
+      const items: any[] = [];
+      const qtyPriceMatches = Array.from(
+        prompt.matchAll(/(\d+)\s+([a-zA-Z\s]+?)\s+(?:at|@|for)\s+(?:[\$₹£€]|rs\.?\s*)?(\d[\d,]*)/gi)
+      );
+      if (qtyPriceMatches.length > 0) {
+        for (const m of qtyPriceMatches) {
+          const qty = parseInt(m[1], 10);
+          const desc = m[2].trim();
+          const price = parseInt(m[3].replace(/,/g, ''), 10);
+          items.push({
+            description: desc.charAt(0).toUpperCase() + desc.slice(1),
+            quantityScaled: BigInt(qty * 10000),
+            unitName: 'item',
+            unitPriceMinor: BigInt(price * 100),
+            hsnSac: '847130',
+          });
+        }
+        return items;
+      }
+
+      const qtyMatch = prompt.match(/(\d+)\s+([a-zA-Z\s]{3,30}?)(?:\s+(?:for|to|with|and|\.|$))/i);
+      if (qtyMatch && !qtyMatch[2].toLowerCase().includes('percent') && !qtyMatch[2].toLowerCase().includes('gst')) {
+        const qty = parseInt(qtyMatch[1], 10);
+        const desc = qtyMatch[2].trim();
+        const priceMatch = prompt.match(/(?:[\$₹£€]|rs\.?\s*)(\d[\d,]*)/i);
+        const price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, ''), 10) : defaultPrice;
+        items.push({
+          description: desc.charAt(0).toUpperCase() + desc.slice(1),
+          quantityScaled: BigInt(qty * 10000),
+          unitName: 'item',
+          unitPriceMinor: BigInt(price * 100),
+          hsnSac: '847130',
+        });
+        return items;
+      }
+
+      const singlePriceMatch = prompt.match(/(?:[\$₹£€]|rs\.?\s*)(\d[\d,]*)/i);
+      const amount = singlePriceMatch ? parseInt(singlePriceMatch[1].replace(/,/g, ''), 10) : defaultPrice;
+      items.push({
+        description: defaultDesc,
+        quantityScaled: 10000n,
+        unitName: 'Service',
+        unitPriceMinor: BigInt(amount * 100),
+        hsnSac: '998314',
+      });
+      return items;
+    };
+
+    // Helper: Extract GST tax rate
+    let taxRateBp = 1800n;
+    let taxLabel = 'GST';
+    const taxMatch = prompt.match(/(\d+)%\s*(?:gst|vat|tax)/i);
+    if (taxMatch) {
+      taxRateBp = BigInt(parseInt(taxMatch[1], 10) * 100);
+      taxLabel = prompt.toLowerCase().includes('vat') ? 'VAT' : 'GST';
+    }
+
+    // ── 1. COMMERCIAL QUOTATION / ESTIMATE ──
+    if (archetypeId === 'quotation') {
+      const clientName = extractParty('Acme Enterprises');
+      const items = extractItems('Cloud Infrastructure & AI Systems Architecture', 45000);
+      return {
+        summary: `Formal Commercial Quotation for ${clientName}`,
+        reasoning: `1. Intent Classification: Commercial Quotation & Price Bid Instrument.\n2. Disambiguation: Selected formal quote archetype (penalized generic tax invoice).\n3. Extracted line items and applied ${Number(taxRateBp) / 100}% ${taxLabel}.\n4. Injected 30-day price validity and milestone payment terms.`,
         draft: {
-          docType: 'job_application',
-          documentTitle: 'Employment Application / Candidate Dossier',
-          provenanceRule: 'Statutory Labor Employment Dossier / Equal Opportunity Act',
-          partyName: candidateName,
-          partyRole: 'Applicant',
-          currency: prompt.includes('₹') || prompt.toLowerCase().includes('inr') ? 'INR' : defaultCurrency,
+          docType: 'quotation',
+          documentTitle: 'Formal Commercial Quotation',
+          provenanceRule: 'Commercial Proposal & Tender Instrument',
+          partyName: clientName,
+          partyRole: 'Client',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: Date.now() + 30 * 86400000,
+          items,
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'exclusive',
+          taxRateBp,
+          taxLabel,
+          notes: 'Quotation valid for 30 calendar days from date of issuance. Commercial terms apply upon acceptance.',
+          terms: 'Payment Terms: 50% advance mobilization fee, 50% upon milestone deliverables completion.',
+        },
+      };
+    }
+
+    // ── 2. PROFORMA INVOICE ──
+    if (archetypeId === 'proforma') {
+      const clientName = extractParty('Purchasing Corp');
+      const items = extractItems('Enterprise Software License & Deployment', 75000);
+      return {
+        summary: `Proforma Invoice for ${clientName}`,
+        reasoning: `1. Intent Classification: Proforma Invoice under CBIC Rule 46 Practice.\n2. Disambiguation: Pre-billing proforma instrument (not a statutory demand for tax payment).\n3. Extracted line items and verified advance settlement terms.`,
+        draft: {
+          docType: 'proforma',
+          documentTitle: 'Proforma Invoice',
+          provenanceRule: 'CBIC GST Rule 46 / Commercial Proforma Practice',
+          partyName: clientName,
+          partyRole: 'Client',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: Date.now() + 14 * 86400000,
+          items,
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'exclusive',
+          taxRateBp,
+          taxLabel,
+          notes: 'Proforma Invoice issued for advance payment authorization. This is not a demand for tax payment.',
+          terms: 'Goods/services will be dispatched immediately upon electronic receipt of payment against this proforma.',
+        },
+      };
+    }
+
+    // ── 3. DELIVERY CHALLAN / DISPATCH NOTE ──
+    if (archetypeId === 'delivery_challan') {
+      const consigneeName = extractParty('Consignee Warehouse Hub');
+      const items = extractItems('Dell 27-inch 4K UltraSharp Monitors', 15000);
+      return {
+        summary: `Delivery Challan / Dispatch Note for ${consigneeName}`,
+        reasoning: `1. Intent Classification: Statutory Delivery Challan under CBIC CGST Rule 55.\n2. Provenance: Transportation of goods without immediate tax liability (tax collected on invoice).\n3. Party designated as Consignee with vehicle and dispatch verification parameters.`,
+        draft: {
+          docType: 'delivery_challan',
+          documentTitle: 'Delivery Challan / Dispatch Note',
+          provenanceRule: 'CBIC CGST Rule 55 Delivery Challan',
+          partyName: consigneeName,
+          partyRole: 'Consignee',
+          currency: defaultCurrency,
           issueDate: Date.now(),
           dueDate: null,
           items,
@@ -1229,84 +1584,447 @@ ${userPrompt}
           taxType: 'none',
           taxRateBp: 0n,
           taxLabel: 'None',
-          notes: metadata.coverStatement,
-          terms: `Applicant confirms all information supplied is verified and truthful.`,
-          metadata,
+          notes: 'Goods dispatched under CBIC Rule 55 for transport. Valid for carrier check-post verification.',
+          terms: 'Received the above goods in good order and condition subject to inward QA store inspection.',
+          metadata: {
+            vehicleNo: 'KA-01-MJ-9912',
+            reasonForTransportation: 'Supply on Approval / Sale on Return',
+          },
         },
       };
     }
 
-    // ── CASE B: JOB OFFER / APPOINTMENT LETTER ──
-    if (primary.id === 'job_offer' || text.includes('job offer') || text.includes('offer letter')) {
-      const candidateName = 'Selected Candidate';
-      const designation = 'Senior Applied AI Engineer';
-      const items = [
-        {
-          description: 'Basic Annual Compensation (Base Pay)',
-          quantityScaled: 10000n,
-          unitName: 'Year',
-          unitPriceMinor: 240000000n, // ₹24,00,000
-          itemNotes: 'Monthly fixed salary component',
-        },
-        {
-          description: 'House Rent Allowance (HRA)',
-          quantityScaled: 10000n,
-          unitName: 'Year',
-          unitPriceMinor: 70000000n, // ₹7,00,000
-          itemNotes: 'Statutory HRA under Income Tax Act',
-        },
-        {
-          description: 'Performance & Retention Equity Bonus',
-          quantityScaled: 10000n,
-          unitName: 'Year',
-          unitPriceMinor: 40000000n, // ₹4,00,000
-          itemNotes: 'Milestone linked annual grant',
-        },
-      ];
-
-      const metadata = {
-        candidateName,
-        designation,
-        annualCtc: '₹35,00,000 PA',
-        monthlyGross: '₹2,91,666',
-        joiningDate: '01 Nov 2026',
-        probationMonths: 3,
-        reportingTo: 'VP of Engineering',
-        benefits: ['Executive Health Coverage', 'Equity Grants', 'Learning Budget', 'Workstation Setup'],
-      };
-
-      const reasoning = `1. Intent Classification: Employment Offer & Appointment Terms.
-2. Statutory Provenance: Indian Contract Act 1872 / Model Standing Orders.
-3. Structured compensation package: ₹35,00,000 Annual CTC across Base, HRA, and Performance Bonus.
-4. Set joining timeline and 3-month statutory probation period.`;
-
+    // ── 4. OFFICIAL PURCHASE ORDER (PO) ──
+    if (archetypeId === 'purchase_order') {
+      const vendorName = extractParty('Supplier Hardware Technologies Ltd');
+      const items = extractItems('Enterprise Server Components & Memory Modules', 120000);
       return {
-        reply: `I have drafted an official **Job Offer & Appointment Letter** for **${candidateName}** as **${designation}** with an annual CTC of ₹35,00,000.`,
-        reasoning,
+        summary: `Official Purchase Order (PO) for ${vendorName}`,
+        reasoning: `1. Intent Classification: Commercial Purchase Order (PO).\n2. Party Role: Assigned Vendor counterparty with procurement terms.\n3. Verified delivery schedules and standard Net 30 payment terms.`,
         draft: {
-          docType: 'job_offer_letter',
-          documentTitle: 'Job Offer & Appointment Letter',
-          provenanceRule: 'Contract Act / Employment Terms SS-3',
-          partyName: candidateName,
-          partyRole: 'Candidate',
-          currency: 'INR',
+          docType: 'purchase_order',
+          documentTitle: 'Official Purchase Order (PO)',
+          provenanceRule: 'Commercial Procurement Instrument',
+          partyName: vendorName,
+          partyRole: 'Vendor',
+          currency: defaultCurrency,
           issueDate: Date.now(),
-          dueDate: Date.now() + 7 * 86400000, // 7 days acceptance deadline
+          dueDate: Date.now() + 14 * 86400000,
           items,
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'exclusive',
+          taxRateBp,
+          taxLabel,
+          notes: 'Purchase Order PO-2026-881. Delivery required within 14 calendar days to central warehouse.',
+          terms: 'Payment terms: Net 30 days post delivery and GRN inspection sign-off.',
+        },
+      };
+    }
+
+    // ── 5. STATUTORY CREDIT NOTE ──
+    if (archetypeId === 'credit_note') {
+      const clientName = extractParty('Customer Accounts Ltd');
+      const singlePriceMatch = prompt.match(/(?:[\$₹£€]|rs\.?\s*)(\d[\d,]*)/i);
+      const amount = singlePriceMatch ? parseInt(singlePriceMatch[1].replace(/,/g, ''), 10) : 15000;
+      return {
+        summary: `Statutory Credit Note for ${clientName}`,
+        reasoning: `1. Intent Classification: Statutory Credit Note under CBIC CGST Rule 53(1).\n2. Adjusted taxable value and input tax credit liability.\n3. Referenced sales return / post-sale allowance terms.`,
+        draft: {
+          docType: 'credit_note',
+          documentTitle: 'Statutory Credit Note',
+          provenanceRule: 'CBIC CGST Rule 53(1) Credit Note',
+          partyName: clientName,
+          partyRole: 'Client',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Sales Return Allowance / Post-Sale Rate Revision',
+              quantityScaled: 10000n,
+              unitName: 'Adjustment',
+              unitPriceMinor: BigInt(amount * 100),
+              hsnSac: '998314',
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'exclusive',
+          taxRateBp,
+          taxLabel,
+          notes: 'Credit Note issued against original invoice. Adjusts taxable turnover and tax liability under Rule 53.',
+          terms: 'This credit note can be adjusted against future invoices or refunded directly.',
+        },
+      };
+    }
+
+    // ── 6. STATUTORY DEBIT NOTE ──
+    if (archetypeId === 'debit_note') {
+      const vendorName = extractParty('Global Supplies Corp');
+      const singlePriceMatch = prompt.match(/(?:[\$₹£€]|rs\.?\s*)(\d[\d,]*)/i);
+      const amount = singlePriceMatch ? parseInt(singlePriceMatch[1].replace(/,/g, ''), 10) : 8000;
+      return {
+        summary: `Statutory Debit Note for ${vendorName}`,
+        reasoning: `1. Intent Classification: Statutory Debit Note under CBIC CGST Rule 53(2).\n2. Supplementary charge / rate escalation debit note.\n3. Calculated tax adjustment with integer arithmetic precision.`,
+        draft: {
+          docType: 'debit_note',
+          documentTitle: 'Statutory Debit Note',
+          provenanceRule: 'CBIC CGST Rule 53(2) Debit Note',
+          partyName: vendorName,
+          partyRole: 'Vendor',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Supplementary Surcharge / Underbilled Freight Adjustment',
+              quantityScaled: 10000n,
+              unitName: 'Charge',
+              unitPriceMinor: BigInt(amount * 100),
+              hsnSac: '998314',
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'exclusive',
+          taxRateBp,
+          taxLabel,
+          notes: 'Debit Note issued for supplementary charges under CGST Rule 53(2).',
+        },
+      };
+    }
+
+    // ── 7. PAYMENT RECEIPT / MONEY VOUCHER ──
+    if (archetypeId === 'receipt') {
+      const payeeName = extractParty('Sharma & Sons Enterprises');
+      const singlePriceMatch = prompt.match(/(?:[\$₹£€]|rs\.?\s*)(\d[\d,]*)/i);
+      const amount = singlePriceMatch ? parseInt(singlePriceMatch[1].replace(/,/g, ''), 10) : 50000;
+      return {
+        summary: `Official Payment Receipt for ${payeeName}`,
+        reasoning: `1. Intent Classification: Official Payment Receipt / Money Voucher.\n2. Disambiguation: Acknowledgment of funds received (tax zero, payment confirmation).\n3. Verified receipt number and payment settlement trace.`,
+        draft: {
+          docType: 'receipt',
+          documentTitle: 'Payment Receipt / Money Voucher',
+          provenanceRule: 'Official Accounts Payment Receipt',
+          partyName: payeeName,
+          partyRole: 'Client',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Commercial Account Settlement / Payment Received with Thanks',
+              quantityScaled: 10000n,
+              unitName: 'Payment',
+              unitPriceMinor: BigInt(amount * 100),
+            },
+          ],
           discountType: 'none',
           discountValue: 0n,
           taxType: 'none',
           taxRateBp: 0n,
           taxLabel: 'None',
-          notes: `Offer valid for acceptance within 7 business days from date of issuance.`,
-          terms: `Subject to reference checks and background verification.`,
-          metadata,
+          notes: 'Received with thanks. Confirms electronic funds transfer into corporate bank account.',
+          terms: 'Subject to electronic realization of funds if paid via cheque/clearing.',
         },
       };
     }
 
-    // ── CASE C: SALARY SLIP / PAYSLIP ──
-    if (primary.id === 'salary_slip' || text.includes('salary') || text.includes('payslip')) {
+    // ── 8. PAYMENT DISBURSEMENT VOUCHER ──
+    if (archetypeId === 'payment_voucher') {
+      const beneficiaryName = extractParty('Beneficiary Vendor');
+      const singlePriceMatch = prompt.match(/(?:[\$₹£€]|rs\.?\s*)(\d[\d,]*)/i);
+      const amount = singlePriceMatch ? parseInt(singlePriceMatch[1].replace(/,/g, ''), 10) : 14500;
+      return {
+        summary: `Payment Disbursement Voucher for ${beneficiaryName}`,
+        reasoning: `1. Intent Classification: Payment Disbursement Voucher.\n2. Authorized financial disbursement record from corporate treasury.`,
+        draft: {
+          docType: 'payment_voucher',
+          documentTitle: 'Payment Disbursement Voucher',
+          provenanceRule: 'Statutory Cash & Bank Payment Voucher',
+          partyName: beneficiaryName,
+          partyRole: 'Vendor',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Disbursement of Approved Operational Expense',
+              quantityScaled: 10000n,
+              unitName: 'Payout',
+              unitPriceMinor: BigInt(amount * 100),
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'none',
+          taxRateBp: 0n,
+          taxLabel: 'None',
+          notes: 'Payment disbursement authorized and recorded in ledger.',
+        },
+      };
+    }
+
+    // ── 9. CONTRACTOR WORK ORDER / SOW ──
+    if (archetypeId === 'work_order') {
+      const contractorName = extractParty('Apex Engineering Solutions');
+      return {
+        summary: `Contractor Work Order / SOW for ${contractorName}`,
+        reasoning: `1. Intent Classification: Contractor Work Order / Statement of Work (SOW).\n2. Generated milestones, deliverable tasks, and completion schedule.`,
+        draft: {
+          docType: 'work_order',
+          documentTitle: 'Contractor Work Order / SOW',
+          provenanceRule: 'Commercial Deliverable & Retainage Contract',
+          partyName: contractorName,
+          partyRole: 'Vendor',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: Date.now() + 45 * 86400000,
+          items: [
+            {
+              description: 'Milestone 1: Architectural Assessment & Schema Migration',
+              quantityScaled: 10000n,
+              unitName: 'Milestone',
+              unitPriceMinor: 4500000n,
+            },
+            {
+              description: 'Milestone 2: Multi-Agent Workflow Engine Implementation',
+              quantityScaled: 10000n,
+              unitName: 'Milestone',
+              unitPriceMinor: 6500000n,
+            },
+            {
+              description: 'Milestone 3: End-to-End Hardening & Security Audit',
+              quantityScaled: 10000n,
+              unitName: 'Milestone',
+              unitPriceMinor: 3500000n,
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'exclusive',
+          taxRateBp: 1800n,
+          taxLabel: 'GST',
+          notes: 'Contractor Work Order authorized for engineering deliverables execution.',
+          terms: '5% statutory retainage withheld until 30 days post final acceptance.',
+        },
+      };
+    }
+
+    // ── 10. EQUIPMENT RESPONSIBILITY & ASSET HANDOVER ──
+    if (archetypeId === 'equipment_responsibility') {
+      const custodianName = extractParty('Aditya Sen');
+      return {
+        summary: `Equipment Responsibility Letter for ${custodianName}`,
+        reasoning: `1. Intent Classification: Asset Handover & Equipment Custody Agreement.\n2. Statutory Provenance: Enterprise IT Governance & Asset Protection Policy.`,
+        draft: {
+          docType: 'equipment_responsibility_letter',
+          documentTitle: 'Equipment Responsibility & Asset Handover Letter',
+          provenanceRule: 'Asset Custody & Enterprise Governance Policy',
+          partyName: custodianName,
+          partyRole: 'Employee',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Apple MacBook Pro 16-inch M3 Max (36GB RAM / 1TB SSD)',
+              quantityScaled: 10000n,
+              unitName: 'Unit',
+              unitPriceMinor: 28000000n,
+              itemNotes: 'Asset Tag: APEX-IT-2026-904 · Serial: C02G4109MD6',
+            },
+            {
+              description: 'Dell UltraSharp 27-inch 4K USB-C Hub Monitor (U2723QE)',
+              quantityScaled: 10000n,
+              unitName: 'Unit',
+              unitPriceMinor: 5500000n,
+              itemNotes: 'Serial: CN-0Y832-74261',
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'none',
+          taxRateBp: 0n,
+          taxLabel: 'None',
+          notes: 'Employee acknowledges receipt of equipment in brand-new operational condition.',
+          terms: 'Custodian is responsible for proper care and immediate reporting of loss/damage.',
+        },
+      };
+    }
+
+    // ── 11. CORPORATE MEETING MINUTES (MOM) ──
+    if (archetypeId === 'meeting_minutes') {
+      return {
+        summary: 'Corporate Meeting Minutes (MOM)',
+        reasoning: `1. Intent Classification: Corporate Meeting Minutes under Secretarial Standard SS-1.\n2. Synthesized key architectural decisions, resolutions, and action items.`,
+        draft: {
+          docType: 'meeting_minutes',
+          documentTitle: 'Corporate Meeting Minutes (MOM)',
+          provenanceRule: 'Secretarial Standard SS-1 / Corporate Governance',
+          partyName: 'Architecture & Steering Committee',
+          partyRole: 'Client',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Resolution 1: Ground all autonomous agents in local SQLite with BigInt integer math',
+              quantityScaled: 10000n,
+              unitName: 'Resolution',
+              unitPriceMinor: 0n,
+            },
+            {
+              description: 'Resolution 2: Universal document dispatcher supporting 446 statutory archetypes',
+              quantityScaled: 10000n,
+              unitName: 'Resolution',
+              unitPriceMinor: 0n,
+            },
+            {
+              description: 'Action Item: Deploy multi-document batch workflow cards in conversational assistant',
+              quantityScaled: 10000n,
+              unitName: 'Action',
+              unitPriceMinor: 0n,
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'none',
+          taxRateBp: 0n,
+          taxLabel: 'None',
+          notes: 'Minutes of Meeting confirmed by chairperson and circulated to all attendees.',
+        },
+      };
+    }
+
+    // ── 12. SITE INSPECTION & AUDIT REPORT ──
+    if (archetypeId === 'site_inspection') {
+      const inspectorName = extractParty('Lead Field Inspector');
+      return {
+        summary: `Site Inspection & Engineering Audit Report`,
+        reasoning: `1. Intent Classification: Site Inspection & Quality Audit Report.\n2. Recorded structural, electrical, and environmental compliance checks.`,
+        draft: {
+          docType: 'site_inspection_report',
+          documentTitle: 'Site Inspection & Engineering Audit Report',
+          provenanceRule: 'Quality Assurance & Occupational Safety Standards',
+          partyName: inspectorName,
+          partyRole: 'Client',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Structural Steel Reinforcement & Weld Integrity Inspection',
+              quantityScaled: 10000n,
+              unitName: 'Check',
+              unitPriceMinor: 0n,
+              itemNotes: 'Status: 100% PASS (Zero micro-fractures detected)',
+            },
+            {
+              description: 'Electrical Substation Grounding & Earthing Resistance Test',
+              quantityScaled: 10000n,
+              unitName: 'Check',
+              unitPriceMinor: 0n,
+              itemNotes: 'Status: PASS (< 1.2 Ohms verified)',
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'none',
+          taxRateBp: 0n,
+          taxLabel: 'None',
+          notes: 'Site inspection completed in accordance with ISO 9001 and statutory safety standards.',
+        },
+      };
+    }
+
+    // ── 13. CUSTOMER STATEMENT OF ACCOUNT ──
+    if (archetypeId === 'customer_statement') {
+      const clientName = extractParty('Customer Account');
+      return {
+        summary: `Customer Statement of Account for ${clientName}`,
+        reasoning: `1. Intent Classification: Customer Account Statement & Aging Ledger.\n2. Summarized period billings, receipts, and net outstanding balance.`,
+        draft: {
+          docType: 'customer_account_statement',
+          documentTitle: 'Customer Statement of Account',
+          provenanceRule: 'Standard Commercial Accounts Ledger',
+          partyName: clientName,
+          partyRole: 'Client',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Billed Invoices Total (Current Billing Cycle)',
+              quantityScaled: 10000n,
+              unitName: 'Debit',
+              unitPriceMinor: 25000000n,
+            },
+            {
+              description: 'Electronic Payments Received & Cleared',
+              quantityScaled: 10000n,
+              unitName: 'Credit',
+              unitPriceMinor: -15000000n,
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'none',
+          taxRateBp: 0n,
+          taxLabel: 'None',
+          notes: 'Statement reflects all verified ledger transactions up to the current date.',
+        },
+      };
+    }
+
+    // ── 14. STUDENT FEE RECEIPT ──
+    if (archetypeId === 'student_fee_receipt') {
+      const studentName = extractParty('Ananya Deshmukh');
+      return {
+        summary: `Institutional Student Fee Receipt for ${studentName}`,
+        reasoning: `1. Intent Classification: Institutional Academic Fee Receipt.\n2. Itemized tuition, computing lab, and library examination fees.`,
+        draft: {
+          docType: 'student_fee_receipt',
+          documentTitle: 'Institutional Student Fee Receipt',
+          provenanceRule: 'Educational Academic Accounts Voucher',
+          partyName: studentName,
+          partyRole: 'Client',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Tuition Fee (Semester Fall 2026)',
+              quantityScaled: 10000n,
+              unitName: 'Term',
+              unitPriceMinor: 7500000n,
+            },
+            {
+              description: 'Computing Laboratory & Cloud Infrastructure Fee',
+              quantityScaled: 10000n,
+              unitName: 'Term',
+              unitPriceMinor: 1500000n,
+            },
+            {
+              description: 'Library & Examination Fee',
+              quantityScaled: 10000n,
+              unitName: 'Term',
+              unitPriceMinor: 500000n,
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'none',
+          taxRateBp: 0n,
+          taxLabel: 'None',
+          notes: 'Received with thanks. Confirms student academic term fee payment.',
+        },
+      };
+    }
+
+    // ── 15. SALARY SLIP / PAYSLIP ──
+    if (archetypeId === 'salary_slip' || text.includes('salary') || text.includes('payslip')) {
       const basicMatch = prompt.match(/basic\s+(?:salary\s+)?(?:of\s+)?(?:[\$₹£€]|rs\.?\s*)?(\d[\d,]*)/i);
       const hraMatch = prompt.match(/hra\s+(?:of\s+)?(?:[\$₹£€]|rs\.?\s*)?(\d[\d,]*)/i);
       const pfMatch = prompt.match(/pf\s+(?:deduction\s+)?(?:of\s+)?(?:[\$₹£€]|rs\.?\s*)?(\d[\d,]*)/i);
@@ -1317,74 +2035,52 @@ ${userPrompt}
 
       const grossNum = basicNum + hraNum;
       const netNum = grossNum - pfNum;
-      const currency = prompt.includes('$') ? 'USD' : 'INR';
 
-      const items: any[] = [
-        {
-          description: 'Basic Salary',
-          quantityScaled: 10000n,
-          unitName: 'Month',
-          unitPriceMinor: BigInt(basicNum * 100),
-          itemNotes: 'Earnings Component',
-        },
-        {
-          description: 'House Rent Allowance (HRA)',
-          quantityScaled: 10000n,
-          unitName: 'Month',
-          unitPriceMinor: BigInt(hraNum * 100),
-          itemNotes: 'Earnings Component',
-        },
-        {
-          description: 'Provident Fund (PF) Employee Deduction',
-          quantityScaled: 10000n,
-          unitName: 'Month',
-          unitPriceMinor: -BigInt(pfNum * 100),
-          itemNotes: 'Statutory Deduction',
-        },
-      ];
-
-      let employeeName = 'John Doe';
+      const employeeName = extractParty('John Doe');
       let designation = 'Senior Architect';
       const desigMatch = prompt.match(/(?:senior\s+architect|architect|engineer|lead|manager|analyst|developer)/i);
       if (desigMatch) {
-        designation = desigMatch[0].split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        designation = desigMatch[0]
+          .split(' ')
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(' ');
       }
-      const forMatch = prompt.match(/\bfor\s+([A-Za-z0-9\s\.\,\'\-]+?)(?:\s+(?:with|basic|salary|amount|buying|at|on|for|dated|\$|₹|rs|\d)|$)/i);
-      if (forMatch && forMatch[1] && !forMatch[1].toLowerCase().includes('senior') && !forMatch[1].toLowerCase().includes('architect')) {
-        employeeName = forMatch[1].trim();
-      }
-
-      const metadata = {
-        employeeName,
-        designation,
-        payPeriod: 'October 2026',
-        basicSalaryMinor: BigInt(basicNum * 100),
-        hraMinor: BigInt(hraNum * 100),
-        pfDeductionMinor: BigInt(pfNum * 100),
-        grossEarningsMinor: BigInt(grossNum * 100),
-        totalDeductionsMinor: BigInt(pfNum * 100),
-        netPayMinor: BigInt(netNum * 100),
-      };
-
-      const reasoning = `1. Intent Classification: Statutory Salary Slip / Payslip.
-2. Provenance: Payment of Wages Act 1936 / Labour Regulations / EPF Act 1952.
-3. Extracted Salary Components: Basic ₹${basicNum.toLocaleString()}, HRA ₹${hraNum.toLocaleString()} (Gross: ₹${grossNum.toLocaleString()}).
-4. Extracted Statutory Deductions: Employee PF ₹${pfNum.toLocaleString()}.
-5. Calculated Net Take-Home Pay: ₹${netNum.toLocaleString()} with deterministic integer balance.`;
 
       return {
-        reply: `I have drafted the official **Salary Slip** for **${employeeName}** (${designation}) for October 2026 with gross earnings of ₹${grossNum.toLocaleString()} and net take-home pay of ₹${netNum.toLocaleString()}.`,
-        reasoning,
+        summary: `Salary Slip for ${employeeName} (${designation})`,
+        reasoning: `1. Intent Classification: Statutory Salary Slip / Payslip.\n2. Provenance: Payment of Wages Act 1936 / EPF Act 1952.\n3. Extracted Salary: Basic ₹${basicNum.toLocaleString()}, HRA ₹${hraNum.toLocaleString()} (Gross: ₹${grossNum.toLocaleString()}).\n4. Deductions: Employee PF ₹${pfNum.toLocaleString()}.\n5. Net Take-Home: ₹${netNum.toLocaleString()}.`,
         draft: {
           docType: 'salary_slip',
           documentTitle: 'Salary Slip / Payslip',
           provenanceRule: 'Payment of Wages Act 1936 / EPF Act 1952',
           partyName: employeeName,
           partyRole: 'Employee',
-          currency,
+          currency: defaultCurrency,
           issueDate: Date.now(),
           dueDate: null,
-          items,
+          items: [
+            {
+              description: 'Basic Salary',
+              quantityScaled: 10000n,
+              unitName: 'Month',
+              unitPriceMinor: BigInt(basicNum * 100),
+              itemNotes: 'Earnings Component',
+            },
+            {
+              description: 'House Rent Allowance (HRA)',
+              quantityScaled: 10000n,
+              unitName: 'Month',
+              unitPriceMinor: BigInt(hraNum * 100),
+              itemNotes: 'Earnings Component',
+            },
+            {
+              description: 'Provident Fund (PF) Employee Deduction',
+              quantityScaled: 10000n,
+              unitName: 'Month',
+              unitPriceMinor: -BigInt(pfNum * 100),
+              itemNotes: 'Statutory Deduction',
+            },
+          ],
           discountType: 'none',
           discountValue: 0n,
           taxType: 'none',
@@ -1392,39 +2088,41 @@ ${userPrompt}
           taxLabel: 'None',
           notes: 'Statutory wage slip. Confirms salary disbursement and statutory deposits.',
           terms: 'Strictly confidential. Issued by employer for statutory tax compliance.',
-          metadata,
+          metadata: {
+            employeeName,
+            designation,
+            payPeriod: 'October 2026',
+            basicSalaryMinor: BigInt(basicNum * 100),
+            hraMinor: BigInt(hraNum * 100),
+            pfDeductionMinor: BigInt(pfNum * 100),
+            grossEarningsMinor: BigInt(grossNum * 100),
+            totalDeductionsMinor: BigInt(pfNum * 100),
+            netPayMinor: BigInt(netNum * 100),
+          },
         },
       };
     }
 
-    // ── CASE D: HOUSE RENT RECEIPT ──
-    if (primary.id === 'rent_receipt' || text.includes('rent') || text.includes('landlord')) {
-      let tenantName = 'Tenant';
-      const forMatch = prompt.match(/\bfor\s+([A-Za-z0-9\s\.\,\'\-]+?)(?:\s+(?:with|for|amount|at|on|dated|\$|₹|rs|\d)|$)/i);
-      if (forMatch && forMatch[1]) tenantName = forMatch[1].trim();
-
+    // ── 16. HOUSE RENT RECEIPT ──
+    if (archetypeId === 'rent_receipt' || text.includes('rent') || text.includes('landlord')) {
+      const tenantName = extractParty('Tenant');
       const rentMatch = prompt.match(/(?:[\$₹£€]|rs\.?\s*)(\d[\d,]*)/i);
       const rentAmount = rentMatch ? parseInt(rentMatch[1].replace(/,/g, ''), 10) : 28000;
-
-      const reasoning = `1. Intent Classification: House Rent Receipt for HRA Exemption.
-2. Statutory Provenance: Section 10(13A) of Income Tax Act 1961 / Rule 2A.
-3. Landlord PAN Declaration and property address slot verified.`;
-
       return {
-        reply: `I have generated the official **House Rent Receipt** for **${tenantName}** for ₹${rentAmount.toLocaleString()} compliant with Section 10(13A) HRA exemption.`,
-        reasoning,
+        summary: `House Rent Receipt for ${tenantName}`,
+        reasoning: `1. Intent Classification: House Rent Receipt for HRA Exemption.\n2. Statutory Provenance: Section 10(13A) Income Tax Act 1961.\n3. Landlord PAN Declaration and residential property address configured.`,
         draft: {
           docType: 'rent_receipt',
           documentTitle: 'House Rent Receipt (HRA Exemption)',
           provenanceRule: 'Section 10(13A) Income Tax Act, 1961',
           partyName: tenantName,
           partyRole: 'Tenant',
-          currency: 'INR',
+          currency: defaultCurrency,
           issueDate: Date.now(),
           dueDate: null,
           items: [
             {
-              description: 'Residential Accommodation Monthly Rent',
+              description: 'Residential Premises Monthly Rent (HRA Exemption)',
               quantityScaled: 10000n,
               unitName: 'Month',
               unitPriceMinor: BigInt(rentAmount * 100),
@@ -1440,209 +2138,148 @@ ${userPrompt}
       };
     }
 
-    // ── CASE E: GROCERY / RETAIL STORE / 10 RANDOM ITEMS ──
-    if (
-      text.includes('grocery') ||
-      text.includes('supermarket') ||
-      text.includes('kirana') ||
-      text.includes('provision') ||
-      (text.includes('10') && (text.includes('item') || text.includes('product') || text.includes('random')))
-    ) {
-      let customerName = 'Walk-in Retail Customer';
-      const forMatch = prompt.match(/\bfor\s+(?!my\b|grocery\b|a\b|the\b)([A-Za-z0-9\s\.\,\'\-]+?)(?:\s+(?:with|items|bill|buying|at|on|dated|\$|₹|rs|\d)|$)/i);
-      if (
-        forMatch &&
-        forMatch[1] &&
-        !forMatch[1].toLowerCase().includes('store') &&
-        !forMatch[1].toLowerCase().includes('fille') &&
-        !forMatch[1].toLowerCase().includes('grocery')
-      ) {
-        customerName = forMatch[1].trim();
-      }
-
-      const groceryItems = [
-        {
-          description: 'Premium Basmati Rice (Daawat / India Gate)',
-          quantityScaled: 50000n,
-          unitName: 'kg',
-          unitPriceMinor: 11000n,
-          hsnSac: '100630',
-          itemNotes: 'Grade A Long Grain Aged Rice',
-        },
-        {
-          description: 'Chakki Fresh Whole Wheat Atta (Aashirvaad)',
-          quantityScaled: 100000n,
-          unitName: 'kg',
-          unitPriceMinor: 4200n,
-          hsnSac: '110100',
-          itemNotes: '100% Whole Wheat Flour',
-        },
-        {
-          description: 'Pure Refined Sunflower Cooking Oil (Fortune)',
-          quantityScaled: 20000n,
-          unitName: 'L',
-          unitPriceMinor: 16500n,
-          hsnSac: '151219',
-          itemNotes: 'Fortified with Vitamin A & D',
-        },
-        {
-          description: 'Farm Fresh Organic Brown Eggs',
-          quantityScaled: 120000n,
-          unitName: 'pcs',
-          unitPriceMinor: 1000n,
-          hsnSac: '040721',
-          itemNotes: 'Pack of 12 Table Eggs',
-        },
-        {
-          description: 'Unpolished Organic Toor / Arhar Dal',
-          quantityScaled: 10000n,
-          unitName: 'kg',
-          unitPriceMinor: 17500n,
-          hsnSac: '071360',
-          itemNotes: 'High Protein Indian Pulse',
-        },
-        {
-          description: 'Pasteurized Full Cream Fresh Milk (Amul Gold)',
-          quantityScaled: 20000n,
-          unitName: 'L',
-          unitPriceMinor: 3400n,
-          hsnSac: '040120',
-          itemNotes: 'Daily Fresh Dairy Pouch',
-        },
-        {
-          description: 'Sulfur-Free Pure Cane White Sugar (Madhur)',
-          quantityScaled: 20000n,
-          unitName: 'kg',
-          unitPriceMinor: 4500n,
-          hsnSac: '170199',
-          itemNotes: 'Refined Sparkling Crystals',
-        },
-        {
-          description: 'Assam Strong CTC Premium Tea (Tata Tea Gold)',
-          quantityScaled: 10000n,
-          unitName: 'pack',
-          unitPriceMinor: 24000n,
-          hsnSac: '090230',
-          itemNotes: '500g Vacuum Fresh Pouch',
-        },
-        {
-          description: 'Tata Vacuum Evaporated Iodized Table Salt',
-          quantityScaled: 10000n,
-          unitName: 'kg',
-          unitPriceMinor: 2800n,
-          hsnSac: '250100',
-          itemNotes: 'Iodine Enriched Food Grade',
-        },
-        {
-          description: 'Everest Shahi Garam Masala Blend',
-          quantityScaled: 10000n,
-          unitName: 'pack',
-          unitPriceMinor: 12000n,
-          hsnSac: '091091',
-          itemNotes: '200g Authentic Spice Carton',
-        },
-      ];
-
-      const reasoning = `1. Intent Classification: Retail Point-of-Sale / Grocery Store Cash Memo under CBIC GST Rule 46.
-2. Inventory Synthesis: Generated 10 essential grocery line items across FMCG staples (Rice, Atta, Oil, Eggs, Dal, Milk, Sugar, Tea, Salt, Spices).
-3. Grounding & Provenance: Applied standard retail units (kg, L, pack, pcs) and current Indian FMCG retail market pricing.
-4. Statutory Taxation: Applied statutory 5% GST (2.5% CGST + 2.5% SGST) for packaged staples.
-5. Integer Arithmetic Verification: Verified all line items and computed invariant grand total using DocumentCalculator.`;
-
+    // ── 17. JOB OFFER / APPOINTMENT LETTER ──
+    if (archetypeId === 'job_offer' || text.includes('job offer') || text.includes('offer letter')) {
+      const candidateName = extractParty('Selected Candidate');
       return {
-        reply: `I have drafted an official **Grocery Retail Tax Invoice / Cash Memo** with 10 essential inventory items for **${customerName}**. Subtotal and statutory GST have been calculated with 100% precision.`,
-        reasoning,
+        summary: `Job Offer & Appointment Letter for ${candidateName}`,
+        reasoning: `1. Intent Classification: Employment Offer & Appointment Terms.\n2. Statutory Provenance: Indian Contract Act 1872 / Model Standing Orders.\n3. Formatted ₹35,00,000 Annual CTC across Base, HRA, and Performance Bonus.`,
+        draft: {
+          docType: 'job_offer_letter',
+          documentTitle: 'Job Offer & Appointment Letter',
+          provenanceRule: 'Contract Act / Employment Terms SS-3',
+          partyName: candidateName,
+          partyRole: 'Candidate',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: Date.now() + 7 * 86400000,
+          items: [
+            {
+              description: 'Basic Annual Compensation (Base Pay)',
+              quantityScaled: 10000n,
+              unitName: 'Year',
+              unitPriceMinor: 240000000n,
+            },
+            {
+              description: 'House Rent Allowance (HRA)',
+              quantityScaled: 10000n,
+              unitName: 'Year',
+              unitPriceMinor: 70000000n,
+            },
+            {
+              description: 'Performance & Retention Equity Bonus',
+              quantityScaled: 10000n,
+              unitName: 'Year',
+              unitPriceMinor: 40000000n,
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'none',
+          taxRateBp: 0n,
+          taxLabel: 'None',
+          notes: 'Offer valid for acceptance within 7 business days from date of issuance.',
+        },
+      };
+    }
+
+    // ── 18. JOB APPLICATION / CANDIDATE DOSSIER ──
+    if (archetypeId === 'job_application' || text.includes('job application') || text.includes('candidate')) {
+      const candidateName = extractParty('Candidate Dossier');
+      return {
+        summary: `Employment Application / Candidate Dossier`,
+        reasoning: `1. Intent Classification: Candidate Job Application & Technical Competency Dossier.\n2. Disambiguation: Heavily penalized commercial invoice (score 0), selected Candidate Dossier (score 95).`,
+        draft: {
+          docType: 'job_application',
+          documentTitle: 'Employment Application / Candidate Dossier',
+          provenanceRule: 'Statutory Labor Employment Dossier / Equal Opportunity Act',
+          partyName: candidateName,
+          partyRole: 'Applicant',
+          currency: defaultCurrency,
+          issueDate: Date.now(),
+          dueDate: null,
+          items: [
+            {
+              description: 'Core Competency: LLM Architectures, Fine-Tuning & Multi-Agent Orchestration',
+              quantityScaled: 10000n,
+              unitName: 'Track',
+              unitPriceMinor: 0n,
+            },
+            {
+              description: 'Production Infrastructure: RAG Pipelines, Vector DBs & Low-Latency Inference',
+              quantityScaled: 10000n,
+              unitName: 'Track',
+              unitPriceMinor: 0n,
+            },
+          ],
+          discountType: 'none',
+          discountValue: 0n,
+          taxType: 'none',
+          taxRateBp: 0n,
+          taxLabel: 'None',
+          notes: 'Applied AI Engineer candidate portfolio and qualification matrix.',
+        },
+      };
+    }
+
+    // ── 19. GROCERY / RETAIL POS MEMO ──
+    if (archetypeId === 'grocery' || /grocery|provision|supermarket|kirana|retail|pos cash|walk-in/i.test(prompt)) {
+      const customerName = 'Walk-in Retail Customer';
+      const groceryItems = [
+        { description: 'Premium Basmati Rice (Daawat / India Gate)', quantityScaled: 50000n, unitName: 'kg', unitPriceMinor: 11000n, hsnSac: '100630' },
+        { description: 'Chakki Fresh Whole Wheat Atta (Aashirvaad)', quantityScaled: 100000n, unitName: 'kg', unitPriceMinor: 4200n, hsnSac: '110100' },
+        { description: 'Pure Refined Sunflower Cooking Oil (Fortune)', quantityScaled: 20000n, unitName: 'L', unitPriceMinor: 16500n, hsnSac: '151219' },
+        { description: 'Farm Fresh Organic Brown Eggs', quantityScaled: 120000n, unitName: 'pcs', unitPriceMinor: 1000n, hsnSac: '040721' },
+        { description: 'Unpolished Organic Toor / Arhar Dal', quantityScaled: 10000n, unitName: 'kg', unitPriceMinor: 17500n, hsnSac: '071360' },
+        { description: 'Pasteurized Full Cream Fresh Milk (Amul Gold)', quantityScaled: 20000n, unitName: 'L', unitPriceMinor: 3400n, hsnSac: '040120' },
+        { description: 'Sulfur-Free Pure Cane White Sugar (Madhur)', quantityScaled: 20000n, unitName: 'kg', unitPriceMinor: 4500n, hsnSac: '170199' },
+        { description: 'Assam Strong CTC Premium Tea (Tata Tea Gold)', quantityScaled: 10000n, unitName: 'pack', unitPriceMinor: 24000n, hsnSac: '090230' },
+        { description: 'Tata Vacuum Evaporated Iodized Table Salt', quantityScaled: 10000n, unitName: 'kg', unitPriceMinor: 2800n, hsnSac: '250100' },
+        { description: 'Everest Shahi Garam Masala Blend', quantityScaled: 10000n, unitName: 'pack', unitPriceMinor: 12000n, hsnSac: '091091' },
+      ];
+      return {
+        summary: `Grocery Retail Tax Invoice with 10 FMCG Items`,
+        reasoning: `1. Intent Classification: Retail Point-of-Sale / Grocery Store Cash Memo under CBIC GST Rule 46.\n2. Inventory Synthesis: Generated 10 essential grocery line items across FMCG staples.\n3. Applied 5% GST for packaged staples with 100% integer precision.`,
         draft: {
           docType: 'invoice',
           documentTitle: 'Grocery Retail Tax Invoice / Cash Memo',
           provenanceRule: 'CBIC CGST Rule 46 / Section 31 Retail Invoicing',
           partyName: customerName,
           partyRole: 'Client',
-          currency: prompt.includes('$') || prompt.toLowerCase().includes('usd') ? 'USD' : 'INR',
+          currency: defaultCurrency,
           issueDate: Date.now(),
           dueDate: null,
           items: groceryItems,
           discountType: 'none',
           discountValue: 0n,
           taxType: 'exclusive',
-          taxRateBp: 500n, // 5% GST
+          taxRateBp: 500n,
           taxLabel: 'GST',
           notes: 'Thank you for shopping at Billframe Fresh Mart! Goods once sold can be exchanged within 3 days with this invoice.',
-          terms: 'All items sold are packed and sealed in accordance with Food Safety & Standards (FSSAI) guidelines.',
-          metadata: {
-            isRetailPos: true,
-            storeName: 'Billframe Fresh Mart & Grocery Store',
-            itemCount: 10,
-          },
+          metadata: { isRetailPos: true, storeName: 'Billframe Fresh Mart & Grocery Store', itemCount: 10 },
         },
       };
     }
 
-    // ── CASE F: COMMERCIAL BILLING / GST INVOICE ──
-    let clientName = 'Acme Corp';
-    const forMatch = prompt.match(/\bfor\s+(?!my\b|a\b)([A-Za-z0-9\s\.\,\'\-]+?)(?:\s+(?:with|basic|salary|amount|buying|at|on|for|dated|\$|₹|rs|\d)|$)/i);
-    if (forMatch && forMatch[1] && !forMatch[1].toLowerCase().includes('store') && !forMatch[1].toLowerCase().includes('fille')) {
-      clientName = forMatch[1].trim();
-    } else if (context.matchedCustomers.length > 0) {
-      clientName = context.matchedCustomers[0].name;
-    }
-
-    const items: any[] = [];
-    const qtyPriceMatch = prompt.match(/(\d+)\s+([a-zA-Z\s]+?)\s+(?:at|@|for)\s+(?:[\$₹£€]|rs\.?\s*)?(\d[\d,]*)/i);
-    if (qtyPriceMatch) {
-      const qty = parseInt(qtyPriceMatch[1], 10);
-      const desc = qtyPriceMatch[2].trim();
-      const price = parseInt(qtyPriceMatch[3].replace(/,/g, ''), 10);
-      items.push({
-        description: desc,
-        quantityScaled: BigInt(qty * 10000),
-        unitName: 'item',
-        unitPriceMinor: BigInt(price * 100),
-        hsnSac: '847130',
-      });
-    } else {
-      const singlePriceMatch = prompt.match(/(?:[\$₹£€]|rs\.?\s*)(\d[\d,]*)/i);
-      const amount = singlePriceMatch ? parseInt(singlePriceMatch[1].replace(/,/g, ''), 10) : 10000;
-      items.push({
-        description: 'Professional Enterprise Services',
-        quantityScaled: 10000n,
-        unitName: 'Service',
-        unitPriceMinor: BigInt(amount * 100),
-        hsnSac: '998314',
-      });
-    }
-
-    let taxType: 'none' | 'exclusive' = 'exclusive';
-    let taxRateBp = 1800n;
-    let taxLabel = 'GST';
-
-    const taxMatch = prompt.match(/(\d+)%\s*(?:gst|vat|tax)/i);
-    if (taxMatch) {
-      taxRateBp = BigInt(parseInt(taxMatch[1], 10) * 100);
-      taxLabel = prompt.toLowerCase().includes('vat') ? 'VAT' : 'GST';
-    }
-
-    const reasoning = `1. Intent Classification: GST Tax Invoice under CBIC CGST Rule 46.
-2. Extracted Line Items: ${items.map((i) => i.description).join(', ')}.
-3. Applied ${Number(taxRateBp) / 100}% ${taxLabel} rate.
-4. Calculated subtotal, tax breakdown, and grand total in integer minor units.`;
-
+    // ── 20. STANDARD GST COMMERCIAL TAX INVOICE ──
+    const clientName = extractParty('Acme Corp');
+    const items = extractItems('Professional Enterprise Services', 10000);
     return {
-      reply: `I have drafted your official **GST Tax Invoice** for **${clientName}** with ${items.length} line item(s). You can preview the draft directly below or ask me to adjust quantities, prices, or dates.`,
-      reasoning,
+      summary: `GST Tax Invoice for ${clientName}`,
+      reasoning: `1. Intent Classification: GST Commercial Tax Invoice under CBIC CGST Rule 46.\n2. Extracted Line Items: ${items.map((i) => i.description).join(', ')}.\n3. Applied ${Number(taxRateBp) / 100}% ${taxLabel} rate.`,
       draft: {
         docType: 'invoice',
         documentTitle: 'GST Tax Invoice',
         provenanceRule: 'CBIC CGST Rule 46',
         partyName: clientName,
         partyRole: 'Client',
-        currency: prompt.includes('₹') || prompt.toLowerCase().includes('rs') || prompt.toLowerCase().includes('inr') ? 'INR' : defaultCurrency,
+        currency: defaultCurrency,
         issueDate: Date.now(),
         dueDate: Date.now() + 30 * 86400000,
         items,
         discountType: 'none',
         discountValue: 0n,
-        taxType,
+        taxType: 'exclusive',
         taxRateBp,
         taxLabel,
         notes: 'Statutory GST Tax Invoice under Rule 46. Subject to full input tax credit eligibility.',
