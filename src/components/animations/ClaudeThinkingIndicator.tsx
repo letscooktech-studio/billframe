@@ -58,13 +58,37 @@ export function ClaudeThinkingIndicator({
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const wordFadeAnim = useRef(new Animated.Value(1)).current;
+  const expandAnim = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
 
   const [activeWordIndex, setActiveWordIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [shouldRenderBody, setShouldRenderBody] = useState(isExpanded);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
   }, []);
+
+  // Smooth accordion expansion & collapse
+  useEffect(() => {
+    if (isExpanded) {
+      setShouldRenderBody(true);
+      Animated.timing(expandAnim, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(expandAnim, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        setShouldRenderBody(false);
+      });
+    }
+  }, [isExpanded, expandAnim]);
 
   // Soft organic pulse animation for thinking dot
   useEffect(() => {
@@ -201,19 +225,42 @@ export function ClaudeThinkingIndicator({
             </Text>
           )}
 
-          <View style={{ marginLeft: 3 }}>
-            {isExpanded ? (
-              <ChevronUp size={12} color={textSecondaryColor} />
-            ) : (
-              <ChevronDown size={12} color={textSecondaryColor} />
-            )}
-          </View>
+          <Animated.View
+            style={{
+              marginLeft: 4,
+              transform: [
+                {
+                  rotate: expandAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '180deg'],
+                  }),
+                },
+              ],
+            }}
+          >
+            <ChevronDown size={12} color={textSecondaryColor} />
+          </Animated.View>
         </View>
       </Pressable>
 
-      {/* ── 2. Container-Free Left-Bordered Reasoning Stream ── */}
-      {isExpanded && (
-        <View style={styles.expandedThoughtStream}>
+      {/* ── 2. Container-Free Left-Bordered Reasoning Stream with Silk Accordion Motion ── */}
+      {shouldRenderBody && (
+        <Animated.View
+          style={[
+            styles.expandedThoughtStream,
+            {
+              opacity: expandAnim,
+              transform: [
+                {
+                  translateY: expandAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-6, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           {/* Sub-Agent Task Steps (if present) */}
           {taskSteps.length > 0 && (
             <View style={styles.taskStepsBlock}>
@@ -274,7 +321,7 @@ export function ClaudeThinkingIndicator({
               </Text>
             </View>
           ) : null}
-        </View>
+        </Animated.View>
       )}
     </View>
   );

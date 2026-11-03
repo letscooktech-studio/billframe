@@ -70,6 +70,8 @@ import { RecommendationEngine, RecommendationItem } from '../../services/ai/Reco
 import { BusinessProfile } from '../../domain/profile/types';
 import { ClaudeThinkingIndicator } from '../../components/animations/ClaudeThinkingIndicator';
 import { IntelligentMessageRenderer } from '../../components/ai/IntelligentMessageRenderer';
+import { FluidStreamingText } from '../../components/ai/FluidStreamingText';
+import { AnimatedArtifactTile } from '../../components/ai/AnimatedArtifactTile';
 
 /**
  * Transforms raw neural reasoning thoughts into clean, high-elegance cognitive steps.
@@ -245,6 +247,39 @@ const AnimatedMessageRow: React.FC<{
         },
       ]}
     >
+      {children}
+    </Animated.View>
+  );
+};
+
+/**
+ * Animated Response Body
+ * Smoothly cascades assistant response content & artifact tiles into view
+ * as soon as thinking finishes, eliminating abrupt DOM snapping.
+ */
+const AnimatedResponseBody: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slide, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fade, slide]);
+
+  return (
+    <Animated.View style={{ width: '100%', opacity: fade, transform: [{ translateY: slide }] }}>
       {children}
     </Animated.View>
   );
@@ -524,6 +559,9 @@ export default function AiAssistantScreen() {
                 ? event.drafts
                 : (event.draft ? [event.draft] : []);
 
+            const replyWords = (event.replyText || '').split(/\s+/).filter(Boolean).length;
+            const streamDurationMs = Math.min(1200, Math.max(300, replyWords * 40));
+
             const finishedAgentMsg: AgentChatMessage = {
               id: agentMsgId,
               role: 'assistant',
@@ -532,13 +570,12 @@ export default function AiAssistantScreen() {
               documentDraft: event.draft || (allDrafts.length > 0 ? allDrafts[0] : null),
               documentDrafts: allDrafts,
               taskSteps: event.taskSteps,
-              isStreaming: false,
+              isStreaming: true, // Keep streaming alive for silky token reveal
               isThinking: false,
               isCompilingDraft: false,
               thoughtDurationSeconds: duration,
               timestamp: Date.now(),
             };
-            AgentSessionRepository.saveMessage('ai_session_default', finishedAgentMsg).catch(() => {});
 
             setMessages((prev) =>
               prev.map((m) =>
@@ -547,6 +584,18 @@ export default function AiAssistantScreen() {
                   : m
               )
             );
+
+            // Settle streaming state and persist completed record to SQLite
+            setTimeout(() => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === agentMsgId
+                    ? { ...m, isStreaming: false }
+                    : m
+                )
+              );
+              AgentSessionRepository.saveMessage('ai_session_default', { ...finishedAgentMsg, isStreaming: false }).catch(() => {});
+            }, streamDurationMs);
 
             if (event.draft || allDrafts.length > 0) {
               const primaryDraft = event.draft || allDrafts[0];
@@ -832,167 +881,99 @@ export default function AiAssistantScreen() {
                     </View>
                   )}
 
-                  {/* Conversational Reply Text with Intelligent Markdown / Table Renderer */}
-                  {(msg.content || (msg.isStreaming && !msg.isThinking)) ? (
+                  {/* Conversational Reply Text & Materialized Artifacts with Claude-Style Motion */}
+                  {(msg.content || (msg.documentDrafts && msg.documentDrafts.length > 0) || msg.documentDraft) && !msg.isThinking ? (
+                    <AnimatedResponseBody>
+                      {msg.content ? (
+                        <View style={styles.assistantTextFlow}>
+                          <FluidStreamingText
+                            content={msg.content}
+                            isStreaming={Boolean(msg.isStreaming && !msg.isThinking)}
+                            textColor={theme.textPrimary}
+                          />
+                        </View>
+                      ) : null}
+
+                      {/* Initial Welcome Quick Suggestions */}
+                      {msg.id === 'welcome_msg' && (
+                        <View style={styles.welcomeGrid}>
+                          <Pressable
+                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                            onPress={() => handleSendMessage('What is my current business overview and total receivables?')}
+                          >
+                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📊 Business Overview</Text>
+                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Live balance, receivables, and ledger summary</Text>
+                          </Pressable>
+
+                          <Pressable
+                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                            onPress={() => handleSendMessage('List all overdue invoices and unpaid customer balances')}
+                          >
+                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>⏰ Check Overdue</Text>
+                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Find unpaid invoices and outstanding payments</Text>
+                          </Pressable>
+
+                          <Pressable
+                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                            onPress={() => handleSendMessage('Draft a GST Tax Invoice for Acme Corp with 18% GST')}
+                          >
+                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>✦ GST Tax Invoice</Text>
+                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Compliant B2B invoice with CBIC tax calculations</Text>
+                          </Pressable>
+
+                          <Pressable
+                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                            onPress={() => handleSendMessage('build me complete highest ats scoring resume for farhan noor for ai engineer')}
+                          >
+                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📄 ATS Resume (Farhan Noor)</Text>
+                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>ATS-optimized curriculum vitae with 98% score</Text>
+                          </Pressable>
+                        </View>
+                      )}
+
+                      {/* ── Claude-Style Materialized Artifact Tiles ── */}
+                      {(() => {
+                        const draftsToRender = (msg.documentDrafts && msg.documentDrafts.length > 0)
+                          ? msg.documentDrafts
+                          : (msg.documentDraft ? [msg.documentDraft] : []);
+                        if (draftsToRender.length === 0) return null;
+
+                        return (
+                          <View style={styles.artifactsContainer}>
+                            {draftsToRender.map((draft, dIdx) => {
+                              const isSelected = activeDraft?.documentId === draft.documentId || activeDraft?.documentNumber === draft.documentNumber;
+
+                              return (
+                                <AnimatedArtifactTile
+                                  key={draft.documentId || `${draft.documentNumber}_${dIdx}`}
+                                  draft={draft}
+                                  index={dIdx}
+                                  isSelected={isSelected}
+                                  isDesktop={isDesktop}
+                                  theme={theme}
+                                  onOpen={() => {
+                                    setActiveDraft(draft);
+                                    if (!isDesktop) handleOpenPreview(draft);
+                                  }}
+                                  onPrint={() => handlePrintDocument(draft)}
+                                  onExportHtml={() => handleDownloadHtml(draft)}
+                                  onEditForm={() => router.push(`/document/edit?id=${draft.documentId}` as any)}
+                                />
+                              );
+                            })}
+                          </View>
+                        );
+                      })()}
+                    </AnimatedResponseBody>
+                  ) : (msg.isStreaming && !msg.isThinking) ? (
                     <View style={styles.assistantTextFlow}>
-                      <IntelligentMessageRenderer
-                        content={msg.content}
-                        isStreaming={Boolean(msg.isStreaming)}
+                      <FluidStreamingText
+                        content=""
+                        isStreaming={true}
                         textColor={theme.textPrimary}
                       />
-                      {msg.isStreaming && !msg.isThinking && (
-                        <Animated.View
-                          style={[
-                            styles.streamingCursorBar,
-                            { opacity: cursorAnim, backgroundColor: '#CC785C' },
-                          ]}
-                        />
-                      )}
                     </View>
                   ) : null}
-
-                  {/* Initial Welcome Quick Suggestions */}
-                  {msg.id === 'welcome_msg' && (
-                    <View style={styles.welcomeGrid}>
-                      <Pressable
-                        style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                        onPress={() => handleSendMessage('What is my current business overview and total receivables?')}
-                      >
-                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📊 Business Overview</Text>
-                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Live balance, receivables, and ledger summary</Text>
-                      </Pressable>
-
-                      <Pressable
-                        style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                        onPress={() => handleSendMessage('List all overdue invoices and unpaid customer balances')}
-                      >
-                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>⏰ Check Overdue</Text>
-                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Find unpaid invoices and outstanding payments</Text>
-                      </Pressable>
-
-                      <Pressable
-                        style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                        onPress={() => handleSendMessage('Draft a GST Tax Invoice for Acme Corp with 18% GST')}
-                      >
-                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>✦ GST Tax Invoice</Text>
-                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Compliant B2B invoice with CBIC tax calculations</Text>
-                      </Pressable>
-
-                      <Pressable
-                        style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                        onPress={() => handleSendMessage('build me complete highest ats scoring resume for farhan noor for ai engineer')}
-                      >
-                        <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📄 ATS Resume (Farhan Noor)</Text>
-                        <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>ATS-optimized curriculum vitae with 98% score</Text>
-                      </Pressable>
-                    </View>
-                  )}
-
-                  {/* Compiling Draft Status Badge */}
-                  {msg.isCompilingDraft && (
-                    <View style={[styles.compilingDraftBadge, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}>
-                      <ActivityIndicator size="small" color={theme.textPrimary} style={{ transform: [{ scale: 0.75 }] }} />
-                      <Text style={[styles.compilingDraftText, { color: theme.textSecondary }]}>
-                        Compiling statutory draft...
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* ── Claude-Style Artifact Tiles (Container-Free & Breathable) ── */}
-                  {(() => {
-                    const draftsToRender = (msg.documentDrafts && msg.documentDrafts.length > 0)
-                      ? msg.documentDrafts
-                      : (msg.documentDraft ? [msg.documentDraft] : []);
-                    if (draftsToRender.length === 0) return null;
-
-                    return (
-                      <View style={styles.artifactsContainer}>
-                        {draftsToRender.map((draft, dIdx) => {
-                          const isSelected = activeDraft?.documentId === draft.documentId || activeDraft?.documentNumber === draft.documentNumber;
-                          const subtitle = draft.docType === 'resume'
-                            ? `${draft.partyName} · ${draft.metadata?.targetRole || 'AI Engineer'} · 98% ATS`
-                            : (draft.metadata?.isRetailPos || draft.documentTitle?.toLowerCase().includes('grocery'))
-                            ? `${draft.metadata?.storeName || 'Billframe Mart'} · ${draft.items.length} items · ${formatMoney(createMoney(draft.grandTotalMinor, draft.currency))}`
-                            : draft.docType === 'salary_slip'
-                            ? `${draft.partyName} · ${draft.metadata?.designation || 'Staff'} · Net ${formatMoney(createMoney(draft.grandTotalMinor > 0n ? draft.grandTotalMinor : (draft.metadata?.netPayMinor || 8640000n), draft.currency))}`
-                            : `${draft.partyName} · ${formatMoney(createMoney(draft.grandTotalMinor, draft.currency))} · ${draft.documentNumber}`;
-
-                          return (
-                            <View key={draft.documentId || `${draft.documentNumber}_${dIdx}`} style={styles.artifactBlock}>
-                              <Pressable
-                                style={[
-                                  styles.artifactTile,
-                                  {
-                                    backgroundColor: theme.surfaceSecondary,
-                                    borderColor: isSelected ? '#CC785C' : theme.borderSubtle,
-                                  },
-                                ]}
-                                onPress={() => {
-                                  setActiveDraft(draft);
-                                  if (!isDesktop) handleOpenPreview(draft);
-                                }}
-                                accessibilityRole="button"
-                                accessibilityLabel={`Open ${draft.documentTitle}`}
-                              >
-                                <View style={styles.artifactIconBox}>
-                                  <FileText size={18} color="#CC785C" />
-                                </View>
-                                <View style={{ flex: 1, minWidth: 0 }}>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Text style={[styles.artifactTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                                      {draft.documentTitle}
-                                    </Text>
-                                    <View style={styles.artifactVerifiedPill}>
-                                      <Text style={styles.artifactVerifiedText}>VERIFIED</Text>
-                                    </View>
-                                  </View>
-                                  <Text style={[styles.artifactSubtitle, { color: theme.textMuted }]} numberOfLines={1}>
-                                    {subtitle}
-                                  </Text>
-                                </View>
-                                <View style={styles.artifactOpenBtn}>
-                                  <Text style={[styles.artifactOpenText, { color: theme.textPrimary }]}>
-                                    {isDesktop ? 'View in Canvas' : 'Preview'}
-                                  </Text>
-                                  <ExternalLink size={12} color={theme.textMuted} />
-                                </View>
-                              </Pressable>
-
-                              {/* Subtle Inline Quick Actions */}
-                              <View style={styles.artifactInlineActionsRow}>
-                                <Pressable
-                                  style={styles.artifactActionLink}
-                                  onPress={() => handlePrintDocument(draft)}
-                                  hitSlop={6}
-                                >
-                                  <Printer size={12} color={theme.textSecondary} />
-                                  <Text style={[styles.artifactActionLinkText, { color: theme.textSecondary }]}>Print</Text>
-                                </Pressable>
-
-                                <Pressable
-                                  style={styles.artifactActionLink}
-                                  onPress={() => handleDownloadHtml(draft)}
-                                  hitSlop={6}
-                                >
-                                  <Download size={12} color={theme.textSecondary} />
-                                  <Text style={[styles.artifactActionLinkText, { color: theme.textSecondary }]}>Export HTML</Text>
-                                </Pressable>
-
-                                <Pressable
-                                  style={styles.artifactActionLink}
-                                  onPress={() => router.push(`/document/edit?id=${draft.documentId}` as any)}
-                                  hitSlop={6}
-                                >
-                                  <ExternalLink size={12} color={theme.textSecondary} />
-                                  <Text style={[styles.artifactActionLinkText, { color: theme.textSecondary }]}>Edit Form</Text>
-                                </Pressable>
-                              </View>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    );
-                  })()}
                 </View>
               </AnimatedMessageRow>
             );
