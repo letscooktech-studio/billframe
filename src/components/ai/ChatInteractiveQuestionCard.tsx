@@ -50,7 +50,7 @@ export const ChatInteractiveQuestionCard: React.FC<ChatInteractiveQuestionCardPr
       {/* Question Header & Reason Banner */}
       <View style={styles.headerRow}>
         <View style={styles.iconSlot}>
-          <Sparkles size={14} color="#CC785C" />
+          <Sparkles size={14} color="#38BDF8" />
         </View>
         <Text style={[styles.questionText, { color: theme.textPrimary || '#F4F4F5' }]}>
           {question.question}
@@ -77,12 +77,12 @@ export const ChatInteractiveQuestionCard: React.FC<ChatInteractiveQuestionCardPr
                 styles.optionRow,
                 {
                   backgroundColor: isSelected
-                    ? 'rgba(204, 120, 92, 0.12)'
+                    ? 'rgba(56, 189, 248, 0.12)'
                     : theme.surface || '#202126',
                   borderColor: isSelected
-                    ? '#CC785C'
+                    ? '#38BDF8'
                     : option.isOther
-                    ? 'rgba(204, 120, 92, 0.35)'
+                    ? 'rgba(56, 189, 248, 0.35)'
                     : theme.borderSubtle || '#2D2E35',
                 },
               ]}
@@ -96,9 +96,9 @@ export const ChatInteractiveQuestionCard: React.FC<ChatInteractiveQuestionCardPr
                   styles.letterBadge,
                   {
                     backgroundColor: isSelected
-                      ? '#CC785C'
+                      ? '#38BDF8'
                       : option.isOther
-                      ? 'rgba(204, 120, 92, 0.2)'
+                      ? 'rgba(56, 189, 248, 0.2)'
                       : 'rgba(255, 255, 255, 0.06)',
                   },
                 ]}
@@ -109,7 +109,7 @@ export const ChatInteractiveQuestionCard: React.FC<ChatInteractiveQuestionCardPr
                   <Text
                     style={[
                       styles.letterText,
-                      { color: option.isOther ? '#CC785C' : theme.textSecondary || '#A1A1AA' },
+                      { color: option.isOther ? '#38BDF8' : theme.textSecondary || '#A1A1AA' },
                     ]}
                   >
                     {letter}
@@ -126,7 +126,7 @@ export const ChatInteractiveQuestionCard: React.FC<ChatInteractiveQuestionCardPr
                       color: isSelected
                         ? '#FFFFFF'
                         : option.isOther
-                        ? '#CC785C'
+                        ? '#38BDF8'
                         : theme.textPrimary || '#F4F4F5',
                       fontWeight: isSelected || option.isOther ? '700' : '600',
                     },
@@ -149,7 +149,7 @@ export const ChatInteractiveQuestionCard: React.FC<ChatInteractiveQuestionCardPr
                 {isSelected ? (
                   <Text style={styles.selectedDoneText}>Selected</Text>
                 ) : option.isOther ? (
-                  <Edit3 size={13} color="#CC785C" />
+                  <Edit3 size={13} color="#38BDF8" />
                 ) : (
                   <ArrowRight size={13} color={theme.textMuted || '#71717A'} />
                 )}
@@ -198,17 +198,17 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   reasonPill: {
-    backgroundColor: 'rgba(204, 120, 92, 0.08)',
+    backgroundColor: 'rgba(56, 189, 248, 0.08)',
     borderRadius: 6,
     paddingHorizontal: 9,
     paddingVertical: 4,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: 'rgba(204, 120, 92, 0.2)',
+    borderColor: 'rgba(56, 189, 248, 0.2)',
   },
   reasonText: {
     fontSize: 11,
-    color: '#CC785C',
+    color: '#38BDF8',
     lineHeight: 16,
     fontWeight: '600',
   },
@@ -257,6 +257,6 @@ const styles = StyleSheet.create({
   selectedDoneText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#CC785C',
+    color: '#38BDF8',
   },
 });

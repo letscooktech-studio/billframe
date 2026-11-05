@@ -1025,8 +1025,8 @@ export default function AiAssistantScreen() {
 
                       {/* ── Subtle In-Message Question Status (Prompted in Chatbox below) ── */}
                       {msg.interactiveQuestion && !msg.interactiveQuestion.isAnswered && (
-                        <View style={[styles.chatboxPromptBanner, { backgroundColor: 'rgba(204, 120, 92, 0.08)' }]}>
-                          <Sparkles size={12} color="#CC785C" />
+                        <View style={[styles.chatboxPromptBanner, { backgroundColor: 'rgba(56, 189, 248, 0.08)' }]}>
+                          <Sparkles size={12} color="#38BDF8" />
                           <Text style={[styles.chatboxPromptBannerText, { color: theme.textSecondary }]}>
                             Guided Field: <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>{msg.interactiveQuestion.question}</Text> (Choose in chat box below)
                           </Text>
@@ -1097,7 +1097,7 @@ export default function AiAssistantScreen() {
               styles.floatingInputBox,
               {
                 backgroundColor: theme.surfaceSecondary,
-                borderColor: activeQuestion ? '#CC785C' : theme.borderDefault,
+                borderColor: activeQuestion ? '#38BDF8' : theme.borderDefault,
               },
             ]}
           >
@@ -1121,7 +1121,7 @@ export default function AiAssistantScreen() {
               style={[
                 styles.floatingSendButton,
                 {
-                  backgroundColor: inputText.trim() && !isProcessing ? '#CC785C' : 'rgba(255, 255, 255, 0.08)',
+                  backgroundColor: inputText.trim() && !isProcessing ? (theme.primaryActionBg || '#F3F3F4') : 'rgba(255, 255, 255, 0.08)',
                 },
               ]}
               onPress={() => handleSendMessage()}
@@ -1130,9 +1130,9 @@ export default function AiAssistantScreen() {
               accessibilityLabel="Send message"
             >
               {isProcessing ? (
-                <ActivityIndicator size="small" color="#FFFFFF" style={{ transform: [{ scale: 0.7 }] }} />
+                <ActivityIndicator size="small" color="#0F172A" style={{ transform: [{ scale: 0.7 }] }} />
               ) : (
-                <Send size={15} color={inputText.trim() ? '#FFFFFF' : theme.textMuted} />
+                <Send size={15} color={inputText.trim() ? (theme.primaryActionText || '#141416') : theme.textMuted} />
               )}
             </Pressable>
           </View>
@@ -1786,7 +1786,7 @@ const styles = StyleSheet.create({
   streamingCursorBar: {
     width: 6,
     height: 15,
-    backgroundColor: '#CC785C',
+    backgroundColor: '#38BDF8',
     borderRadius: 1,
     marginLeft: 3,
   },
@@ -2311,12 +2311,12 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(204, 120, 92, 0.3)',
+    borderColor: 'rgba(56, 189, 248, 0.3)',
   },
   chatboxReasonText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#CC785C',
+    color: '#38BDF8',
   },
   chatboxOptionsScroll: {
     flexDirection: 'row',
@@ -2333,8 +2333,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   chatboxOptionChipOther: {
-    backgroundColor: 'rgba(204, 120, 92, 0.12)',
-    borderColor: '#CC785C',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    borderColor: '#38BDF8',
   },
   chatboxLetterBadge: {
     width: 18,

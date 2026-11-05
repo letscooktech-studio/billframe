@@ -1,7 +1,28 @@
 {
   "name": "billframe",
   "version": "1.0.0",
-  "private": true,
+  "description": "Billframe — Free, Open-Source, AI-Powered Local-First Alternative to Zoho Books, Zoho Invoice, and QuickBooks",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/letscooktech-studio/billframe.git"
+  },
+  "homepage": "https://github.com/letscooktech-studio/billframe#readme",
+  "bugs": {
+    "url": "https://github.com/letscooktech-studio/billframe/issues"
+  },
+  "keywords": [
+    "zoho-alternative",
+    "invoicing",
+    "accounting",
+    "local-first",
+    "sqlite",
+    "ai-copilot",
+    "gst-invoice",
+    "open-source",
+    "expo",
+    "react-native"
+  ],
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",

@@ -24,8 +24,12 @@ const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 /**
  * ChatboxAnimatedMcq
  * An animated, interactive multiple-choice question card docked directly in the chat box.
- * Slides up animately when a question is elicited, providing structured choices (A, B, C...)
- * and always ends with an "Other (Enter custom data in chat)" option.
+ * 
+ * Styled strictly to Billframe Arctic Aurora Monochrome standards:
+ * - Surfaces: #18191D, #222326
+ * - Polar Accent: Arctic Blue #38BDF8 & Polar Emerald #10B981
+ * - Letter Badges: Clean monochrome chips [A], [B], [C], [Other ✎]
+ * - Slides up animately when a statutory field is needed to eliminate placeholder data.
  */
 export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
   question,
@@ -37,34 +41,34 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   // Animation values for smooth slide-up and fade-in from the chatbox
-  const slideUpAnim = useRef(new Animated.Value(28)).current;
+  const slideUpAnim = useRef(new Animated.Value(24)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.96)).current;
+  const scaleAnim = useRef(new Animated.Value(0.97)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Trigger smooth entrance animation whenever question changes
   useEffect(() => {
     setSelectedId(null);
-    slideUpAnim.setValue(28);
+    slideUpAnim.setValue(24);
     fadeAnim.setValue(0);
-    scaleAnim.setValue(0.96);
+    scaleAnim.setValue(0.97);
 
     Animated.parallel([
       Animated.spring(slideUpAnim, {
         toValue: 0,
-        tension: 80,
+        tension: 85,
         friction: 9,
         useNativeDriver: true,
       }),
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 220,
+        duration: 200,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
-        tension: 80,
+        tension: 85,
         friction: 9,
         useNativeDriver: true,
       }),
@@ -76,8 +80,8 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
 
     // Micro-interaction bounce
     Animated.sequence([
-      Animated.timing(pulseAnim, { toValue: 1.02, duration: 70, useNativeDriver: true }),
-      Animated.timing(pulseAnim, { toValue: 1, duration: 90, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1.02, duration: 60, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
     ]).start();
 
     if (opt.isOther) {
@@ -85,19 +89,19 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
     } else {
       setTimeout(() => {
         onSelectOption(opt);
-      }, 180);
+      }, 160);
     }
   };
 
-  const reasonTag = question.reason ? question.reason.split(':')[0] : 'Statutory Invariant';
+  const reasonTag = question.reason ? question.reason.split(':')[0].replace(/^[✦\s*]+/, '') : 'Statutory Standard';
 
   return (
     <Animated.View
       style={[
         styles.container,
         {
-          backgroundColor: theme.surfaceSecondary || '#16171B',
-          borderColor: 'rgba(204, 120, 92, 0.3)',
+          backgroundColor: theme.surfaceSecondary || '#18191D',
+          borderColor: theme.borderDefault || '#35363B',
           opacity: fadeAnim,
           transform: [
             { translateY: slideUpAnim },
@@ -113,10 +117,10 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
       <View style={styles.headerRow}>
         <View style={styles.titleSlot}>
           <View style={styles.sparkleBadge}>
-            <Sparkles size={13} color="#CC785C" />
+            <Sparkles size={13} color="#38BDF8" />
           </View>
           <Text
-            style={[styles.questionTitle, { color: theme.textPrimary || '#F4F4F5' }]}
+            style={[styles.questionTitle, { color: theme.textPrimary || '#F5F5F6' }]}
             numberOfLines={isCollapsed ? 1 : 2}
           >
             {question.question}
@@ -142,9 +146,9 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
             accessibilityLabel={isCollapsed ? 'Expand question options' : 'Collapse question options'}
           >
             {isCollapsed ? (
-              <ChevronUp size={15} color={theme.textMuted || '#8E8F96'} />
+              <ChevronUp size={15} color={theme.textMuted || '#77797F'} />
             ) : (
-              <ChevronDown size={15} color={theme.textMuted || '#8E8F96'} />
+              <ChevronDown size={15} color={theme.textMuted || '#77797F'} />
             )}
           </Pressable>
         </View>
@@ -156,7 +160,7 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
           style={styles.collapsedPromptRow}
           onPress={() => setIsCollapsed(false)}
         >
-          <Text style={[styles.collapsedPromptText, { color: '#CC785C' }]}>
+          <Text style={[styles.collapsedPromptText, { color: '#38BDF8' }]}>
             Tap to view {question.options.length} MCQ options or type custom answer below
           </Text>
         </Pressable>
@@ -181,15 +185,15 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
                   styles.optionCard,
                   {
                     backgroundColor: isSelected
-                      ? 'rgba(204, 120, 92, 0.14)'
-                      : theme.surface || '#1C1D22',
+                      ? 'rgba(56, 189, 248, 0.12)'
+                      : theme.surface || '#141416',
                     borderColor: isSelected
-                      ? '#CC785C'
+                      ? '#38BDF8'
                       : opt.isOther
-                      ? 'rgba(204, 120, 92, 0.35)'
-                      : theme.borderSubtle || '#28292F',
+                      ? 'rgba(56, 189, 248, 0.3)'
+                      : theme.borderSubtle || '#26272B',
                   },
-                  pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] },
+                  pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
                 ]}
                 onPress={() => handlePressOption(opt)}
                 accessibilityRole="button"
@@ -201,9 +205,9 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
                     styles.letterBadge,
                     {
                       backgroundColor: isSelected
-                        ? '#CC785C'
+                        ? '#38BDF8'
                         : opt.isOther
-                        ? 'rgba(204, 120, 92, 0.2)'
+                        ? 'rgba(56, 189, 248, 0.18)'
                         : 'rgba(255, 255, 255, 0.08)',
                     },
                   ]}
@@ -213,10 +217,10 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
                       styles.letterText,
                       {
                         color: isSelected
-                          ? '#FFFFFF'
+                          ? '#0F172A'
                           : opt.isOther
-                          ? '#CC785C'
-                          : theme.textPrimary || '#F4F4F5',
+                          ? '#38BDF8'
+                          : theme.textPrimary || '#F5F5F6',
                       },
                     ]}
                   >
@@ -231,8 +235,8 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
                       styles.optionLabel,
                       {
                         color: isSelected
-                          ? '#CC785C'
-                          : theme.textPrimary || '#F4F4F5',
+                          ? '#38BDF8'
+                          : theme.textPrimary || '#F5F5F6',
                         fontWeight: isSelected ? '700' : '600',
                       },
                     ]}
@@ -241,7 +245,7 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
                   </Text>
                   {Boolean(opt.description) && (
                     <Text
-                      style={[styles.optionDesc, { color: theme.textMuted || '#8E8F96' }]}
+                      style={[styles.optionDesc, { color: theme.textMuted || '#77797F' }]}
                       numberOfLines={1}
                     >
                       {opt.description}
@@ -255,18 +259,18 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
                     styles.radioCircle,
                     {
                       borderColor: isSelected
-                        ? '#CC785C'
+                        ? '#38BDF8'
                         : opt.isOther
-                        ? 'rgba(204, 120, 92, 0.4)'
-                        : theme.borderDefault || '#383942',
-                      backgroundColor: isSelected ? '#CC785C' : 'transparent',
+                        ? 'rgba(56, 189, 248, 0.4)'
+                        : theme.borderDefault || '#35363B',
+                      backgroundColor: isSelected ? '#38BDF8' : 'transparent',
                     },
                   ]}
                 >
                   {isSelected ? (
-                    <Check size={11} color="#FFFFFF" strokeWidth={3} />
+                    <Check size={11} color="#0F172A" strokeWidth={3} />
                   ) : opt.isOther ? (
-                    <Edit3 size={10} color="#CC785C" />
+                    <Edit3 size={10} color="#38BDF8" />
                   ) : null}
                 </View>
               </Pressable>
@@ -280,13 +284,13 @@ export const ChatboxAnimatedMcq: React.FC<ChatboxAnimatedMcqProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     padding: 12,
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 3,
   },
@@ -306,7 +310,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(204, 120, 92, 0.15)',
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -322,17 +326,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   reasonBadge: {
-    backgroundColor: 'rgba(204, 120, 92, 0.12)',
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(204, 120, 92, 0.25)',
+    borderColor: 'rgba(56, 189, 248, 0.25)',
   },
   reasonText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
-    color: '#CC785C',
+    color: '#38BDF8',
     letterSpacing: 0.2,
   },
   collapseButton: {
@@ -360,7 +364,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 9,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: 11,
     borderWidth: 1,
     gap: 10,
   },
@@ -383,7 +387,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
   optionDesc: {
-    fontSize: 10,
+    fontSize: 10.5,
     marginTop: 1,
   },
   radioCircle: {

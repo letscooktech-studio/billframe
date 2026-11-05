@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 16,
     borderRadius: 2,
-    backgroundColor: '#CC785C',
+    backgroundColor: '#38BDF8',
     marginTop: 4,
     marginLeft: 2,
   },

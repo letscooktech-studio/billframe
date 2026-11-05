@@ -273,7 +273,7 @@ export function ClaudeThinkingIndicator({
                     <View style={styles.taskIconSlot}>
                       {isRunning ? (
                         <Animated.View style={{ opacity: pulseAnim }}>
-                          <Text style={{ fontSize: 9, color: '#CC785C' }}>●</Text>
+                          <Text style={{ fontSize: 9, color: '#38BDF8' }}>●</Text>
                         </Animated.View>
                       ) : isDone ? (
                         <Check size={11} color="#10B981" strokeWidth={2.5} />
@@ -313,7 +313,7 @@ export function ClaudeThinkingIndicator({
             </View>
           ) : isThinking && taskSteps.length === 0 ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 }}>
-              <Animated.Text style={{ opacity: pulseAnim, color: '#CC785C', fontSize: 11 }}>
+              <Animated.Text style={{ opacity: pulseAnim, color: '#38BDF8', fontSize: 11 }}>
                 ●
               </Animated.Text>
               <Text style={[styles.thoughtBodyText, { color: textSecondaryColor, fontStyle: 'italic' }]}>
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: '#CC785C',
+    backgroundColor: '#38BDF8',
   },
   thinkingLabel: {
     fontSize: 13,
