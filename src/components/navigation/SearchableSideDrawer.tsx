@@ -93,7 +93,7 @@ export const DRAWER_GROUPS: DrawerGroup[] = [
     items: [
       { id: 'create_doc', label: 'Create Document', route: '/document/templates?type=invoice', icon: FilePlus, keywords: ['new', 'invoice', 'gst', 'bill', 'order', 'document'] },
       { id: 'doc_library', label: 'Document Library', route: '/(tabs)/documents', icon: FolderOpen, keywords: ['all', 'files', 'records', 'history', 'drafts', 'invoices', 'receipts'] },
-      { id: 'template_studio', label: 'Template Studio', route: '/document/templates?type=invoice', icon: Palette, badge: 'PRO', keywords: ['design', 'brand', 'rule 46', 'layouts', 'templates', 'studio'] },
+      { id: 'template_studio', label: 'Template Studio', route: '/templates/studio', icon: Palette, keywords: ['design', 'brand', 'rule 46', 'layouts', 'templates', 'studio'] },
       { id: 'custom_docs', label: 'Custom Document Builder', route: '/templates/create-type', icon: Sparkles, keywords: ['builder', 'creator', 'custom', 'schema', 'type'] },
     ],
   },
@@ -109,15 +109,15 @@ export const DRAWER_GROUPS: DrawerGroup[] = [
     title: 'BUSINESS WORK',
     items: [
       { id: 'inventory_catalog', label: 'Item Catalog & Work', route: '/(tabs)/money', icon: Package, keywords: ['catalog', 'products', 'services', 'hsn', 'rates', 'pricing'] },
-      { id: 'expenses', label: 'Expense Records', route: '/expenses/index', icon: Receipt, keywords: ['spending', 'costs', 'bills', 'outflows', 'receipts'] },
+      { id: 'expenses', label: 'Expense Records', route: '/expenses', icon: Receipt, keywords: ['spending', 'costs', 'bills', 'outflows', 'receipts'] },
     ],
   },
   {
     id: 'finance',
     title: 'FINANCE',
     items: [
-      { id: 'collections', label: 'Collections Hub', route: '/collections/index', icon: Wallet, badge: 'AUTO', keywords: ['overdue', 'aging', 'reminders', 'receivables', 'collections'] },
-      { id: 'reports', label: 'Financial Reports & Tax', route: '/reports/index', icon: BarChart3, keywords: ['analytics', 'p&l', 'gst', 'summary', 'cashflow', 'tax'] },
+      { id: 'collections', label: 'Collections Hub', route: '/collections', icon: Wallet, keywords: ['overdue', 'aging', 'reminders', 'receivables', 'collections'] },
+      { id: 'reports', label: 'Financial Reports & Tax', route: '/reports', icon: BarChart3, keywords: ['analytics', 'p&l', 'gst', 'summary', 'cashflow', 'tax'] },
       { id: 'payment_settings', label: 'Payment Gateways & UPI', route: '/settings/payments', icon: QrCode, keywords: ['qr', 'vpa', 'gateway', 'razorpay', 'cashfree', 'upi'] },
     ],
   },
