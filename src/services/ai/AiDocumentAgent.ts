@@ -12,7 +12,7 @@
  * 7. Real-time iterative chat refinement ("change basic to 65000", "add 10% discount").
  */
 
-import { AiConfigService, DEFAULT_GROQ_KEY, MAX_UNIVERSAL_KEY_DOCS } from './AiConfigService';
+import { AiConfigService } from './AiConfigService';
 import { AiLocalSqlContext } from './AiLocalSqlContext';
 import { AiRagRegistry } from './AiRagRegistry';
 import { DocumentTypeRegistry } from '../../domain/documents/DocumentTypeRegistry';
@@ -23,6 +23,7 @@ import { BusinessProfileRepository } from '../../data/repositories/BusinessProfi
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DocumentType } from '../../domain/documents/types';
 import { createMoney, formatMoney } from '../../domain/money/Money';
+import { UniversalAgentEngine } from './UniversalAgentEngine';
 import {
   ChatInteractiveQuestion,
   ChatQuestionOption,
@@ -787,13 +788,11 @@ export class AiDocumentAgent {
       }
     }
 
-    const effectiveApiKey = config.apiKey || (config.provider === 'groq' ? DEFAULT_GROQ_KEY : '');
-    const isUsingUniversal = config.provider === 'groq' && (!config.apiKey || config.apiKey.trim() === DEFAULT_GROQ_KEY);
-    const universalLimit = await AiConfigService.checkUniversalLimit();
-    const isOverUniversalLimit = isUsingUniversal && universalLimit.isLimited;
+    const effectiveApiKey = config.apiKey ? config.apiKey.trim() : '';
 
     // 1. Live Cloud Execution on Groq LPU (GPT-OSS 120B Reasoning with Native Tool Calling)
-    if (effectiveApiKey && config.provider === 'groq' && !isOverUniversalLimit) {
+    // Strictly requires an explicit user-configured API key (BYOK); never silently sends dummy or hardcoded keys.
+    if (effectiveApiKey && config.provider === 'groq') {
       try {
         const formattedContext = AiLocalSqlContext.formatContextForSystemPrompt(localContext);
         const activeDraftStr = this.serializeDraftForPrompt(activeDraft);
@@ -924,9 +923,6 @@ CORE AGENTIC INVARIANTS:
               }
 
               if (allDrafts.length > 0) {
-                if (isUsingUniversal) {
-                  await AiConfigService.incrementUniversalUsage();
-                }
                 const reasoning = this.buildComprehensiveReasoning(allDrafts, combinedReasoning);
                 const reply =
                   combinedReply ||
@@ -1250,9 +1246,6 @@ CORE AGENTIC INVARIANTS:
             }
 
             if (rawDraft && rawDraft.docType) {
-              if (isUsingUniversal) {
-                await AiConfigService.incrementUniversalUsage();
-              }
               const verified = await this.commitAndVerifyDraft(rawDraft, localContext);
               const reasoning = this.synthesizeReasoning(userPrompt, verified);
               taskSteps[2] = {
@@ -1281,9 +1274,6 @@ CORE AGENTIC INVARIANTS:
               /(?:build|draft|create|generate|make|write|in document|ats|dossier)/i.test(userPrompt);
 
             if (isResumeRequest) {
-              if (isUsingUniversal) {
-                await AiConfigService.incrementUniversalUsage();
-              }
               const genResume = this.generateDeterministicDraftForArchetype(
                 'resume',
                 userPrompt,
@@ -1376,12 +1366,6 @@ CORE AGENTIC INVARIANTS:
       verifiedDrafts.push(v);
     }
     const verified = verifiedDrafts[0] || null;
-    if (verifiedDrafts.length > 0 && isUsingUniversal && !isOverUniversalLimit) {
-      await AiConfigService.incrementUniversalUsage();
-    }
-    if (isOverUniversalLimit) {
-      heuristicResult.reply += `\n\n> ⚡ **Universal Key Free Preview (7/7 docs used)**: You've reached the free trial limit. Add your free personal Groq API key in **AI Settings (BYOK)** to unlock unlimited ultra-fast AI generation with deep step-by-step reasoning, or continue with 100% offline mode.`;
-    }
     const trace =
       heuristicResult.reasoning ||
       (verified ? this.synthesizeReasoning(userPrompt, verified) : 'Local assistant processed query.');
@@ -1730,6 +1714,15 @@ ${userPrompt}
     }
 
     if (isQuestion) {
+      const universalAnswer = UniversalAgentEngine.answerBusinessQuestion(prompt, context);
+      if (universalAnswer) {
+        return {
+          reply: universalAnswer.reply,
+          reasoning: universalAnswer.reasoning,
+          draft: null as any,
+        };
+      }
+
       if (/gst/i.test(prompt)) {
         return {
           reply: `**Goods and Services Tax (GST) in India** is governed by the CGST Act 2017.\n\n• Standard commercial B2B invoices apply **18% GST** (9% CGST + 9% SGST intra-state, or 18% IGST inter-state).\n• Concessional rates: **0%**, **5%**, and **12%**.\n• Luxury/de-merit goods: **28%**.\n\nYou can ask me to draft a GST invoice anytime with specific items and rates!`,
@@ -1737,6 +1730,7 @@ ${userPrompt}
           draft: null as any,
         };
       }
+
       return {
         reply: `I am currently operating in **Offline Local Assistant** mode for **${context?.businessProfile?.name || 'your business'}**.\n\nTo ask open-ended questions with deep neural reasoning, connect to Groq in Settings. For document creation, you can ask me to draft an invoice, salary slip, rent receipt, or job offer directly.`,
         reasoning: 'Offline transparency: Reported local mode status without generating fictitious records.',
@@ -1948,7 +1942,8 @@ ${userPrompt}
       if (context?.matchedCustomers?.length > 0) {
         return context.matchedCustomers[0].name;
       }
-      return fallback;
+      const universalParty = UniversalAgentEngine.extractPartyName(prompt, history, fallback);
+      return universalParty || fallback;
     };
 
     // Helper: Extract items and quantities
@@ -1971,6 +1966,21 @@ ${userPrompt}
           });
         }
         return items;
+      }
+
+      // Universal natural language multi-pattern extraction for freeform queries
+      const parsedUniversal = UniversalAgentEngine.parseLineItems(prompt, defaultCurrency);
+      if (
+        parsedUniversal.length > 0 &&
+        !(parsedUniversal.length === 1 && parsedUniversal[0].description.includes('Statutory & Commercial Deliverable'))
+      ) {
+        return parsedUniversal.map((p) => ({
+          description: p.description,
+          quantityScaled: p.quantityScaled,
+          unitName: p.unitName,
+          unitPriceMinor: p.unitPriceMinor,
+          hsnSac: p.hsnSac || '998314',
+        }));
       }
 
       const qtyMatch = prompt.match(/(\d+)\s+([a-zA-Z\s]{3,30}?)(?:\s+(?:for|to|with|and|\.|$))/i);

@@ -13,3 +13,10 @@ export async function digestStringAsync(
   hash.update(str);
   return hash.digest('hex');
 }
+
+export function getRandomValues<T extends ArrayBufferView>(typedArray: T): T {
+  const bytes = crypto.randomBytes(typedArray.byteLength);
+  const view = new Uint8Array(typedArray.buffer, typedArray.byteOffset, typedArray.byteLength);
+  view.set(bytes);
+  return typedArray;
+}

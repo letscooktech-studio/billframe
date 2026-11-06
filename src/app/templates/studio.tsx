@@ -103,8 +103,10 @@ export default function DocumentStudioScreen() {
     }
 
     // Common standard fallbacks
-    if (!initial.signatory_name) initial.signatory_name = 'Rahul Mehta';
-    if (!initial.signatory_title) initial.signatory_title = 'CEO, Apex Solutions';
+    if (!existingData) {
+      initial.signatory_name ??= 'Rahul Mehta';
+      initial.signatory_title ??= 'CEO, Apex Solutions';
+    }
 
     setFormData(initial);
 
@@ -125,8 +127,10 @@ export default function DocumentStudioScreen() {
     }
 
     // Default reference number format
-    const prefix = (s.code || 'DOC').substring(0, 4).toUpperCase();
-    setDocNumber(`${prefix}-2026-042`);
+    if (!existingData) {
+      const prefix = (s.code || 'DOC').substring(0, 4).toUpperCase();
+      setDocNumber(`${prefix}-2026-042`);
+    }
   }, []);
 
   // Load Business Profile & Custom Schema if any
@@ -152,6 +156,8 @@ export default function DocumentStudioScreen() {
           setDocNumber(inst.documentNumber);
           setDocStatus(inst.status as any);
           if (inst.partyName) setPartyName(inst.partyName);
+          setSignatoryName(inst.content.signatory_name ?? active?.signatory_name ?? '');
+          setSignatoryTitle(inst.content.signatory_title ?? active?.signatory_title ?? '');
           if (inst.templateCode) setSelectedLayout(inst.templateCode);
           initializeFormDataFromSchema(activeSchema, inst.content);
           return;
@@ -260,20 +266,11 @@ export default function DocumentStudioScreen() {
   const generatePreview = useCallback((version: number) => {
     const dummyBiz: BusinessProfile = businessProfile || {
       id: 'biz_default',
-      name: 'Apex Solutions',
-      legal_name: 'Apex Solutions Pvt Ltd',
-      tax_id: '29ABCDE1234F1Z5',
+      name: '',
       default_currency: 'INR',
       default_document_locale: 'en-IN',
-      address_line1: 'Flat 402, Green View Apartments',
-      city: 'Bengaluru',
-      state: 'Karnataka',
-      postal_code: '560038',
       country: 'IN',
       country_iso2: 'IN',
-      phone: '+91 98765 43210',
-      email: 'hello@apexsolutions.com',
-      website: 'www.apexsolutions.com',
       is_active: 1,
       created_at: Date.now(),
       updated_at: Date.now(),

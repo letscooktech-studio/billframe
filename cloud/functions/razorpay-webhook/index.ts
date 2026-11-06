@@ -149,25 +149,66 @@ serve(async (req: Request) => {
       paymentLinkId = payment?.notes?.payment_link_id || null;
     }
 
-    // 5. Atomic transaction log in payment_events
-    await supabase.from('payment_events').insert({
-      business_id: businessId,
-      event_id: eventId,
-      event_type: eventType,
-      provider: 'razorpay',
-      provider_payment_id: providerPaymentId,
-      amount_minor: amountMinor,
-      currency,
-      payload,
-      signature: signatureHeader,
-      is_verified: true,
-      processed_status: 'processed',
-      processed_at: new Date().toISOString(),
+    // 5. Atomic persistence: first attempt database-level atomic stored procedure
+    const { data: rpcData, error: rpcError } = await supabase.rpc('process_payment_webhook', {
+      p_event_id: eventId,
+      p_event_type: eventType,
+      p_provider: 'razorpay',
+      p_provider_payment_id: providerPaymentId,
+      p_amount_minor: amountMinor,
+      p_currency: currency,
+      p_payload: payload,
+      p_signature: signatureHeader,
+      p_payment_link_id: paymentLinkId,
+      p_business_id: businessId,
     });
 
-    // 6. Update payment_request status if linked
+    if (!rpcError && rpcData) {
+      if (rpcData.status === 'already_processed') {
+        return new Response(JSON.stringify({ message: 'Event already processed', eventId }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ success: true, eventId, status: rpcData.status }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Fallback: If stored procedure is unavailable, perform atomic ON CONFLICT insert with explicit error boundary
+    const { error: insertError } = await supabase
+      .from('payment_events')
+      .insert({
+        business_id: businessId,
+        event_id: eventId,
+        event_type: eventType,
+        provider: 'razorpay',
+        provider_payment_id: providerPaymentId,
+        amount_minor: amountMinor,
+        currency,
+        payload,
+        signature: signatureHeader,
+        is_verified: true,
+        processed_status: 'processed',
+        processed_at: new Date().toISOString(),
+      });
+
+    if (insertError) {
+      // Postgres error code 23505 indicates unique_violation on event_id
+      if (insertError.code === '23505' || insertError.message?.includes('duplicate key') || insertError.message?.includes('already exists')) {
+        return new Response(JSON.stringify({ message: 'Event already processed', eventId }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      console.error(`Database error inserting payment_event ${eventId}:`, insertError);
+      throw insertError;
+    }
+
+    // 6. Update payment_request status if linked with explicit error checking
     if (paymentLinkId) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('payment_requests')
         .update({
           status: 'paid',
@@ -178,6 +219,11 @@ serve(async (req: Request) => {
           },
         })
         .eq('provider_reference_id', paymentLinkId);
+
+      if (updateError) {
+        console.error(`Failed to update payment_request status for link ${paymentLinkId}:`, updateError);
+        throw updateError;
+      }
     }
 
     return new Response(JSON.stringify({ success: true, eventId }), {

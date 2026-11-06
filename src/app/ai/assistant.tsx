@@ -57,10 +57,16 @@ import {
   Check,
   Maximize2,
   RotateCcw,
+  Plus,
+  Menu,
+  Pencil,
+  Mic,
+  ArrowUp,
+  Square,
 } from 'lucide-react-native';
 import { useTheme } from '../../design/ThemeContext';
 import { colors, radii, spacing, typography } from '../../design/tokens';
-import { AiConfigService, AiConfig, AiProvider, DEFAULT_GROQ_KEY, MAX_UNIVERSAL_KEY_DOCS } from '../../services/ai/AiConfigService';
+import { AiConfigService, AiConfig, AiProvider } from '../../services/ai/AiConfigService';
 import { AiDocumentAgent, AgentChatMessage, ParsedDocumentDraft } from '../../services/ai/AiDocumentAgent';
 import { AiTemplateBridge, DocumentTemplateOption } from '../../services/ai/AiTemplateBridge';
 import { createMoney, formatMoney } from '../../domain/money/Money';
@@ -71,11 +77,16 @@ import { ActionApprovalSheet } from '../../components/ai/ActionApprovalSheet';
 import { RecommendationEngine, RecommendationItem } from '../../services/ai/RecommendationEngine';
 import { BusinessProfile } from '../../domain/profile/types';
 import { ClaudeThinkingIndicator } from '../../components/animations/ClaudeThinkingIndicator';
+import { AuraWavesVisualizer } from '../../components/animations/AuraWavesVisualizer';
+import { CopilotActionSheet } from '../../components/ai/CopilotActionSheet';
 import { IntelligentMessageRenderer } from '../../components/ai/IntelligentMessageRenderer';
 import { FluidStreamingText } from '../../components/ai/FluidStreamingText';
 import { AnimatedArtifactTile } from '../../components/ai/AnimatedArtifactTile';
 import { ChatQuestionOption } from '../../services/ai/DocumentQuestionElicitor';
 import { ChatboxAnimatedMcq } from '../../components/ai/ChatboxAnimatedMcq';
+import { AuraSparkle } from '../../components/ai/AuraSparkle';
+import { PulsingDots } from '../../components/ai/PulsingDots';
+import { AmbientBottomGlow } from '../../components/animations/AmbientBottomGlow';
 
 /**
  * Transforms raw neural reasoning thoughts into clean, high-elegance cognitive steps.
@@ -295,19 +306,39 @@ export default function AiAssistantScreen() {
   const isDesktop = windowWidth >= 960;
 
   // Chat State
-  const [messages, setMessages] = useState<AgentChatMessage[]>([
-    {
-      id: 'welcome_msg',
-      role: 'assistant',
-      content:
-        'What would you like to draft today?\n\nTell me what document you need in plain words, or tap a quick starter below.',
-      timestamp: Date.now(),
-    },
-  ]);
+  const [messages, setMessages] = useState<AgentChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeDraft, setActiveDraft] = useState<ParsedDocumentDraft | null>(null);
   const [activeDrafts, setActiveDrafts] = useState<ParsedDocumentDraft[]>([]);
+  const [showActionSheet, setShowActionSheet] = useState(false);
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
+
+  useEffect(() => {
+    BusinessProfileRepository.getActiveProfile()
+      .then((p) => {
+        if (p) setBusinessProfile(p);
+      })
+      .catch(() => {});
+  }, []);
+
+  const firstName = useMemo(() => {
+    const raw = businessProfile?.name || businessProfile?.legal_name || '';
+    if (!raw) return '';
+    const parts = raw.trim().split(/\s+/);
+    return parts[0] || '';
+  }, [businessProfile]);
+
+  const hasUserMessages = useMemo(() => {
+    return messages.some((m) => m.role === 'user');
+  }, [messages]);
+
+  const handleStopGeneration = () => {
+    setIsProcessing(false);
+    setMessages((prev) =>
+      prev.map((m) => (m.isThinking || m.isStreaming ? { ...m, isThinking: false, isStreaming: false } : m))
+    );
+  };
 
   // Codex Real-Time Streaming & Thinking State
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -321,9 +352,9 @@ export default function AiAssistantScreen() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [config, setConfig] = useState<AiConfig>({
     provider: 'groq',
-    apiKey: DEFAULT_GROQ_KEY,
+    apiKey: '',
     model: 'openai/gpt-oss-120b',
-    isReady: true,
+    isReady: false,
   });
   const [universalStatus, setUniversalStatus] = useState<{
     isLimited: boolean;
@@ -333,10 +364,10 @@ export default function AiAssistantScreen() {
   }>({
     isLimited: false,
     count: 0,
-    max: MAX_UNIVERSAL_KEY_DOCS,
-    isUniversalKey: true,
+    max: 7,
+    isUniversalKey: false,
   });
-  const [tempApiKey, setTempApiKey] = useState(DEFAULT_GROQ_KEY);
+  const [tempApiKey, setTempApiKey] = useState('');
   const [tempProvider, setTempProvider] = useState<AiProvider>('groq');
   const [isTestingKey, setIsTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -363,6 +394,16 @@ export default function AiAssistantScreen() {
 
   const scrollViewRef = useRef<ScrollView>(null);
   const textInputRef = useRef<TextInput>(null);
+  const lastScrollTime = useRef<number>(0);
+
+  const handleContentSizeChange = () => {
+    const now = Date.now();
+    // Throttle animated scroll to eliminate micro-jitter and shaking
+    if (now - lastScrollTime.current > 140) {
+      lastScrollTime.current = now;
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }
+  };
 
   // Hydrate persistent AI session and recommendations from SQLite on Mount
   useEffect(() => {
@@ -375,7 +416,10 @@ export default function AiAssistantScreen() {
         }
         const saved = await AgentSessionRepository.getMessages(session.id);
         if (saved && saved.length > 0) {
-          setMessages(saved);
+          const nonWelcome = saved.filter((m) => !m.id.startsWith('welcome_'));
+          if (nonWelcome.length > 0) {
+            setMessages(nonWelcome);
+          }
         }
         const recs = await RecommendationEngine.evaluateRecommendations();
         setRecommendations(recs);
@@ -389,18 +433,10 @@ export default function AiAssistantScreen() {
   // Load Config on Mount
   useEffect(() => {
     async function initConfig() {
-      let current = await AiConfigService.getConfig();
-      if (current.provider === 'offline_heuristic' && !current.apiKey) {
-        await AiConfigService.saveConfig({
-          provider: 'groq',
-          apiKey: DEFAULT_GROQ_KEY,
-          model: 'openai/gpt-oss-120b',
-        });
-        current = await AiConfigService.getConfig();
-      }
+      const current = await AiConfigService.getConfig();
       setConfig(current);
       setTempProvider(current.provider);
-      setTempApiKey(current.apiKey || (current.provider === 'groq' ? DEFAULT_GROQ_KEY : ''));
+      setTempApiKey(current.apiKey || '');
       const limit = await AiConfigService.checkUniversalLimit();
       setUniversalStatus(limit);
     }
@@ -533,15 +569,7 @@ export default function AiAssistantScreen() {
     await AgentSessionRepository.clearSession().catch(() => {});
     setActiveDraft(null);
     setActiveDrafts([]);
-    setMessages([
-      {
-        id: `welcome_${Date.now()}`,
-        role: 'assistant',
-        content:
-          'What would you like to draft today?\n\nTell me what document you need in plain words, or tap a quick starter below.',
-        timestamp: Date.now(),
-      },
-    ]);
+    setMessages([]);
   }
 
   // Handle Send Message with Real-Time Codex Streaming Animation
@@ -844,356 +872,315 @@ export default function AiAssistantScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: '#000000' }]} edges={['top', 'bottom']}>
       {/* Top Header Bar */}
-      <View style={[styles.headerBar, { borderBottomColor: theme.borderSubtle, backgroundColor: theme.surface }]}>
-        <View style={styles.headerLeft}>
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.backButton}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <ArrowLeft color={theme.textPrimary} size={20} />
-          </Pressable>
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Sparkles size={16} color={theme.textPrimary} />
-              <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Billframe AI Agent</Text>
-            </View>
-            <Text style={[styles.headerSubtitle, { color: theme.textMuted }]}>
-              {config.provider === 'offline_heuristic'
-                ? 'Offline Engine'
-                : config.isReady
-                ? 'AI Agent · Ready'
-                : 'Offline Engine'}
-            </Text>
-          </View>
-        </View>
+      <View style={[styles.headerBar, { backgroundColor: '#000000', borderBottomColor: 'transparent' }]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.headerIconButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Menu color="#F4F4F5" size={22} />
+        </Pressable>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Pressable
-            onPress={() => setShowConfigModal(true)}
-            style={[
-              styles.byokBadge,
-              {
-                backgroundColor: universalStatus.isUniversalKey
-                  ? (universalStatus.isLimited ? '#3f1a1a' : '#142938')
-                  : config.provider === 'offline_heuristic'
-                  ? '#1f2024'
-                  : '#132e22',
-                borderColor: universalStatus.isUniversalKey
-                  ? (universalStatus.isLimited ? '#f87171' : '#38BDF8')
-                  : config.provider === 'offline_heuristic'
-                  ? '#35363B'
-                  : '#10B981',
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="AI Engine and BYOK Key Status"
-          >
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: '700',
-                color: universalStatus.isUniversalKey
-                  ? (universalStatus.isLimited ? '#fca5a5' : '#38BDF8')
-                  : config.provider === 'offline_heuristic'
-                  ? '#A5A6AB'
-                  : '#34d399',
-              }}
-            >
-              {universalStatus.isUniversalKey
-                ? (universalStatus.isLimited ? '⚡ Limit: 7/7 · BYOK ↗' : `⚡ Free: ${universalStatus.count}/7 · BYOK ↗`)
-                : config.provider === 'offline_heuristic'
-                ? '🔒 Offline'
-                : '🔑 BYOK Active'}
-            </Text>
-          </Pressable>
+        <Pressable
+          onPress={() => setShowConfigModal(true)}
+          style={styles.modelSwitcherPill}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Model switcher"
+        >
+          <Text style={styles.modelSwitcherText}>
+            {config.provider === 'offline_heuristic' ? 'Billframe 4.0' : 'Billframe Copilot'}
+          </Text>
+          <ChevronDown size={14} color="#94A3B8" />
+        </Pressable>
 
+        <View style={styles.headerRightGroup}>
           <Pressable
             onPress={handleClearConversation}
-            style={[styles.settingsButton, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+            style={styles.headerIconButton}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Reset conversation"
+            accessibilityLabel="New chat"
           >
-            <RotateCcw color={theme.textSecondary} size={16} />
+            <Pencil color="#F4F4F5" size={20} />
           </Pressable>
 
           <Pressable
             onPress={() => setShowConfigModal(true)}
-            style={[styles.settingsButton, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+            style={styles.avatarButton}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Open AI Settings"
+            accessibilityLabel="User profile"
           >
-            <Settings color={theme.textSecondary} size={18} />
+            <Text style={styles.avatarText}>
+              {firstName ? firstName.charAt(0).toUpperCase() : 'A'}
+            </Text>
+            <View style={styles.avatarStatusDot} />
           </Pressable>
         </View>
       </View>
 
       {/* Main Responsive Dual-Pane Layout */}
-      <View style={[styles.mainLayoutContainer, isDesktop && styles.desktopLayoutRow]}>
+      <View style={[styles.mainLayoutContainer, isDesktop && styles.desktopLayoutRow, { backgroundColor: '#000000' }]}>
         {/* Left Column: Conversational AI Copilot */}
         <KeyboardAvoidingView
-          style={[styles.chatPaneContainer, isDesktop && styles.desktopChatPane]}
+          style={[styles.chatPaneContainer, isDesktop && styles.desktopChatPane, { backgroundColor: '#000000' }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          <ScrollView
-          ref={scrollViewRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.scrollContent}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-        >
-          {messages.map((msg) => {
-            const isUser = msg.role === 'user';
+          {/* Ambient Holographic Aura Waves Upper Side (Active during inference/streaming) */}
+          <AuraWavesVisualizer isProcessing={isProcessing} height={140} />
 
-            if (isUser) {
-              return (
-                <AnimatedMessageRow key={msg.id} isUser={true}>
-                  <View
-                    style={[
-                      styles.userBubbleContainer,
-                      {
-                        backgroundColor: theme.surfaceSecondary,
-                        borderColor: theme.borderDefault,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.userMessageText, { color: theme.textPrimary }]}>
-                      {msg.content}
-                    </Text>
-                  </View>
-                </AnimatedMessageRow>
-              );
-            }
+          {/* Ambient Deep Atmospheric Glow at Bottom */}
+          <AmbientBottomGlow />
 
-            return (
-              <AnimatedMessageRow key={msg.id} isUser={false}>
-                <View style={styles.assistantMessageFlow}>
-                  {/* Claude Intelligent Thinking Indicator (Flat, Inline, Organic) */}
-                  {(msg.isThinking || msg.reasoningTrace || (msg.taskSteps && msg.taskSteps.length > 0)) && (
-                    <View style={{ marginBottom: 6 }}>
-                      <ClaudeThinkingIndicator
-                        isThinking={Boolean(msg.isThinking)}
-                        thoughtDurationSeconds={msg.thoughtDurationSeconds}
-                        elapsedSeconds={elapsedSeconds}
-                        taskSteps={msg.taskSteps || []}
-                        reasoningTrace={msg.reasoningTrace || ''}
-                        isExpanded={
-                          expandedThoughts[msg.id] !== undefined
-                            ? expandedThoughts[msg.id]
-                            : Boolean(msg.isThinking)
-                        }
-                        onToggleExpand={() => toggleThought(msg.id)}
-                        textColor={theme.textPrimary}
-                        textSecondaryColor={theme.textMuted}
-                      />
-                    </View>
-                  )}
+          {!hasUserMessages ? (
+            <View style={styles.emptyContainer}>
+              <AuraSparkle size={48} />
+              <Text style={styles.emptyTitle}>
+                {firstName ? `What's next, ${firstName}?` : 'Where should we start?'}
+              </Text>
+            </View>
+          ) : (
+            <ScrollView
+              ref={scrollViewRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.scrollContent}
+              onContentSizeChange={handleContentSizeChange}
+            >
+              {messages.map((msg) => {
+                const isUser = msg.role === 'user';
 
-                  {/* Conversational Reply Text & Materialized Artifacts with Claude-Style Motion */}
-                  {(msg.content || msg.interactiveQuestion || (msg.documentDrafts && msg.documentDrafts.length > 0) || msg.documentDraft) && !msg.isThinking ? (
-                    <AnimatedResponseBody>
-                      {msg.content ? (
+                if (isUser) {
+                  return (
+                    <AnimatedMessageRow key={msg.id} isUser={true}>
+                      <View style={styles.userBubbleContainer}>
+                        <Text style={styles.userMessageText}>
+                          {msg.content}
+                        </Text>
+                      </View>
+                    </AnimatedMessageRow>
+                  );
+                }
+
+                return (
+                  <AnimatedMessageRow key={msg.id} isUser={false}>
+                    <View style={styles.assistantMessageFlow}>
+                      {/* Claude Intelligent Thinking Indicator (Flat, Inline, Organic) */}
+                      {(msg.isThinking || msg.reasoningTrace || (msg.taskSteps && msg.taskSteps.length > 0)) && (
+                        <View style={{ marginBottom: 6 }}>
+                          <ClaudeThinkingIndicator
+                            isThinking={Boolean(msg.isThinking)}
+                            thoughtDurationSeconds={msg.thoughtDurationSeconds}
+                            elapsedSeconds={elapsedSeconds}
+                            taskSteps={msg.taskSteps || []}
+                            reasoningTrace={msg.reasoningTrace || ''}
+                            isExpanded={
+                              expandedThoughts[msg.id] !== undefined
+                                ? expandedThoughts[msg.id]
+                                : Boolean(msg.isThinking)
+                            }
+                            onToggleExpand={() => toggleThought(msg.id)}
+                            textColor="#F4F4F5"
+                            textSecondaryColor="#8E8E93"
+                          />
+                        </View>
+                      )}
+
+                      {/* 3 Glowing Pulsing Dots while waiting for first tokens */}
+                      {msg.isThinking && !msg.content && (
+                        <PulsingDots color="#38BDF8" size={6} />
+                      )}
+
+                      {/* Conversational Reply Text & Materialized Artifacts with Claude-Style Motion */}
+                      {(msg.content || msg.interactiveQuestion || (msg.documentDrafts && msg.documentDrafts.length > 0) || msg.documentDraft) && !msg.isThinking ? (
+                        <AnimatedResponseBody>
+                          {msg.content ? (
+                            <View style={styles.assistantTextFlow}>
+                              <FluidStreamingText
+                                content={msg.content}
+                                isStreaming={Boolean(msg.isStreaming && !msg.isThinking)}
+                                textColor="#F1F5F9"
+                              />
+                            </View>
+                          ) : null}
+
+                          {/* ── Claude-Style Materialized Artifact Tiles ── */}
+                          {(() => {
+                            const draftsToRender = (msg.documentDrafts && msg.documentDrafts.length > 0)
+                              ? msg.documentDrafts
+                              : (msg.documentDraft ? [msg.documentDraft] : []);
+                            if (draftsToRender.length === 0) return null;
+
+                            return (
+                              <View style={styles.artifactsContainer}>
+                                {draftsToRender.map((draft, dIdx) => {
+                                  const isSelected = activeDraft?.documentId === draft.documentId || activeDraft?.documentNumber === draft.documentNumber;
+
+                                  return (
+                                    <AnimatedArtifactTile
+                                      key={draft.documentId || `${draft.documentNumber}_${dIdx}`}
+                                      draft={draft}
+                                      index={dIdx}
+                                      isSelected={isSelected}
+                                      isDesktop={isDesktop}
+                                      theme={theme}
+                                      onOpen={() => {
+                                        setActiveDraft(draft);
+                                        if (!isDesktop) handleOpenPreview(draft);
+                                      }}
+                                      onPrint={() => handlePrintDocument(draft)}
+                                      onExportHtml={() => handleDownloadHtml(draft)}
+                                      onEditForm={() => router.push(`/document/edit?id=${draft.documentId}` as any)}
+                                    />
+                                  );
+                                })}
+                              </View>
+                            );
+                          })()}
+
+                          {/* ── Subtle In-Message Question Status (Prompted in Chatbox below) ── */}
+                          {msg.interactiveQuestion && !msg.interactiveQuestion.isAnswered && (
+                            <View style={[styles.chatboxPromptBanner, { backgroundColor: 'rgba(56, 189, 248, 0.08)' }]}>
+                              <Sparkles size={12} color="#38BDF8" />
+                              <Text style={[styles.chatboxPromptBannerText, { color: '#D4D4D8' }]}>
+                                Guided Field: <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>{msg.interactiveQuestion.question}</Text> (Choose in chat box below)
+                              </Text>
+                            </View>
+                          )}
+
+                          {msg.interactiveQuestion?.isAnswered && msg.interactiveQuestion.selectedValue && (
+                            <View style={styles.inMessageAnsweredBadge}>
+                              <Check size={11} color="#34C759" />
+                              <Text style={[styles.inMessageAnsweredText, { color: '#9CA3AF' }]}>
+                                Answered: {msg.interactiveQuestion.selectedValue}
+                              </Text>
+                            </View>
+                          )}
+                        </AnimatedResponseBody>
+                      ) : (msg.isStreaming && !msg.isThinking) ? (
                         <View style={styles.assistantTextFlow}>
                           <FluidStreamingText
-                            content={msg.content}
-                            isStreaming={Boolean(msg.isStreaming && !msg.isThinking)}
-                            textColor={theme.textPrimary}
+                            content=""
+                            isStreaming={true}
+                            textColor="#F1F5F9"
                           />
                         </View>
                       ) : null}
-
-                      {/* Initial Welcome Quick Suggestions */}
-                      {msg.id === 'welcome_msg' && (
-                        <View style={styles.welcomeGrid}>
-                          <Pressable
-                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                            onPress={() => handleSendMessage('What is my current business overview and total receivables?')}
-                          >
-                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📊 Business Overview</Text>
-                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Live balance, receivables, and ledger summary</Text>
-                          </Pressable>
-
-                          <Pressable
-                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                            onPress={() => handleSendMessage('List all overdue invoices and unpaid customer balances')}
-                          >
-                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>⏰ Check Overdue</Text>
-                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Find unpaid invoices and outstanding payments</Text>
-                          </Pressable>
-
-                          <Pressable
-                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                            onPress={() => handleSendMessage('Draft a GST Tax Invoice for Acme Corp with 18% GST')}
-                          >
-                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>✦ GST Tax Invoice</Text>
-                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Compliant B2B invoice with CBIC tax calculations</Text>
-                          </Pressable>
-
-                          <Pressable
-                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                            onPress={() => handleSendMessage('build me complete highest ats scoring resume for farhan noor for ai engineer')}
-                          >
-                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📄 ATS Resume (Farhan Noor)</Text>
-                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>ATS-optimized curriculum vitae with 98% score</Text>
-                          </Pressable>
-                        </View>
-                      )}
-
-                      {/* ── Claude-Style Materialized Artifact Tiles ── */}
-                      {(() => {
-                        const draftsToRender = (msg.documentDrafts && msg.documentDrafts.length > 0)
-                          ? msg.documentDrafts
-                          : (msg.documentDraft ? [msg.documentDraft] : []);
-                        if (draftsToRender.length === 0) return null;
-
-                        return (
-                          <View style={styles.artifactsContainer}>
-                            {draftsToRender.map((draft, dIdx) => {
-                              const isSelected = activeDraft?.documentId === draft.documentId || activeDraft?.documentNumber === draft.documentNumber;
-
-                              return (
-                                <AnimatedArtifactTile
-                                  key={draft.documentId || `${draft.documentNumber}_${dIdx}`}
-                                  draft={draft}
-                                  index={dIdx}
-                                  isSelected={isSelected}
-                                  isDesktop={isDesktop}
-                                  theme={theme}
-                                  onOpen={() => {
-                                    setActiveDraft(draft);
-                                    if (!isDesktop) handleOpenPreview(draft);
-                                  }}
-                                  onPrint={() => handlePrintDocument(draft)}
-                                  onExportHtml={() => handleDownloadHtml(draft)}
-                                  onEditForm={() => router.push(`/document/edit?id=${draft.documentId}` as any)}
-                                />
-                              );
-                            })}
-                          </View>
-                        );
-                      })()}
-
-                      {/* ── Subtle In-Message Question Status (Prompted in Chatbox below) ── */}
-                      {msg.interactiveQuestion && !msg.interactiveQuestion.isAnswered && (
-                        <View style={[styles.chatboxPromptBanner, { backgroundColor: 'rgba(56, 189, 248, 0.08)' }]}>
-                          <Sparkles size={12} color="#38BDF8" />
-                          <Text style={[styles.chatboxPromptBannerText, { color: theme.textSecondary }]}>
-                            Guided Field: <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>{msg.interactiveQuestion.question}</Text> (Choose in chat box below)
-                          </Text>
-                        </View>
-                      )}
-
-                      {msg.interactiveQuestion?.isAnswered && msg.interactiveQuestion.selectedValue && (
-                        <View style={styles.inMessageAnsweredBadge}>
-                          <Check size={11} color="#34C759" />
-                          <Text style={[styles.inMessageAnsweredText, { color: theme.textMuted }]}>
-                            Answered: {msg.interactiveQuestion.selectedValue}
-                          </Text>
-                        </View>
-                      )}
-                    </AnimatedResponseBody>
-                  ) : (msg.isStreaming && !msg.isThinking) ? (
-                    <View style={styles.assistantTextFlow}>
-                      <FluidStreamingText
-                        content=""
-                        isStreaming={true}
-                        textColor={theme.textPrimary}
-                      />
                     </View>
-                  ) : null}
-                </View>
-              </AnimatedMessageRow>
-            );
-          })}
-        </ScrollView>
-
-        {/* Context-Aware Smart Workflow Chips (Hidden when question active) */}
-        {!activeQuestion && (
-          <View style={styles.chipsContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScrollContent}>
-              {getSmartWorkflowChips(activeDraft).map((chip, idx) => (
-                <Pressable
-                  key={idx}
-                  style={[styles.chipButton, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                  onPress={() => {
-                    if (chip.label.startsWith('⎙')) {
-                      if (activeDraft) handlePrintDocument(activeDraft);
-                    } else {
-                      handleSendMessage(chip.prompt);
-                    }
-                  }}
-                >
-                  <Text style={[styles.chipText, { color: theme.textSecondary }]}>{chip.label}</Text>
-                </Pressable>
-              ))}
+                  </AnimatedMessageRow>
+                );
+              })}
             </ScrollView>
-          </View>
-        )}
-
-        {/* Floating Input Bar & In-Chatbox Question Elicitor */}
-        <View style={[styles.inputBarContainer, { backgroundColor: theme.surface, borderTopColor: theme.borderSubtle }]}>
-          {/* Animated Guided MCQ Question Card Rises Up Animately in Chatbox */}
-          {activeQuestion && (
-            <ChatboxAnimatedMcq
-              question={activeQuestion}
-              theme={theme}
-              onSelectOption={handleSelectQuestionOption}
-              onSelectOther={handleSelectQuestionOther}
-            />
           )}
 
-          <View
-            style={[
-              styles.floatingInputBox,
-              {
-                backgroundColor: theme.surfaceSecondary,
-                borderColor: activeQuestion ? '#38BDF8' : theme.borderDefault,
-              },
-            ]}
-          >
-            <TextInput
-              ref={textInputRef}
-              style={[
-                styles.floatingTextInput,
-                {
-                  color: theme.textPrimary,
-                },
-              ]}
-              placeholder={activeDraft ? `Modify ${activeDraft.documentTitle} (e.g. "change price to 45000")...` : 'Ask Billframe to create or query any document...'}
-              placeholderTextColor={theme.textMuted}
-              value={inputText}
-              onChangeText={setInputText}
-              onSubmitEditing={() => handleSendMessage()}
-              returnKeyType="send"
-              editable={!isProcessing}
-            />
-            <Pressable
-              style={[
-                styles.floatingSendButton,
-                {
-                  backgroundColor: inputText.trim() && !isProcessing ? (theme.primaryActionBg || '#F3F3F4') : 'rgba(255, 255, 255, 0.08)',
-                },
-              ]}
-              onPress={() => handleSendMessage()}
-              disabled={!inputText.trim() || isProcessing}
-              accessibilityRole="button"
-              accessibilityLabel="Send message"
-            >
-              {isProcessing ? (
-                <ActivityIndicator size="small" color="#0F172A" style={{ transform: [{ scale: 0.7 }] }} />
+          {/* Context-Aware Smart Workflow Chips (Hidden when question active or no active draft) */}
+          {hasUserMessages && activeDraft && !activeQuestion && (
+            <View style={styles.chipsContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScrollContent}>
+                {getSmartWorkflowChips(activeDraft).map((chip, idx) => (
+                  <Pressable
+                    key={idx}
+                    style={[styles.chipButton, { backgroundColor: '#1E1F23', borderColor: 'rgba(255, 255, 255, 0.08)' }]}
+                    onPress={() => {
+                      if (chip.label.startsWith('⎙')) {
+                        if (activeDraft) handlePrintDocument(activeDraft);
+                      } else {
+                        handleSendMessage(chip.prompt);
+                      }
+                    }}
+                  >
+                    <Text style={[styles.chipText, { color: '#D4D4D8' }]}>{chip.label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Floating Input Bar & In-Chatbox Question Elicitor */}
+          <View style={styles.bottomBarWrapper}>
+            {/* Animated Guided MCQ Question Card Rises Up Animately in Chatbox */}
+            {activeQuestion && (
+              <ChatboxAnimatedMcq
+                question={activeQuestion}
+                theme={theme}
+                onSelectOption={handleSelectQuestionOption}
+                onSelectOther={handleSelectQuestionOther}
+              />
+            )}
+
+            <View style={styles.floatingInputPill}>
+              <Pressable
+                style={styles.floatingPlusBtn}
+                onPress={() => setShowActionSheet(true)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Open document action menu"
+              >
+                <Plus size={22} color="#9CA3AF" />
+              </Pressable>
+
+              <TextInput
+                ref={textInputRef}
+                style={styles.floatingTextInputField}
+                placeholder={activeDraft ? `Modify ${activeDraft.documentTitle}...` : 'Ask Billframe...'}
+                placeholderTextColor="#6B7280"
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={() => handleSendMessage()}
+                returnKeyType="send"
+                editable={!isProcessing}
+              />
+
+              {inputText.trim().length > 0 ? (
+                <Pressable
+                  style={styles.sendCircleBtn}
+                  onPress={() => handleSendMessage()}
+                  disabled={isProcessing}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send message"
+                >
+                  <ArrowUp size={20} color="#0D0E10" strokeWidth={2.8} />
+                </Pressable>
+              ) : isProcessing ? (
+                <Pressable
+                  style={styles.stopCircleBtn}
+                  onPress={handleStopGeneration}
+                  accessibilityRole="button"
+                  accessibilityLabel="Stop generation"
+                >
+                  <View style={styles.stopSquareIcon} />
+                </Pressable>
               ) : (
-                <Send size={15} color={inputText.trim() ? (theme.primaryActionText || '#141416') : theme.textMuted} />
+                <View style={styles.idleRightGroup}>
+                  <Pressable
+                    style={styles.micCircleBtn}
+                    onPress={() => handleSendMessage('Draft a GST Tax Invoice for Acme Corp with 18% GST')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Voice input"
+                  >
+                    <Mic size={20} color="#E4E4E7" />
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.voiceOrbCircleBtn}
+                    onPress={() => setShowActionSheet(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Audio assistant"
+                  >
+                    <View style={[styles.orbWaveBar, { height: 9 }]} />
+                    <View style={[styles.orbWaveBar, { height: 16 }]} />
+                    <View style={[styles.orbWaveBar, { height: 11 }]} />
+                  </Pressable>
+                </View>
               )}
-            </Pressable>
+            </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
 
       {/* Right Column: Live Document Artifact Canvas (Desktop Wide Screen) */}
       {isDesktop && (
@@ -1380,6 +1367,7 @@ export default function AiAssistantScreen() {
                     <iframe
                       srcDoc={previewHtml}
                       title="Live Statutory Document Preview"
+                      sandbox="allow-same-origin"
                       style={{
                         width: '100%',
                         height: '100%',
@@ -1575,6 +1563,7 @@ export default function AiAssistantScreen() {
                 <iframe
                   srcDoc={previewHtml}
                   title="Statutory Document Preview"
+                  sandbox="allow-same-origin"
                   style={{
                     width: '100%',
                     height: '100%',
@@ -1613,54 +1602,37 @@ export default function AiAssistantScreen() {
               Billframe supports Bring-Your-Own-Key (BYOK) with deep reasoning on Groq LPU, Gemini 2.5, OpenAI, or 100% offline deterministic processing.
             </Text>
 
-            {/* BYOK & Trial Status Card */}
-            {tempProvider === 'groq' && (
+            {/* BYOK Status Card */}
+            {tempProvider !== 'offline_heuristic' && (
               <View
                 style={[
                   styles.trialInfoCard,
                   {
-                    backgroundColor: (!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
-                      ? (universalStatus.isLimited ? '#2d1414' : '#142533')
-                      : '#10261c',
-                    borderColor: (!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
-                      ? (universalStatus.isLimited ? '#7f1d1d' : '#1e4976')
-                      : '#14532d',
+                    backgroundColor: tempApiKey.trim() ? '#10261c' : '#142533',
+                    borderColor: tempApiKey.trim() ? '#14532d' : '#1e4976',
                   },
                 ]}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Sparkles size={14} color={(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY) ? '#38BDF8' : '#34d399'} />
+                    <Sparkles size={14} color={tempApiKey.trim() ? '#34d399' : '#38BDF8'} />
                     <Text
                       style={{
                         fontSize: 12,
                         fontWeight: '700',
-                        color: (!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY) ? '#38BDF8' : '#34d399',
+                        color: tempApiKey.trim() ? '#34d399' : '#38BDF8',
                       }}
                     >
-                      {(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
-                        ? 'Universal Free Trial Key (Groq LPU 120B)'
-                        : 'Personal BYOK Key Active'}
+                      {tempApiKey.trim()
+                        ? 'Personal BYOK Key Active'
+                        : 'Bring-Your-Own-Key (BYOK) Mode'}
                     </Text>
                   </View>
-                  {(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY) && (
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: '700',
-                        color: universalStatus.isLimited ? '#f87171' : '#38BDF8',
-                      }}
-                    >
-                      {universalStatus.count} / {universalStatus.max} docs used
-                    </Text>
-                  )}
                 </View>
                 <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, lineHeight: 15 }}>
-                  {(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
-                    ? universalStatus.isLimited
-                      ? '⚠️ Free trial limit reached. Add your own free personal Groq key below for unlimited generation, or use offline mode.'
-                      : 'Built-in universal key active for quick trial documents. To unlock unlimited generation, paste your free Groq key below.'
-                    : 'Personal key configured. You have unlimited cloud document drafting and deep reasoning with zero rate limits.'}
+                  {tempApiKey.trim()
+                    ? 'Your personal API key is securely stored in hardware-backed storage. Zero network requests occur when using offline mode.'
+                    : 'Enter your personal API key below to enable cloud reasoning. Keys are never shared and stay strictly on your device.'}
                 </Text>
               </View>
             )}
@@ -1685,9 +1657,6 @@ export default function AiAssistantScreen() {
                   ]}
                   onPress={() => {
                     setTempProvider(p.id);
-                    if (p.id === 'groq' && !tempApiKey) {
-                      setTempApiKey(DEFAULT_GROQ_KEY);
-                    }
                   }}
                 >
                   <Text style={{ fontSize: 12, fontWeight: '700', color: tempProvider === p.id ? theme.textPrimary : theme.textSecondary }}>
@@ -1708,11 +1677,6 @@ export default function AiAssistantScreen() {
                       ? 'Google Gemini API Key:'
                       : 'OpenAI API Key:'}
                   </Text>
-                  {tempProvider === 'groq' && (
-                    <Pressable onPress={() => setTempApiKey(DEFAULT_GROQ_KEY)} hitSlop={6}>
-                      <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '700' }}>Use Pre-Configured Key</Text>
-                    </Pressable>
-                  )}
                 </View>
 
                 <TextInput
@@ -1835,6 +1799,18 @@ export default function AiAssistantScreen() {
         }}
         onDismiss={() => setPendingProposal(null)}
       />
+
+      {/* Sleek Monochrome Bottom Sheet Overlay (Image 4 Style) */}
+      <CopilotActionSheet
+        visible={showActionSheet}
+        onClose={() => setShowActionSheet(false)}
+        activeDraft={activeDraft}
+        onPreview={() => activeDraft && handleOpenPreview(activeDraft)}
+        onPrint={() => activeDraft && handlePrintDocument(activeDraft)}
+        onDownloadHtml={() => activeDraft && handleDownloadHtml(activeDraft)}
+        onOpenStudio={() => router.push('/templates/studio' as any)}
+        onSelectPrompt={(p) => handleSendMessage(p)}
+      />
     </SafeAreaView>
   );
 }
@@ -1842,14 +1818,82 @@ export default function AiAssistantScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: '#000000',
   },
   headerBar: {
-    height: 56,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    height: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    backgroundColor: '#000000',
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modelSwitcherPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 18,
+    backgroundColor: 'transparent',
+  },
+  modelSwitcherText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#F4F4F5',
+    letterSpacing: -0.2,
+  },
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  avatarButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#0D9488',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  avatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  avatarStatusDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+    zIndex: 1,
+  },
+  emptyTitle: {
+    fontSize: 28,
+    fontWeight: '400',
+    color: '#F1F5F9',
+    textAlign: 'center',
+    letterSpacing: -0.3,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1914,22 +1958,102 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   userBubbleContainer: {
-    maxWidth: Platform.OS === 'web' ? '78%' : '88%',
-    borderRadius: 16,
-    borderBottomRightRadius: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
+    maxWidth: Platform.OS === 'web' ? '78%' : '84%',
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: '#1E293B',
+    alignSelf: 'flex-end',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
   userMessageText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '400',
+    color: '#F8FAFC',
+  },
+  bottomBarWrapper: {
+    paddingHorizontal: 16,
+    paddingBottom: Platform.OS === 'ios' ? 12 : 16,
+    backgroundColor: 'transparent',
+    zIndex: 10,
+  },
+  floatingInputPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#1C1D21',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 10,
+  },
+  floatingPlusBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floatingTextInputField: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    paddingHorizontal: 10,
+    height: '100%',
+  },
+  sendCircleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stopCircleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#27272A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stopSquareIcon: {
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+  },
+  idleRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  micCircleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceOrbCircleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 2.5,
+  },
+  orbWaveBar: {
+    width: 2.5,
+    borderRadius: 1,
+    backgroundColor: '#FFFFFF',
   },
   messageTimestamp: {
     fontSize: 10,
@@ -2072,6 +2196,42 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#10B981',
+  },
+  copilotHeroBanner: {
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  copilotHeroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  copilotHeroBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#38BDF8',
+    letterSpacing: 0.6,
+  },
+  copilotHeroTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    marginBottom: 4,
+  },
+  copilotHeroSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   welcomeGrid: {
     marginTop: 12,
@@ -2550,7 +2710,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 24,
     borderWidth: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     minHeight: 48,
     shadowColor: '#000',
@@ -2558,6 +2718,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  floatingPlusButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
   },
   floatingTextInput: {
     flex: 1,

@@ -10,10 +10,11 @@ import { SupabaseSyncConfigService } from '../../src/services/sync/SupabaseSyncC
 import { SupabaseSyncService } from '../../src/services/sync/SupabaseSyncService';
 
 describe('AI Config Service (BYOK)', () => {
-  it('defaults to groq provider with included high-speed reasoning', async () => {
+  it('defaults to groq provider awaiting BYOK key or offline mode', async () => {
     const config = await AiConfigService.getConfig();
     expect(config.provider).toBe('groq');
-    expect(config.isReady).toBe(true);
+    expect(config.apiKey).toBe('');
+    expect(config.isReady).toBe(false);
   });
 
   it('fails connection test gracefully when API key is missing', async () => {

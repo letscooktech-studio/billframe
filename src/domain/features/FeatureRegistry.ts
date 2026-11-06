@@ -112,7 +112,7 @@ export const FEATURE_REGISTRY: FeatureCapability[] = [
     name: 'Customers & Clients',
     description: 'Customer directory, balances, contact information, and billing history',
     icon: 'customers',
-    route: '/(tabs)/customers',
+    route: '/(tabs)/contacts',
     availability: 'ready',
     businessRelevance: {
       freelancer: 95,

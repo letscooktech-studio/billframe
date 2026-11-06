@@ -196,7 +196,7 @@ export class WorkspaceResolver {
         id: 'customers',
         name: 'Customers',
         icon: 'customers',
-        route: '/(tabs)/customers',
+        route: '/(tabs)/contacts',
         description: 'Customer directory and history',
       });
       list.push({
@@ -235,7 +235,7 @@ export class WorkspaceResolver {
         id: 'customers',
         name: 'Clients',
         icon: 'customers',
-        route: '/(tabs)/customers',
+        route: '/(tabs)/contacts',
         description: 'Client ledger & accounts',
       });
       return list;
@@ -262,7 +262,7 @@ export class WorkspaceResolver {
       id: 'customers',
       name: 'Clients & Customers',
       icon: 'customers',
-      route: '/(tabs)/customers',
+      route: '/(tabs)/contacts',
       description: 'Customer balances and history',
     });
     if (enabledFeatures.includes('expenses')) {

@@ -301,7 +301,13 @@ export class UniversalDocumentRepository {
          id, business_profile_id, type_id, doc_class, document_number, title,
          status, issue_date, party_name, party_details_json, content_json,
          template_code, branding_json, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         document_number = excluded.document_number, title = excluded.title,
+         status = excluded.status, issue_date = excluded.issue_date,
+         party_name = excluded.party_name, party_details_json = excluded.party_details_json,
+         content_json = excluded.content_json, template_code = excluded.template_code,
+         branding_json = excluded.branding_json, updated_at = excluded.updated_at;`,
       [
         id,
         savedInstance.businessProfileId,

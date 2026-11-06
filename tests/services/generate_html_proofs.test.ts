@@ -12,7 +12,13 @@ import { UniversalDocumentInstance, UniversalDocumentSchema } from '../../src/do
 import { SYSTEM_SCHEMAS } from '../../src/domain/documents/universal/SystemSchemas';
 
 describe('Generate HTML Proofs for Visual Verification', () => {
-  const artifactDir = 'C:\\Users\\manis\\.gemini\\antigravity\\brain\\b7518e44-99c6-47f3-9b05-4526047e62da';
+  const artifactDir = path.resolve(__dirname, '../../test-artifacts');
+
+  beforeAll(() => {
+    if (!fs.existsSync(artifactDir)) {
+      fs.mkdirSync(artifactDir, { recursive: true });
+    }
+  });
 
   const mockBusiness: BusinessProfile = {
     id: 'biz_apex_01',

@@ -113,6 +113,7 @@ function RootLayoutInner() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="document/edit" options={{ presentation: 'card' }} />
       <Stack.Screen name="document/[id]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="document/templates" options={{ presentation: 'card' }} />
       <Stack.Screen name="ai/assistant" options={{ presentation: 'card' }} />
       <Stack.Screen name="templates/index" options={{ presentation: 'card' }} />
       <Stack.Screen name="templates/studio" options={{ presentation: 'card' }} />

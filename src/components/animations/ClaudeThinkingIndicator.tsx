@@ -60,6 +60,12 @@ export function ClaudeThinkingIndicator({
   const wordFadeAnim = useRef(new Animated.Value(1)).current;
   const expandAnim = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
 
+  // Multi-frequency wave equalizer bars
+  const eqBar1 = useRef(new Animated.Value(5)).current;
+  const eqBar2 = useRef(new Animated.Value(9)).current;
+  const eqBar3 = useRef(new Animated.Value(12)).current;
+  const eqBar4 = useRef(new Animated.Value(4)).current;
+
   const [activeWordIndex, setActiveWordIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [shouldRenderBody, setShouldRenderBody] = useState(isExpanded);
@@ -138,6 +144,45 @@ export function ClaudeThinkingIndicator({
     };
   }, [isThinking, pulseAnim, scaleAnim, reduceMotion]);
 
+  // Multi-frequency wave equalizer bars loop
+  useEffect(() => {
+    let eqLoop: Animated.CompositeAnimation | null = null;
+    if (isThinking && !reduceMotion) {
+      eqLoop = Animated.loop(
+        Animated.parallel([
+          Animated.sequence([
+            Animated.timing(eqBar1, { toValue: 12, duration: 400, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+            Animated.timing(eqBar1, { toValue: 4, duration: 400, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          ]),
+          Animated.sequence([
+            Animated.delay(100),
+            Animated.timing(eqBar2, { toValue: 16, duration: 375, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+            Animated.timing(eqBar2, { toValue: 6, duration: 375, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          ]),
+          Animated.sequence([
+            Animated.delay(200),
+            Animated.timing(eqBar3, { toValue: 14, duration: 325, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+            Animated.timing(eqBar3, { toValue: 5, duration: 325, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          ]),
+          Animated.sequence([
+            Animated.delay(150),
+            Animated.timing(eqBar4, { toValue: 10, duration: 425, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+            Animated.timing(eqBar4, { toValue: 3, duration: 425, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          ]),
+        ])
+      );
+      eqLoop.start();
+    } else {
+      eqBar1.setValue(5);
+      eqBar2.setValue(9);
+      eqBar3.setValue(12);
+      eqBar4.setValue(4);
+    }
+    return () => {
+      if (eqLoop) eqLoop.stop();
+    };
+  }, [isThinking, eqBar1, eqBar2, eqBar3, eqBar4, reduceMotion]);
+
   // Cycle thinking words smoothly
   useEffect(() => {
     let wordInterval: any = null;
@@ -197,16 +242,25 @@ export function ClaudeThinkingIndicator({
       >
         <View style={styles.triggerContent}>
           {isThinking ? (
-            /* Soft Pulsing Amber Dot */
-            <Animated.View
-              style={[
-                styles.thinkingDot,
-                {
-                  opacity: pulseAnim,
-                  transform: [{ scale: scaleAnim }],
-                },
-              ]}
-            />
+            <View style={styles.thinkingIndicatorGroup}>
+              {/* Soft Pulsing Dot */}
+              <Animated.View
+                style={[
+                  styles.thinkingDot,
+                  {
+                    opacity: pulseAnim,
+                    transform: [{ scale: scaleAnim }],
+                  },
+                ]}
+              />
+              {/* Multi-Frequency Wave Equalizer Bars */}
+              <View style={styles.miniEqualizerRow}>
+                <Animated.View style={[styles.miniEqBar, { height: eqBar1 }]} />
+                <Animated.View style={[styles.miniEqBar, { height: eqBar2 }]} />
+                <Animated.View style={[styles.miniEqBar, { height: eqBar3 }]} />
+                <Animated.View style={[styles.miniEqBar, { height: eqBar4 }]} />
+              </View>
+            </View>
           ) : null}
 
           {isThinking ? (
@@ -346,6 +400,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  thinkingIndicatorGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  miniEqualizerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 16,
+    gap: 2,
+    marginRight: 2,
+  },
+  miniEqBar: {
+    width: 2.2,
+    borderRadius: 1,
+    backgroundColor: '#2DD4BF',
   },
   thinkingDot: {
     width: 7,
