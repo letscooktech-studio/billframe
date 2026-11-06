@@ -49,10 +49,10 @@ Equipped with an **Autonomous AI Copilot**, Billframe understands natural langua
 - **Cognitive Step-by-Step Reasoning**: Features a transparent, Claude-style thinking accordion (`Thought for 3s ⌵`) that shows intent classification, legal rule grounding, and mathematical derivations.
 - **Interactive In-Chatbox MCQ Elicitation**: When statutory fields are missing, the AI smoothly slides up interactive multiple-choice cards in the chatbox (with options `[A]`, `[B]`, `[C]` and `[Other ✎]`), eliminating dummy placeholder data without tedious form filling.
 - **Multi-Turn Context Memory**: References previous turns to seamlessly extract counterparties, candidate names, and line items.
-- **Bring Your Own Key (BYOK) & Universal Free Trial**:
-  - **Universal Trial Key Out-of-the-Box**: Runs instantly with deep reasoning on Groq LPU (GPT-OSS 120B) with a built-in preview limit of **7 documents**.
-  - **Unlimited Free BYOK**: Plug in your free personal Groq API key in **AI Settings** for unlimited, ultra-fast generation ([Get Free Key at console.groq.com/keys](https://console.groq.com/keys) — zero cost, no credit card required).
-  - **100% Offline Heuristic Fallback**: Zero-network on-device policy engine with BigInt arithmetic precision.
+- **Bring Your Own Key (BYOK) & True Offline Architecture**:
+  - **100% Zero-Network Offline Engine**: Billframe functions completely out of the box without requiring any API keys or network connection. Its on-device deterministic policy engine performs statutory calculations, document structuring, and BigInt balance verifications locally.
+  - **Secure Bring-Your-Own-Key (BYOK)**: To enable deep neural reasoning on cloud models (Groq LPU GPT-OSS 120B, Google Gemini 2.5 Flash, or OpenAI GPT-4o Mini), users can configure their personal API keys in **AI Settings**. Free personal keys can be generated at [console.groq.com/keys](https://console.groq.com/keys) (zero cost, no credit card required).
+  - **Hardware-Backed Credential Isolation**: User-configured credentials are stored directly in the device's secure enclave (`Android Keystore` and `iOS Keychain` via `expo-secure-store`) and never touch Billframe servers. Zero developer-owned API keys are embedded in application code.
 
 ### 2. 🧾 Complete CBIC GST & Statutory Invoicing Suite
 - **Rule 46 B2B Tax Invoices**: Full GSTIN, PAN, HSN/SAC codes, reverse charge flags, and dual-state tax reconciliations.
@@ -193,6 +193,21 @@ We welcome contributions from developers, accountants, tax consultants, and open
 3. Commit your Changes (`git commit -m "feat: add Germany VAT statutory pack"`)
 4. Push to the Branch (`git push origin feat/statutory-tax-pack`)
 5. Open a Pull Request
+
+---
+
+## 🔒 Security, Privacy & Reliability Hardening
+
+Billframe follows rigorous security best practices to protect sensitive financial records:
+
+- **Zero Hardcoded Secrets**: Client bundles contain zero developer-owned inference keys or cloud credentials. Automated CI checks enforce secret scanning across source and cloud functions.
+- **Hardware-Backed Device PIN**: Protected by high-entropy CSPRNG salts (32 bytes / 64 hex characters) and salted SHA-256 digests. Features constant-time hash verification and automated 30-second lockout after 5 consecutive failed attempts.
+- **Multi-Tenant Cloud Isolation**: Cloud synchronization strictly requires authenticated user session JWTs, disallowing anonymous bearer tokens and enforcing PostgreSQL Row Level Security (`auth.uid() = user_id`).
+- **SQL Injection Defense**: Network delta synchronization payloads are filtered against strict per-table column allowlists before local SQLite persistence.
+- **Safe LWW Concurrency**: Uses timestamp-based Last-Write-Wins upserts that preserve foreign key constraints and relational integrity rather than destructive replacement.
+- **Payment Webhook Atomicity**: Server-side HMAC-SHA256 signature verification and database-level idempotency (`ON CONFLICT (event_id) DO NOTHING`) defend against webhook replay attacks and race conditions.
+
+For full architectural details, see [`SECURITY.md`](SECURITY.md).
 
 ---
 

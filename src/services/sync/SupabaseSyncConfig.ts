@@ -11,6 +11,7 @@ import { CloudSyncConfig } from './types';
 const STORAGE_KEYS = {
   SUPABASE_URL: 'billframe_sync_supabase_url',
   SUPABASE_ANON_KEY: 'billframe_sync_supabase_anon_key',
+  AUTH_TOKEN: 'billframe_sync_auth_token',
   USER_ID: 'billframe_sync_user_id',
   AUTO_SYNC: 'billframe_sync_auto_sync',
   LAST_SYNCED_AT: 'billframe_sync_last_synced_at',
@@ -68,6 +69,7 @@ export class SupabaseSyncConfigService {
 
     const supabaseUrl = rawUrl !== null ? rawUrl : DEFAULT_SUPABASE_URL;
     const supabaseAnonKey = rawKey !== null ? rawKey : DEFAULT_SUPABASE_ANON_KEY;
+    const authToken = (await this.getRaw(STORAGE_KEYS.AUTH_TOKEN)) || undefined;
     const userId = (await this.getRaw(STORAGE_KEYS.USER_ID)) || undefined;
     const autoSyncRaw = await this.getRaw(STORAGE_KEYS.AUTO_SYNC);
     const autoSync = autoSyncRaw === 'true';
@@ -77,6 +79,7 @@ export class SupabaseSyncConfigService {
     return {
       supabaseUrl,
       supabaseAnonKey,
+      authToken,
       userId,
       autoSync,
       lastSyncedAt,
@@ -92,6 +95,9 @@ export class SupabaseSyncConfigService {
     if (config.supabaseAnonKey !== undefined) {
       await this.setRaw(STORAGE_KEYS.SUPABASE_ANON_KEY, config.supabaseAnonKey.trim());
     }
+    if (config.authToken !== undefined) {
+      await this.setRaw(STORAGE_KEYS.AUTH_TOKEN, config.authToken.trim());
+    }
     if (config.userId !== undefined) {
       await this.setRaw(STORAGE_KEYS.USER_ID, config.userId.trim());
     }
@@ -106,6 +112,7 @@ export class SupabaseSyncConfigService {
   static async clearConfig(): Promise<void> {
     await this.setRaw(STORAGE_KEYS.SUPABASE_URL, '');
     await this.setRaw(STORAGE_KEYS.SUPABASE_ANON_KEY, '');
+    await this.deleteRaw(STORAGE_KEYS.AUTH_TOKEN);
     await this.deleteRaw(STORAGE_KEYS.USER_ID);
     await this.deleteRaw(STORAGE_KEYS.AUTO_SYNC);
     await this.deleteRaw(STORAGE_KEYS.LAST_SYNCED_AT);

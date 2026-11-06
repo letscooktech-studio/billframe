@@ -11,7 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const ARTIFACT_DIR = 'C:\\Users\\manis\\.gemini\\antigravity\\brain\\b7518e44-99c6-47f3-9b05-4526047e62da';
+const ARTIFACT_DIR = path.resolve(__dirname, '../fixtures/pdf');
 
 describe('Real PDF Binary Verification & Chromium Print Engine Output', () => {
   const pdfFiles = [

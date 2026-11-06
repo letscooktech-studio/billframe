@@ -31,3 +31,4 @@ expo-env.d.ts
 .env.*
 *.keystore
 scratch/
+test-artifacts/

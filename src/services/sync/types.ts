@@ -8,6 +8,7 @@ export type SyncStatusState = 'idle' | 'syncing' | 'success' | 'error';
 export interface CloudSyncConfig {
   supabaseUrl: string;
   supabaseAnonKey: string;
+  authToken?: string; // Authenticated user session JWT (never use public anon key as bearer token)
   userId?: string;
   autoSync: boolean;
   lastSyncedAt?: number;

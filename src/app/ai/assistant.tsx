@@ -60,7 +60,7 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '../../design/ThemeContext';
 import { colors, radii, spacing, typography } from '../../design/tokens';
-import { AiConfigService, AiConfig, AiProvider, DEFAULT_GROQ_KEY, MAX_UNIVERSAL_KEY_DOCS } from '../../services/ai/AiConfigService';
+import { AiConfigService, AiConfig, AiProvider } from '../../services/ai/AiConfigService';
 import { AiDocumentAgent, AgentChatMessage, ParsedDocumentDraft } from '../../services/ai/AiDocumentAgent';
 import { AiTemplateBridge, DocumentTemplateOption } from '../../services/ai/AiTemplateBridge';
 import { createMoney, formatMoney } from '../../domain/money/Money';
@@ -321,9 +321,9 @@ export default function AiAssistantScreen() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [config, setConfig] = useState<AiConfig>({
     provider: 'groq',
-    apiKey: DEFAULT_GROQ_KEY,
+    apiKey: '',
     model: 'openai/gpt-oss-120b',
-    isReady: true,
+    isReady: false,
   });
   const [universalStatus, setUniversalStatus] = useState<{
     isLimited: boolean;
@@ -333,10 +333,10 @@ export default function AiAssistantScreen() {
   }>({
     isLimited: false,
     count: 0,
-    max: MAX_UNIVERSAL_KEY_DOCS,
-    isUniversalKey: true,
+    max: 7,
+    isUniversalKey: false,
   });
-  const [tempApiKey, setTempApiKey] = useState(DEFAULT_GROQ_KEY);
+  const [tempApiKey, setTempApiKey] = useState('');
   const [tempProvider, setTempProvider] = useState<AiProvider>('groq');
   const [isTestingKey, setIsTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -389,18 +389,10 @@ export default function AiAssistantScreen() {
   // Load Config on Mount
   useEffect(() => {
     async function initConfig() {
-      let current = await AiConfigService.getConfig();
-      if (current.provider === 'offline_heuristic' && !current.apiKey) {
-        await AiConfigService.saveConfig({
-          provider: 'groq',
-          apiKey: DEFAULT_GROQ_KEY,
-          model: 'openai/gpt-oss-120b',
-        });
-        current = await AiConfigService.getConfig();
-      }
+      const current = await AiConfigService.getConfig();
       setConfig(current);
       setTempProvider(current.provider);
-      setTempApiKey(current.apiKey || (current.provider === 'groq' ? DEFAULT_GROQ_KEY : ''));
+      setTempApiKey(current.apiKey || '');
       const limit = await AiConfigService.checkUniversalLimit();
       setUniversalStatus(limit);
     }
@@ -1613,54 +1605,37 @@ export default function AiAssistantScreen() {
               Billframe supports Bring-Your-Own-Key (BYOK) with deep reasoning on Groq LPU, Gemini 2.5, OpenAI, or 100% offline deterministic processing.
             </Text>
 
-            {/* BYOK & Trial Status Card */}
-            {tempProvider === 'groq' && (
+            {/* BYOK Status Card */}
+            {tempProvider !== 'offline_heuristic' && (
               <View
                 style={[
                   styles.trialInfoCard,
                   {
-                    backgroundColor: (!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
-                      ? (universalStatus.isLimited ? '#2d1414' : '#142533')
-                      : '#10261c',
-                    borderColor: (!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
-                      ? (universalStatus.isLimited ? '#7f1d1d' : '#1e4976')
-                      : '#14532d',
+                    backgroundColor: tempApiKey.trim() ? '#10261c' : '#142533',
+                    borderColor: tempApiKey.trim() ? '#14532d' : '#1e4976',
                   },
                 ]}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Sparkles size={14} color={(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY) ? '#38BDF8' : '#34d399'} />
+                    <Sparkles size={14} color={tempApiKey.trim() ? '#34d399' : '#38BDF8'} />
                     <Text
                       style={{
                         fontSize: 12,
                         fontWeight: '700',
-                        color: (!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY) ? '#38BDF8' : '#34d399',
+                        color: tempApiKey.trim() ? '#34d399' : '#38BDF8',
                       }}
                     >
-                      {(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
-                        ? 'Universal Free Trial Key (Groq LPU 120B)'
-                        : 'Personal BYOK Key Active'}
+                      {tempApiKey.trim()
+                        ? 'Personal BYOK Key Active'
+                        : 'Bring-Your-Own-Key (BYOK) Mode'}
                     </Text>
                   </View>
-                  {(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY) && (
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: '700',
-                        color: universalStatus.isLimited ? '#f87171' : '#38BDF8',
-                      }}
-                    >
-                      {universalStatus.count} / {universalStatus.max} docs used
-                    </Text>
-                  )}
                 </View>
                 <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, lineHeight: 15 }}>
-                  {(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
-                    ? universalStatus.isLimited
-                      ? '⚠️ Free trial limit reached. Add your own free personal Groq key below for unlimited generation, or use offline mode.'
-                      : 'Built-in universal key active for quick trial documents. To unlock unlimited generation, paste your free Groq key below.'
-                    : 'Personal key configured. You have unlimited cloud document drafting and deep reasoning with zero rate limits.'}
+                  {tempApiKey.trim()
+                    ? 'Your personal API key is securely stored in hardware-backed storage. Zero network requests occur when using offline mode.'
+                    : 'Enter your personal API key below to enable cloud reasoning. Keys are never shared and stay strictly on your device.'}
                 </Text>
               </View>
             )}
@@ -1685,9 +1660,6 @@ export default function AiAssistantScreen() {
                   ]}
                   onPress={() => {
                     setTempProvider(p.id);
-                    if (p.id === 'groq' && !tempApiKey) {
-                      setTempApiKey(DEFAULT_GROQ_KEY);
-                    }
                   }}
                 >
                   <Text style={{ fontSize: 12, fontWeight: '700', color: tempProvider === p.id ? theme.textPrimary : theme.textSecondary }}>
@@ -1708,11 +1680,6 @@ export default function AiAssistantScreen() {
                       ? 'Google Gemini API Key:'
                       : 'OpenAI API Key:'}
                   </Text>
-                  {tempProvider === 'groq' && (
-                    <Pressable onPress={() => setTempApiKey(DEFAULT_GROQ_KEY)} hitSlop={6}>
-                      <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '700' }}>Use Pre-Configured Key</Text>
-                    </Pressable>
-                  )}
                 </View>
 
                 <TextInput

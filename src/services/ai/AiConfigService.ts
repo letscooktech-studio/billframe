@@ -26,7 +26,7 @@ export interface AiConfig {
   isReady: boolean;
 }
 
-export const DEFAULT_GROQ_KEY = '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';
+export const DEFAULT_GROQ_KEY = '';
 export const MAX_UNIVERSAL_KEY_DOCS = 7;
 
 export const PROVIDER_MODELS: Record<AiProvider, Array<{ id: string; name: string; description: string }>> = {
@@ -144,7 +144,7 @@ export class AiConfigService {
       provider,
       apiKey,
       model,
-      isReady: provider === 'offline_heuristic' || Boolean(apiKey.trim()) || (provider === 'groq' && Boolean(DEFAULT_GROQ_KEY)),
+      isReady: provider === 'offline_heuristic' || Boolean(apiKey && apiKey.trim().length > 0),
     };
   }
 
@@ -186,10 +186,13 @@ export class AiConfigService {
    * Performs live healthcheck probe with the configured key
    */
   static async testConnection(apiKey?: string, provider: AiProvider = 'groq'): Promise<{ success: boolean; message: string }> {
-    const key = apiKey !== undefined ? apiKey : ((await this.getStorageItem(AI_API_KEY)) || (provider === 'groq' ? DEFAULT_GROQ_KEY : ''));
+    const key = apiKey !== undefined ? apiKey.trim() : ((await this.getStorageItem(AI_API_KEY)) || '');
 
     if (!key && provider !== 'offline_heuristic') {
-      return { success: false, message: 'API Key is missing.' };
+      return {
+        success: false,
+        message: 'API Key is missing. Please enter your provider API key (BYOK) or switch to Offline mode.',
+      };
     }
 
     if (provider === 'offline_heuristic') {

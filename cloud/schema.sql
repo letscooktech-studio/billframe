@@ -137,3 +137,166 @@ CREATE POLICY tax_packs_read_all ON tax_packs
 
 CREATE POLICY tax_pack_updates_read_all ON tax_pack_updates
   FOR SELECT USING (true);
+
+-- ==============================================================================
+-- ATOMIC TRANSACTION STORED PROCEDURES
+-- ==============================================================================
+
+-- Atomic Webhook Processor: Idempotently ingests webhook event and updates payment ledger in a single transaction
+CREATE OR REPLACE FUNCTION process_payment_webhook(
+  p_event_id TEXT,
+  p_event_type TEXT,
+  p_provider VARCHAR(20),
+  p_provider_payment_id TEXT,
+  p_amount_minor BIGINT,
+  p_currency VARCHAR(3),
+  p_payload JSONB,
+  p_signature TEXT,
+  p_payment_link_id TEXT,
+  p_business_id UUID DEFAULT NULL
+) RETURNS JSONB AS $$
+DECLARE
+  v_event_inserted_id UUID;
+BEGIN
+  -- 1. Atomic insertion with unique conflict handling (defends against race conditions & replay attacks)
+  INSERT INTO payment_events (
+    business_id, event_id, event_type, provider, provider_payment_id,
+    amount_minor, currency, payload, signature, is_verified, processed_status, processed_at
+  ) VALUES (
+    p_business_id, p_event_id, p_event_type, p_provider, p_provider_payment_id,
+    p_amount_minor, p_currency, p_payload, p_signature, TRUE, 'processed', NOW()
+  )
+  ON CONFLICT (event_id) DO NOTHING
+  RETURNING id INTO v_event_inserted_id;
+
+  -- If no row was inserted, event_id already exists (concurrent retry or duplicate delivery)
+  IF v_event_inserted_id IS NULL THEN
+    RETURN jsonb_build_object('success', TRUE, 'status', 'already_processed', 'event_id', p_event_id);
+  END IF;
+
+  -- 2. Atomic state transition for the matching payment request
+  IF p_payment_link_id IS NOT NULL THEN
+    UPDATE payment_requests
+    SET status = 'paid',
+        updated_at = NOW(),
+        metadata = jsonb_build_object(
+          'providerPaymentId', p_provider_payment_id,
+          'paidAt', NOW()
+        )
+    WHERE provider_reference_id = p_payment_link_id;
+  END IF;
+
+  RETURN jsonb_build_object('success', TRUE, 'status', 'processed', 'event_id', p_event_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ==============================================================================
+-- MULTI-TENANT DELTA SYNCHRONIZATION TABLES WITH ROW LEVEL SECURITY
+-- ==============================================================================
+
+-- 1. Business Profiles Sync
+CREATE TABLE IF NOT EXISTS cloud_business_profiles (
+  id TEXT NOT NULL,
+  user_id UUID NOT NULL,
+  data JSONB NOT NULL,
+  client_updated_at BIGINT NOT NULL,
+  server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  device_id TEXT,
+  PRIMARY KEY (user_id, id)
+);
+ALTER TABLE cloud_business_profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY cloud_profiles_tenant_isolation ON cloud_business_profiles
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- 2. Customers Sync
+CREATE TABLE IF NOT EXISTS cloud_customers (
+  id TEXT NOT NULL,
+  user_id UUID NOT NULL,
+  data JSONB NOT NULL,
+  client_updated_at BIGINT NOT NULL,
+  server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  device_id TEXT,
+  PRIMARY KEY (user_id, id)
+);
+ALTER TABLE cloud_customers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY cloud_customers_tenant_isolation ON cloud_customers
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- 3. Catalog Items Sync
+CREATE TABLE IF NOT EXISTS cloud_catalog_items (
+  id TEXT NOT NULL,
+  user_id UUID NOT NULL,
+  data JSONB NOT NULL,
+  client_updated_at BIGINT NOT NULL,
+  server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  device_id TEXT,
+  PRIMARY KEY (user_id, id)
+);
+ALTER TABLE cloud_catalog_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY cloud_catalog_items_tenant_isolation ON cloud_catalog_items
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- 4. Documents Sync
+CREATE TABLE IF NOT EXISTS cloud_documents (
+  id TEXT NOT NULL,
+  user_id UUID NOT NULL,
+  data JSONB NOT NULL,
+  client_updated_at BIGINT NOT NULL,
+  server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  device_id TEXT,
+  PRIMARY KEY (user_id, id)
+);
+ALTER TABLE cloud_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY cloud_documents_tenant_isolation ON cloud_documents
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- 5. Document Items Sync
+CREATE TABLE IF NOT EXISTS cloud_document_items (
+  id TEXT NOT NULL,
+  user_id UUID NOT NULL,
+  data JSONB NOT NULL,
+  client_updated_at BIGINT NOT NULL,
+  server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  device_id TEXT,
+  PRIMARY KEY (user_id, id)
+);
+ALTER TABLE cloud_document_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY cloud_document_items_tenant_isolation ON cloud_document_items
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- 6. Payments Sync
+CREATE TABLE IF NOT EXISTS cloud_payments (
+  id TEXT NOT NULL,
+  user_id UUID NOT NULL,
+  data JSONB NOT NULL,
+  client_updated_at BIGINT NOT NULL,
+  server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  device_id TEXT,
+  PRIMARY KEY (user_id, id)
+);
+ALTER TABLE cloud_payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY cloud_payments_tenant_isolation ON cloud_payments
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- 7. Universal Documents Sync
+CREATE TABLE IF NOT EXISTS cloud_universal_documents (
+  id TEXT NOT NULL,
+  user_id UUID NOT NULL,
+  data JSONB NOT NULL,
+  client_updated_at BIGINT NOT NULL,
+  server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  device_id TEXT,
+  PRIMARY KEY (user_id, id)
+);
+ALTER TABLE cloud_universal_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY cloud_universal_documents_tenant_isolation ON cloud_universal_documents
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+

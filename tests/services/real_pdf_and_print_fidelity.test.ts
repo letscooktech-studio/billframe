@@ -25,7 +25,7 @@ const LOGO_SQUARE_1X1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABC
 const LOGO_TALL_1X2 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACfailfAAAAEElEQVR42mNk+M9QDwAE/wF7p654kQAAAABJRU5ErkJggg==';
 const LOGO_TRANSPARENT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-const ARTIFACT_DIR = 'C:\\Users\\manis\\.gemini\\antigravity\\brain\\b7518e44-99c6-47f3-9b05-4526047e62da';
+const ARTIFACT_DIR = path.resolve(__dirname, '../../test-artifacts');
 
 const BASE_BUSINESS: BusinessProfile = {
   id: 'biz_fidelity_test',
