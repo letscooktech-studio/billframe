@@ -84,15 +84,26 @@ export const FluidStreamingText: React.FC<FluidStreamingTextProps> = ({
       cursorFade.setValue(1);
     }
 
-    // Continue streaming words to completion
+    // Continue streaming words to completion with smooth token cadence
     if (displayedLength < content.length) {
       const timer = setTimeout(() => {
         setDisplayedLength((prev) => {
           if (prev >= content.length) return prev;
-          // Advance by 1 to 2 words per tick (~8-15 characters)
-          const nextSpace = content.indexOf(' ', prev + 6);
-          const nextTarget = nextSpace === -1 ? content.length : nextSpace + 1;
-          return Math.min(content.length, Math.max(prev + 4, nextTarget));
+          // Advance smoothly to next whitespace or punctuation boundary
+          const nextSpace = content.indexOf(' ', prev + 1);
+          const nextNewline = content.indexOf('\n', prev + 1);
+          let target = -1;
+          if (nextSpace !== -1 && nextNewline !== -1) {
+            target = Math.min(nextSpace, nextNewline);
+          } else if (nextSpace !== -1) {
+            target = nextSpace;
+          } else if (nextNewline !== -1) {
+            target = nextNewline;
+          }
+          if (target === -1 || target > prev + 24) {
+            return Math.min(content.length, prev + 12);
+          }
+          return target + 1;
         });
       }, speedMs);
 
@@ -129,11 +140,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   claudeCursor: {
-    width: 6,
-    height: 16,
-    borderRadius: 2,
+    width: 5,
+    height: 14,
+    borderRadius: 1.5,
     backgroundColor: '#38BDF8',
-    marginTop: 4,
+    marginTop: 2,
     marginLeft: 2,
   },
 });

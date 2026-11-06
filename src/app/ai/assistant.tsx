@@ -367,6 +367,16 @@ export default function AiAssistantScreen() {
 
   const scrollViewRef = useRef<ScrollView>(null);
   const textInputRef = useRef<TextInput>(null);
+  const lastScrollTime = useRef<number>(0);
+
+  const handleContentSizeChange = () => {
+    const now = Date.now();
+    // Throttle animated scroll to eliminate micro-jitter and shaking
+    if (now - lastScrollTime.current > 140) {
+      lastScrollTime.current = now;
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }
+  };
 
   // Hydrate persistent AI session and recommendations from SQLite on Mount
   useEffect(() => {
@@ -942,11 +952,11 @@ export default function AiAssistantScreen() {
           <AuraWavesVisualizer isProcessing={isProcessing} height={140} />
 
           <ScrollView
-          ref={scrollViewRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.scrollContent}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-        >
+            ref={scrollViewRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.scrollContent}
+            onContentSizeChange={handleContentSizeChange}
+          >
           {messages.map((msg) => {
             const isUser = msg.role === 'user';
 

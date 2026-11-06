@@ -23,6 +23,7 @@ import { BusinessProfileRepository } from '../../data/repositories/BusinessProfi
 import { DatabaseManager } from '../../data/database/DatabaseManager';
 import { DocumentType } from '../../domain/documents/types';
 import { createMoney, formatMoney } from '../../domain/money/Money';
+import { UniversalAgentEngine } from './UniversalAgentEngine';
 import {
   ChatInteractiveQuestion,
   ChatQuestionOption,
@@ -1713,6 +1714,15 @@ ${userPrompt}
     }
 
     if (isQuestion) {
+      const universalAnswer = UniversalAgentEngine.answerBusinessQuestion(prompt, context);
+      if (universalAnswer) {
+        return {
+          reply: universalAnswer.reply,
+          reasoning: universalAnswer.reasoning,
+          draft: null as any,
+        };
+      }
+
       if (/gst/i.test(prompt)) {
         return {
           reply: `**Goods and Services Tax (GST) in India** is governed by the CGST Act 2017.\n\n• Standard commercial B2B invoices apply **18% GST** (9% CGST + 9% SGST intra-state, or 18% IGST inter-state).\n• Concessional rates: **0%**, **5%**, and **12%**.\n• Luxury/de-merit goods: **28%**.\n\nYou can ask me to draft a GST invoice anytime with specific items and rates!`,
@@ -1720,6 +1730,7 @@ ${userPrompt}
           draft: null as any,
         };
       }
+
       return {
         reply: `I am currently operating in **Offline Local Assistant** mode for **${context?.businessProfile?.name || 'your business'}**.\n\nTo ask open-ended questions with deep neural reasoning, connect to Groq in Settings. For document creation, you can ask me to draft an invoice, salary slip, rent receipt, or job offer directly.`,
         reasoning: 'Offline transparency: Reported local mode status without generating fictitious records.',
@@ -1931,7 +1942,8 @@ ${userPrompt}
       if (context?.matchedCustomers?.length > 0) {
         return context.matchedCustomers[0].name;
       }
-      return fallback;
+      const universalParty = UniversalAgentEngine.extractPartyName(prompt, history, fallback);
+      return universalParty || fallback;
     };
 
     // Helper: Extract items and quantities
@@ -1954,6 +1966,21 @@ ${userPrompt}
           });
         }
         return items;
+      }
+
+      // Universal natural language multi-pattern extraction for freeform queries
+      const parsedUniversal = UniversalAgentEngine.parseLineItems(prompt, defaultCurrency);
+      if (
+        parsedUniversal.length > 0 &&
+        !(parsedUniversal.length === 1 && parsedUniversal[0].description.includes('Statutory & Commercial Deliverable'))
+      ) {
+        return parsedUniversal.map((p) => ({
+          description: p.description,
+          quantityScaled: p.quantityScaled,
+          unitName: p.unitName,
+          unitPriceMinor: p.unitPriceMinor,
+          hsnSac: p.hsnSac || '998314',
+        }));
       }
 
       const qtyMatch = prompt.match(/(\d+)\s+([a-zA-Z\s]{3,30}?)(?:\s+(?:for|to|with|and|\.|$))/i);
