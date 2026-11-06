@@ -200,6 +200,12 @@ Distributed under the **MIT License**. Free for personal, commercial, and enterp
 ---
 
 <p align="center">
+  <a href="https://github.com/letscooktech-studio/billframe">
+    <img src="assets/images/letscooktech-team.jpg" alt="Let's Cook Tech Open Source Team" width="100%" style="border-radius: 16px; max-width: 900px;" />
+  </a>
+</p>
+
+<p align="center">
   <b>Built with ❤️ by Let's Cook Tech Studio & the Global Open Source Community.</b><br/>
-  <i>Your business. Your data. Zero subscriptions.</i>
+  <i>Your business. Your data. Zero subscriptions. Free forever.</i>
 </p>
