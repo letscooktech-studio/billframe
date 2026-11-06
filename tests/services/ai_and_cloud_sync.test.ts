@@ -157,3 +157,35 @@ describe('Supabase Cloud Sync Subsystem', () => {
     expect(cleared.supabaseAnonKey).toBe('');
   });
 });
+
+describe('Copilot routing', () => {
+  it('answers a model question without creating a document', async () => {
+    const result = await AiDocumentAgent.processMessage('whats your under ly llm model and your data', []);
+    expect(result.replyText).toContain('Billframe Copilot');
+    expect(result.documentDraft).toBeNull();
+  });
+
+  it('returns results for every allowed tool call in a cloud turn', async () => {
+    await AiConfigService.saveConfig({ provider: 'openai', apiKey: 'test-key' });
+    const tool = jest.spyOn(AiDocumentAgent, 'executeLocalTool').mockResolvedValue({ count: 1 });
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { tool_calls: [
+        { id: 'a', type: 'function', function: { name: 'get_business_summary', arguments: '{}' } },
+        { id: 'b', type: 'function', function: { name: 'list_overdue_invoices', arguments: '{}' } },
+      ] } }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: 'Here are your results.' } }] }) });
+    global.fetch = fetchMock;
+    try {
+      const result = await AiDocumentAgent.processMessage('Summarize my business and overdue invoices', []);
+      expect(result.replyText).toBe('Here are your results.');
+      expect(tool.mock.calls.map(call => call[0])).toEqual(['get_business_summary', 'list_overdue_invoices']);
+      const next = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(next.messages.filter((message: { role: string }) => message.role === 'tool')).toHaveLength(2);
+    } finally {
+      global.fetch = originalFetch;
+      tool.mockRestore();
+      await AiConfigService.clearApiKey();
+    }
+  });
+});
