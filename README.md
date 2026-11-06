@@ -1,7 +1,7 @@
 # Billframe ⚡
 
-> **The Local-First, Zero-Subscription, AI-Powered Invoice & Statutory Business Operating System**  
-> *The modern, 100% free & open-source alternative to Zoho Books, Zoho Invoice, and QuickBooks.*
+> **The Local-First, Open-Source Invoice & Financial Document App for Android & Web**  
+> *Offline-capable, deterministic financial document generation with Bring-Your-Own-Key (BYOK) AI assistance.*
 
 <p align="center">
   <img src="assets/images/icon.png" width="120" height="120" alt="Billframe Logo" style="border-radius: 24px;" />
@@ -10,51 +10,54 @@
 <p align="center">
   <a href="#license"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT"></a>
   <a href="#local-first-architecture"><img src="https://img.shields.io/badge/Data-Local--First%20SQLite-10B981.svg?style=flat-square" alt="Local First SQLite"></a>
-  <a href="#why-billframe-vs-zoho--quickbooks"><img src="https://img.shields.io/badge/Subscription-Zero%20Fees%20(Free%20Forever)-38BDF8.svg?style=flat-square" alt="Zero Fees"></a>
-  <a href="#autonomous-ai-copilot"><img src="https://img.shields.io/badge/AI%20Copilot-446%20Statutory%20Docs-8B5CF6.svg?style=flat-square" alt="446 Statutory Documents"></a>
-  <a href="#quickstart"><img src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-EA580C.svg?style=flat-square" alt="Cross Platform"></a>
+  <a href="#licensing"><img src="https://img.shields.io/badge/Pricing-Free%20%26%20Open%20Source-38BDF8.svg?style=flat-square" alt="Free and Open Source"></a>
+  <a href="#statutory-standards"><img src="https://img.shields.io/badge/Statutory-40%2B%20Archetypes-8B5CF6.svg?style=flat-square" alt="40+ Document Archetypes"></a>
+  <a href="#quickstart"><img src="https://img.shields.io/badge/Platform-Android%20%7C%20Web-EA580C.svg?style=flat-square" alt="Android and Web"></a>
 </p>
 
 ---
 
 ## 🌟 Overview
 
-**Billframe** is an enterprise-grade, local-first business operating system designed for freelancers, entrepreneurs, SMBs, and modern enterprises. While traditional SaaS giants lock your financial records behind expensive recurring paywalls, sell your accounting metadata, and grind to a halt during cloud outages, **Billframe runs 100% on your own device with zero subscriptions, zero trackers, and complete data sovereignty.**
+**Billframe** is an open-source, local-first billing and document generation application designed for freelancers, independent contractors, tradespeople, and micro-businesses.
 
-Equipped with an **Autonomous AI Copilot**, Billframe understands natural language and statutory regulations. It autonomously reasons, calculates, and compiles compliant business documents—from CBIC GST Tax Invoices and Delivery Challans to Salary Slips, Commercial Quotations, and ATS-optimized Resumes.
+Unlike subscription cloud SaaS tools that require continuous internet connectivity, store financial records on third-party servers, and enforce recurring monthly fees, **Billframe runs directly on your device**. All customer directories, catalog items, and document records are stored locally in an embedded SQLite database, giving you complete data privacy with zero trackers and zero mandatory cloud services.
+
+### Core Engineering Priorities
+- **Deterministic Minor-Unit Arithmetic**: All monetary balances, taxes, and item sums are computed in integer minor units (`BigInt` paisa/cents), preventing floating-point rounding errors.
+- **Offline Autonomy**: Core invoicing, estimates, challans, receipts, local queries, and printing work without network connectivity.
+- **Privacy & Security by Default**: Client records and financial history never leave your hardware unless you configure your own sync backend. User credentials are kept in the hardware-backed keystore (`expo-secure-store`).
+- **Opt-in AI with BYOK**: Conversational drafting uses Bring-Your-Own-Key (BYOK) or deterministic local heuristics. No centralized developer API keys are bundled into the app.
 
 ---
 
-## ⚔️ Why Billframe vs. Zoho & QuickBooks?
+## ⚖️ Architectural Philosophy & Comparison
 
-| Feature | **Billframe (Open Source)** | **Zoho Invoice / Books** | **QuickBooks Online** |
-| :--- | :--- | :--- | :--- |
-| **Pricing & Licensing** | **100% Free & Open Source (MIT)** | $15 to $240 / month per user | $30 to $200 / month |
-| **Data Ownership** | **100% Local-First (On-Device SQLite)** | Cloud vendor locked | Cloud vendor locked |
-| **Offline Reliability** | **Instantaneous offline execution** | Unusable without internet | Unusable without internet |
-| **AI Copilot** | **Autonomous CoT Reasoning + 446 Docs** | None / Rigid rule scripts | Rudimentary categorization |
-| **Data Elicitation** | **Interactive in-chatbox MCQ builder** | Static multi-page manual forms | Static multi-page manual forms |
-| **Statutory Standards** | **CBIC GST 01–05, Rule 46/55, Sec 10(13A)** | Regional add-on fees | Regional add-on fees |
-| **Financial Arithmetic** | **Deterministic BigInt Minor Units** | Floating-point rounding risk | Floating-point rounding risk |
-| **POS & Thermal Printing** | **Built-in 80mm ESC/POS + Direct Print** | Requires third-party drivers | Requires expensive hardware bundles |
-| **Privacy & Security** | **Zero trackers, Local biometric PIN** | Third-party analytics tracking | Telemetry & ad tracking |
-| **Custom Templates** | **Visual Template Studio + Gold Masters** | Limited CSS customization | Restrictive templates |
+| Dimension | Billframe (Local-First Open Source) | Full-Suite Cloud SaaS (Zoho / QuickBooks) |
+| :--- | :--- | :--- |
+| **Data Storage** | **100% On-Device SQLite** (User controls local database) | Multi-tenant cloud database |
+| **Offline Execution** | **Full offline capability** for all core operations | Requires continuous internet access |
+| **Pricing Model** | **Free & Open Source (MIT)** | Recurring monthly or annual subscription |
+| **Telemetry & Privacy** | **Zero telemetry, zero trackers** | Product analytics and telemetry |
+| **Arithmetic Precision** | **Deterministic `BigInt` minor units** | Platform-managed decimal engines |
+| **AI Integration** | **Client-side BYOK** (Groq/Gemini/OpenAI) + local heuristic fallback | Cloud-managed AI add-ons |
+| **Application Scope** | Focused billing, GST compliance, quotes, salary slips, receipts | Full double-entry bookkeeping, payroll tax filing, bank feeds |
 
 ---
 
 ## 🚀 Key Features
 
-### 1. 🤖 Autonomous AI Document Copilot
-- **446 Statutory Document Archetypes**: Covers 25 industry families including Commercial Billing, Logistics & Transport, HR & Payroll, Real Estate, Legal & Institutional, and Engineering Dossiers.
-- **Cognitive Step-by-Step Reasoning**: Features a transparent, Claude-style thinking accordion (`Thought for 3s ⌵`) that shows intent classification, legal rule grounding, and mathematical derivations.
-- **Interactive In-Chatbox MCQ Elicitation**: When statutory fields are missing, the AI smoothly slides up interactive multiple-choice cards in the chatbox (with options `[A]`, `[B]`, `[C]` and `[Other ✎]`), eliminating dummy placeholder data without tedious form filling.
-- **Multi-Turn Context Memory**: References previous turns to seamlessly extract counterparties, candidate names, and line items.
+### 1. 🤖 AI Document Assistant (BYOK & Offline Heuristics)
+- **40+ Implemented Statutory & Commercial Archetypes**: Covers core billing and operational instruments including B2B GST Invoices, Delivery Challans, Purchase Orders, Quotations, Salary Slips, and Rent Receipts, supported by an extensible taxonomy schema.
+- **Transparent Reasoning Flow**: Displays structured intent extraction, statutory rule grounding, and calculation traces.
+- **Interactive In-Chatbox MCQ Elicitation**: When required statutory fields are missing, interactive option chips appear directly in the chat to clarify details without tedious form navigation.
+- **Multi-Turn Context**: References previous conversation turns to carry over counterparty data, candidate profiles, and line items.
 - **Bring Your Own Key (BYOK) & True Offline Architecture**:
   - **100% Zero-Network Offline Engine**: Billframe functions completely out of the box without requiring any API keys or network connection. Its on-device deterministic policy engine performs statutory calculations, document structuring, and BigInt balance verifications locally.
-  - **Secure Bring-Your-Own-Key (BYOK)**: To enable deep neural reasoning on cloud models (Groq LPU GPT-OSS 120B, Google Gemini 2.5 Flash, or OpenAI GPT-4o Mini), users can configure their personal API keys in **AI Settings**. Free personal keys can be generated at [console.groq.com/keys](https://console.groq.com/keys) (zero cost, no credit card required).
+  - **Secure Bring-Your-Own-Key (BYOK)**: To enable deep neural reasoning on cloud models (Groq, Google Gemini, or OpenAI), users can configure their personal API keys in **AI Settings**. Free personal keys can be generated at [console.groq.com/keys](https://console.groq.com/keys) (zero cost, no credit card required).
   - **Hardware-Backed Credential Isolation**: User-configured credentials are stored directly in the device's secure enclave (`Android Keystore` and `iOS Keychain` via `expo-secure-store`) and never touch Billframe servers. Zero developer-owned API keys are embedded in application code.
 
-### 2. 🧾 Complete CBIC GST & Statutory Invoicing Suite
+### 2. 🧾 CBIC GST & Statutory Invoicing Suite
 - **Rule 46 B2B Tax Invoices**: Full GSTIN, PAN, HSN/SAC codes, reverse charge flags, and dual-state tax reconciliations.
 - **Intra-State vs Inter-State Tax Engine**: Automatically splits tax into CGST + SGST or Integrated IGST based on the customer's Place of Supply.
 - **Rule 55 Delivery Challans**: Formatted for goods transportation, job work, and supply on approval with transit valuations.
@@ -70,21 +73,21 @@ Equipped with an **Autonomous AI Copilot**, Billframe understands natural langua
 ### 3. 💼 HR, Payroll & Operations
 - **Statutory Salary Slips**: Compliant with the *Payment of Wages Act 1936*, featuring itemized Gross Earnings and statutory deductions (EPF 12%, ESI, Professional Tax).
 - **House Rent Receipts**: Fully formatted under *Section 10(13A) of the Income Tax Act 1961* for HRA tax exemption claims with Landlord PAN tracking.
-- **ATS-Optimized Resumes & Dossiers**: Generates 98% ATS-scoring single-column resumes with structured skill matrices, quantified impact metrics, and zero parsing traps.
+- **ATS-Friendly Resumes & Dossiers**: Clean, single-column resume and dossier templates designed for clear structural parsing with structured skill matrices and quantified project summaries.
 - **Field Engineering Work Orders**: Operational task lists, milestone deliverables, and authorized engineer sign-offs.
 
 ### 4. ⚡ Local-First SQLite & BigInt Math Engine
 - **Deterministic Minor Units**: All monetary calculations are performed in integer minor units (paisa, cents) using `BigInt`, eliminating IEEE-754 floating-point rounding errors.
 - **100% Local SQLite Database**: Powered by `expo-sqlite`, storing customers, catalog items, ledger balances, and documents locally on your device.
-- **Optional Supabase Cloud Sync**: Encrypted peer-to-peer cloud sync for cross-device backup when you want it.
+- **Optional Supabase Cloud Sync**: Encrypted peer-to-peer cloud sync for cross-device backup when configured by the user.
 
 ### 5. 🖨️ Hardware & Thermal POS Printing
 - **80mm POS Thermal Receipts**: Instant itemized receipts for grocery stores, retail counters, and quick-service shops.
-- **Zero-Blocker Printing**: Bulletproof cross-platform printing for web, Android, and iOS.
-- **Vector UPI QR Codes**: Dynamic on-invoice QR codes for instant UPI / SEPA / bank wire settlements.
+- **Cross-Platform Printing**: Standard printing via native Android print service (`expo-print`) and browser print dialog.
+- **Vector UPI QR Codes**: Dynamic on-invoice QR codes for instant UPI / bank wire settlements.
 
 ### 6. 🎨 Arctic Aurora Monochrome Design System
-- Neutral-first, distraction-free executive interface (`#0D0E10` dark canvas, `#18191D` surfaces, `#F5F5F6` crisp typography).
+- Neutral-first, distraction-free interface (`#0D0E10` dark canvas, `#18191D` surfaces, `#F5F5F6` crisp typography).
 - Responsive on mobile smartphones, tablets, and widescreen desktop monitors with split-pane live document preview.
 - Fluid token cadence animations without bulky, congested container nesting.
 
