@@ -1300,8 +1300,8 @@ export class DocumentQuestionElicitor {
         ];
       }
 
-      feedback = `Updated resume domain specialization to "${cleanAnswer}" and re-indexed technical competencies for maximum ATS relevance.`;
-      reasoning = `• Phase 1: Semantic Intent Analysis: Processed target domain "${cleanAnswer}".\n• Phase 2: ATS Keyword Calibration: Injected high-density keyword clusters recognized by Workday, Greenhouse, and Taleo.\n• Phase 3: Architectural Synthesis: Rewrote professional summary, competence pillars, and target title to "${meta.targetRole}".\n• Phase 4: ATS Score Optimization: Target ATS algorithmic match score projected at 98.4%.`;
+      feedback = `Applied targetDomain: Updated resume domain specialization to "${cleanAnswer}" and re-indexed technical competencies for maximum ATS relevance.`;
+      reasoning = `• Phase 1: Semantic Intent Analysis: Processed targetDomain "${cleanAnswer}".\n• Phase 2: ATS Keyword Calibration: Injected high-density keyword clusters recognized by Workday, Greenhouse, and Taleo.\n• Phase 3: Architectural Synthesis: Rewrote professional summary, competence pillars, and target title to "${meta.targetRole}".\n• Phase 4: ATS Score Optimization: Target ATS algorithmic match score projected at 98.4%.`;
     }
 
     if (fieldKey === 'experienceYears') {

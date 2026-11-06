@@ -49,7 +49,10 @@ Equipped with an **Autonomous AI Copilot**, Billframe understands natural langua
 - **Cognitive Step-by-Step Reasoning**: Features a transparent, Claude-style thinking accordion (`Thought for 3s ⌵`) that shows intent classification, legal rule grounding, and mathematical derivations.
 - **Interactive In-Chatbox MCQ Elicitation**: When statutory fields are missing, the AI smoothly slides up interactive multiple-choice cards in the chatbox (with options `[A]`, `[B]`, `[C]` and `[Other ✎]`), eliminating dummy placeholder data without tedious form filling.
 - **Multi-Turn Context Memory**: References previous turns to seamlessly extract counterparties, candidate names, and line items.
-- **Bring Your Own Key (BYOK) or 100% Offline**: Works out-of-the-box with lightning-fast Groq LPU (GPT-OSS 120B), Gemini 2.5 Flash, OpenAI, or 100% local deterministic heuristics with zero network connectivity.
+- **Bring Your Own Key (BYOK) & Universal Free Trial**:
+  - **Universal Trial Key Out-of-the-Box**: Runs instantly with deep reasoning on Groq LPU (GPT-OSS 120B) with a built-in preview limit of **7 documents**.
+  - **Unlimited Free BYOK**: Plug in your free personal Groq API key in **AI Settings** for unlimited, ultra-fast generation ([Get Free Key at console.groq.com/keys](https://console.groq.com/keys) — zero cost, no credit card required).
+  - **100% Offline Heuristic Fallback**: Zero-network on-device policy engine with BigInt arithmetic precision.
 
 ### 2. 🧾 Complete CBIC GST & Statutory Invoicing Suite
 - **Rule 46 B2B Tax Invoices**: Full GSTIN, PAN, HSN/SAC codes, reverse charge flags, and dual-state tax reconciliations.

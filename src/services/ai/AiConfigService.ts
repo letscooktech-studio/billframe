@@ -15,6 +15,7 @@ import { Platform } from 'react-native';
 const AI_PROVIDER_KEY = 'billframe_ai_provider';
 const AI_API_KEY = 'billframe_ai_api_key';
 const AI_MODEL_KEY = 'billframe_ai_model';
+const AI_UNIVERSAL_USAGE_COUNT = 'billframe_universal_usage_count';
 
 export type AiProvider = 'groq' | 'gemini' | 'openai' | 'offline_heuristic';
 
@@ -26,6 +27,7 @@ export interface AiConfig {
 }
 
 export const DEFAULT_GROQ_KEY = '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';
+export const MAX_UNIVERSAL_KEY_DOCS = 7;
 
 export const PROVIDER_MODELS: Record<AiProvider, Array<{ id: string; name: string; description: string }>> = {
   groq: [
@@ -264,5 +266,73 @@ export class AiConfigService {
     }
 
     return { success: false, message: 'Unknown provider' };
+  }
+
+  /**
+   * Checks whether the current active configuration relies on the universal default key
+   * versus a personal user-provided BYOK key.
+   */
+  static isUsingUniversalKey(config: AiConfig): boolean {
+    if (config.provider === 'offline_heuristic') return false;
+    if (config.provider !== 'groq') return false;
+    return !config.apiKey || config.apiKey.trim() === DEFAULT_GROQ_KEY;
+  }
+
+  /**
+   * Retrieves how many documents have been generated using the built-in universal key
+   */
+  static async getUniversalUsageCount(): Promise<number> {
+    const raw = await this.getStorageItem(AI_UNIVERSAL_USAGE_COUNT);
+    if (!raw) return 0;
+    const parsed = parseInt(raw, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
+  /**
+   * Increments the document generation counter for the universal key
+   */
+  static async incrementUniversalUsage(): Promise<number> {
+    const current = await this.getUniversalUsageCount();
+    const next = current + 1;
+    await this.setStorageItem(AI_UNIVERSAL_USAGE_COUNT, next.toString());
+    return next;
+  }
+
+  /**
+   * Resets the universal usage count (e.g. for testing or key cycling)
+   */
+  static async resetUniversalUsage(): Promise<void> {
+    await this.deleteStorageItem(AI_UNIVERSAL_USAGE_COUNT);
+  }
+
+  /**
+   * Evaluates if the universal rate limit has been reached.
+   * If user has configured their own BYOK key, rate limit is always FALSE (unlimited).
+   */
+  static async checkUniversalLimit(): Promise<{
+    isLimited: boolean;
+    count: number;
+    max: number;
+    isUniversalKey: boolean;
+  }> {
+    const config = await this.getConfig();
+    const isUniversal = this.isUsingUniversalKey(config);
+
+    if (!isUniversal) {
+      return {
+        isLimited: false,
+        count: 0,
+        max: MAX_UNIVERSAL_KEY_DOCS,
+        isUniversalKey: false,
+      };
+    }
+
+    const count = await this.getUniversalUsageCount();
+    return {
+      isLimited: count >= MAX_UNIVERSAL_KEY_DOCS,
+      count,
+      max: MAX_UNIVERSAL_KEY_DOCS,
+      isUniversalKey: true,
+    };
   }
 }

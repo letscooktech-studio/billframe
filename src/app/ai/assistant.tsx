@@ -28,6 +28,7 @@ import {
   Animated,
   Easing,
   useWindowDimensions,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -59,7 +60,7 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '../../design/ThemeContext';
 import { colors, radii, spacing, typography } from '../../design/tokens';
-import { AiConfigService, AiConfig, AiProvider, DEFAULT_GROQ_KEY } from '../../services/ai/AiConfigService';
+import { AiConfigService, AiConfig, AiProvider, DEFAULT_GROQ_KEY, MAX_UNIVERSAL_KEY_DOCS } from '../../services/ai/AiConfigService';
 import { AiDocumentAgent, AgentChatMessage, ParsedDocumentDraft } from '../../services/ai/AiDocumentAgent';
 import { AiTemplateBridge, DocumentTemplateOption } from '../../services/ai/AiTemplateBridge';
 import { createMoney, formatMoney } from '../../domain/money/Money';
@@ -324,6 +325,17 @@ export default function AiAssistantScreen() {
     model: 'openai/gpt-oss-120b',
     isReady: true,
   });
+  const [universalStatus, setUniversalStatus] = useState<{
+    isLimited: boolean;
+    count: number;
+    max: number;
+    isUniversalKey: boolean;
+  }>({
+    isLimited: false,
+    count: 0,
+    max: MAX_UNIVERSAL_KEY_DOCS,
+    isUniversalKey: true,
+  });
   const [tempApiKey, setTempApiKey] = useState(DEFAULT_GROQ_KEY);
   const [tempProvider, setTempProvider] = useState<AiProvider>('groq');
   const [isTestingKey, setIsTestingKey] = useState(false);
@@ -389,6 +401,8 @@ export default function AiAssistantScreen() {
       setConfig(current);
       setTempProvider(current.provider);
       setTempApiKey(current.apiKey || (current.provider === 'groq' ? DEFAULT_GROQ_KEY : ''));
+      const limit = await AiConfigService.checkUniversalLimit();
+      setUniversalStatus(limit);
     }
     initConfig();
   }, []);
@@ -660,6 +674,7 @@ export default function AiAssistantScreen() {
               setActiveDraft(primaryDraft);
               setActiveDrafts(allDrafts);
               AgentSessionRepository.updateActiveDraft('ai_session_default', primaryDraft).catch(() => {});
+              AiConfigService.checkUniversalLimit().then(setUniversalStatus).catch(() => {});
             }
           }
         }
@@ -813,6 +828,8 @@ export default function AiAssistantScreen() {
     });
     const updated = await AiConfigService.getConfig();
     setConfig(updated);
+    const limit = await AiConfigService.checkUniversalLimit();
+    setUniversalStatus(limit);
     setShowConfigModal(false);
     setTestResult(null);
   }
@@ -856,6 +873,45 @@ export default function AiAssistantScreen() {
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Pressable
+            onPress={() => setShowConfigModal(true)}
+            style={[
+              styles.byokBadge,
+              {
+                backgroundColor: universalStatus.isUniversalKey
+                  ? (universalStatus.isLimited ? '#3f1a1a' : '#142938')
+                  : config.provider === 'offline_heuristic'
+                  ? '#1f2024'
+                  : '#132e22',
+                borderColor: universalStatus.isUniversalKey
+                  ? (universalStatus.isLimited ? '#f87171' : '#38BDF8')
+                  : config.provider === 'offline_heuristic'
+                  ? '#35363B'
+                  : '#10B981',
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="AI Engine and BYOK Key Status"
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '700',
+                color: universalStatus.isUniversalKey
+                  ? (universalStatus.isLimited ? '#fca5a5' : '#38BDF8')
+                  : config.provider === 'offline_heuristic'
+                  ? '#A5A6AB'
+                  : '#34d399',
+              }}
+            >
+              {universalStatus.isUniversalKey
+                ? (universalStatus.isLimited ? '⚡ Limit: 7/7 · BYOK ↗' : `⚡ Free: ${universalStatus.count}/7 · BYOK ↗`)
+                : config.provider === 'offline_heuristic'
+                ? '🔒 Offline'
+                : '🔑 BYOK Active'}
+            </Text>
+          </Pressable>
+
           <Pressable
             onPress={handleClearConversation}
             style={[styles.settingsButton, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
@@ -1557,6 +1613,58 @@ export default function AiAssistantScreen() {
               Billframe supports Bring-Your-Own-Key (BYOK) with deep reasoning on Groq LPU, Gemini 2.5, OpenAI, or 100% offline deterministic processing.
             </Text>
 
+            {/* BYOK & Trial Status Card */}
+            {tempProvider === 'groq' && (
+              <View
+                style={[
+                  styles.trialInfoCard,
+                  {
+                    backgroundColor: (!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
+                      ? (universalStatus.isLimited ? '#2d1414' : '#142533')
+                      : '#10261c',
+                    borderColor: (!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
+                      ? (universalStatus.isLimited ? '#7f1d1d' : '#1e4976')
+                      : '#14532d',
+                  },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Sparkles size={14} color={(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY) ? '#38BDF8' : '#34d399'} />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: (!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY) ? '#38BDF8' : '#34d399',
+                      }}
+                    >
+                      {(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
+                        ? 'Universal Free Trial Key (Groq LPU 120B)'
+                        : 'Personal BYOK Key Active'}
+                    </Text>
+                  </View>
+                  {(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY) && (
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '700',
+                        color: universalStatus.isLimited ? '#f87171' : '#38BDF8',
+                      }}
+                    >
+                      {universalStatus.count} / {universalStatus.max} docs used
+                    </Text>
+                  )}
+                </View>
+                <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, lineHeight: 15 }}>
+                  {(!tempApiKey || tempApiKey === DEFAULT_GROQ_KEY)
+                    ? universalStatus.isLimited
+                      ? '⚠️ Free trial limit reached. Add your own free personal Groq key below for unlimited generation, or use offline mode.'
+                      : 'Built-in universal key active for quick trial documents. To unlock unlimited generation, paste your free Groq key below.'
+                    : 'Personal key configured. You have unlimited cloud document drafting and deep reasoning with zero rate limits.'}
+                </Text>
+              </View>
+            )}
+
             {/* Provider Selector */}
             <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Select Active Model Provider:</Text>
             <View style={styles.providerRow}>
@@ -1624,6 +1732,40 @@ export default function AiAssistantScreen() {
                     ? 'Get a free API key at: aistudio.google.com'
                     : 'Get an API key at: platform.openai.com'}
                 </Text>
+
+                {tempProvider === 'groq' && (
+                  <View
+                    style={[
+                      styles.byokGuideCard,
+                      { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle },
+                    ]}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textPrimary }}>
+                        ⚡ Get Free Groq Key (Unlimited)
+                      </Text>
+                      <Pressable
+                        onPress={() => Linking.openURL('https://console.groq.com/keys')}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          paddingVertical: 4,
+                          paddingHorizontal: 8,
+                          backgroundColor: '#38BDF8',
+                          borderRadius: 6,
+                        }}
+                        hitSlop={6}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#0D0E10' }}>Open Groq Console ↗</Text>
+                      </Pressable>
+                    </View>
+                    <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 6, lineHeight: 15 }}>
+                      1. Visit <Text style={{ color: '#38BDF8', fontWeight: '600' }}>console.groq.com/keys</Text> (Free forever · No credit card){'\n'}
+                      2. Create an API key & paste above for unlimited sub-second generation!
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -1734,6 +1876,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  byokBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trialInfoCard: {
+    borderRadius: radii.md,
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 12,
+  },
+  byokGuideCard: {
+    borderRadius: radii.md,
+    borderWidth: 1,
+    padding: 10,
+    marginTop: 10,
+    marginBottom: 6,
   },
   scrollContent: {
     paddingHorizontal: 20,
