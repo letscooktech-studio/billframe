@@ -43,9 +43,10 @@ export class DocumentQuestionElicitor {
   ): string {
     const party = draft.partyName || 'the recipient';
     const title = draft.documentTitle || 'Document Draft';
-    let reply =
-      introMessage ||
-      `I have drafted the official **${title}** for **${party}** directly on your canvas.`;
+    if (introMessage) {
+      return introMessage;
+    }
+    let reply = `I have drafted the official **${title}** for **${party}** directly on your canvas.`;
 
     if (nextQuestion) {
       reply += `\n\n✦ **Next Required Detail to Finalize & Maximize Compliance**:\n${nextQuestion.question}\n\n*${nextQuestion.reason}*\n\n*(Select an option in the chat box below or tap Other to type custom data)*`;
@@ -245,7 +246,8 @@ export class DocumentQuestionElicitor {
 
     // ── 2. TAX INVOICE ARCHETYPE ──
     if (dt === 'invoice' || dt === 'tax_invoice' || title.includes('tax invoice')) {
-      if (!answeredFieldKeys.includes('taxRate') && !draft.metadata?.taxRateAnswered) {
+      const hasTaxRate = (draft.taxRateBp !== undefined && draft.taxRateBp > 0n) || draft.metadata?.taxRateAnswered;
+      if (!answeredFieldKeys.includes('taxRate') && !hasTaxRate) {
         return {
           id: `q_inv_tax_${Date.now()}`,
           docType: 'invoice',

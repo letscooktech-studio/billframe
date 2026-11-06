@@ -650,7 +650,7 @@ export class AiDocumentAgent {
     const config = await AiConfigService.getConfig();
 
     const effectiveApiKey = config.apiKey.trim();
-    const explicitDraft = /^(?:(?:please|can you|could you) )?(?:create|draft|generate|build|make|prepare|write)\b/i.test(userPrompt.trim());
+    const explicitDraft = !/^(?:whats?|which|who|how|tell me|do you|where)\b/i.test(userPrompt.trim()) || /\b(?:create|draft|generate|build|make|prepare|write|invoice|bill|receipt|resume|cv|quote|estimate|slip|salary|headshot|purchase order|contract)\b/i.test(userPrompt.trim());
     const question = userPrompt.trim().toLowerCase().replace(/[’']/g, '');
     if (/^(?:whats?|which|who|how|tell me|do you|where)\b/.test(question) &&
       /\b(?:llm|language model|ai model|model do you|training data|data sources|your data)\b/.test(question)) {
@@ -688,7 +688,7 @@ export class AiDocumentAgent {
 
     taskSteps[1] = {
       id: 'statutory_rag',
-      label: 'Document structure matched',
+      label: 'Document archetype & structure matched',
       status: 'completed',
     };
     taskSteps.push({

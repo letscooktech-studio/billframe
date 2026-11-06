@@ -223,7 +223,7 @@ export function ClaudeThinkingIndicator({
       .replace(/```(?:json)?[\s\S]*?```/g, '')
       .split(/\n\s*\n/)
       .map((p) => p.trim())
-      .filter((p) => p.length > 0 && !p.startsWith('{') && !p.endsWith('}'));
+      .filter((p) => p.length > 0 && !p.startsWith('{') && !p.endsWith('}') && !p.startsWith('✦') && !p.includes('Statutory rules verified') && !p.includes('CBIC CGST'));
   }, [reasoningTrace]);
 
   return (

@@ -83,8 +83,6 @@ import { IntelligentMessageRenderer } from '../../components/ai/IntelligentMessa
 import { FluidStreamingText } from '../../components/ai/FluidStreamingText';
 import { AnimatedArtifactTile } from '../../components/ai/AnimatedArtifactTile';
 import { ChatQuestionOption } from '../../services/ai/DocumentQuestionElicitor';
-import { ChatboxAnimatedMcq } from '../../components/ai/ChatboxAnimatedMcq';
-import { AuraSparkle } from '../../components/ai/AuraSparkle';
 import { PulsingDots } from '../../components/ai/PulsingDots';
 import { AmbientBottomGlow } from '../../components/animations/AmbientBottomGlow';
 
@@ -940,10 +938,8 @@ export default function AiAssistantScreen() {
 
           {!hasUserMessages ? (
             <View style={styles.emptyContainer}>
-              <AuraSparkle size={48} />
-              <Text style={styles.emptyTitle}>
-                {firstName ? `What's next, ${firstName}?` : 'Where should we start?'}
-              </Text>
+              <Text style={styles.emptyBrandWordmark}>Billframe</Text>
+              <Text style={styles.emptyBrandTagline}>Enterprise Financial Intelligence</Text>
             </View>
           ) : (
             <ScrollView
@@ -1043,15 +1039,7 @@ export default function AiAssistantScreen() {
                             );
                           })()}
 
-                          {/* ── Subtle In-Message Question Status (Prompted in Chatbox below) ── */}
-                          {msg.interactiveQuestion && !msg.interactiveQuestion.isAnswered && (
-                            <View style={[styles.chatboxPromptBanner, { backgroundColor: 'rgba(56, 189, 248, 0.08)' }]}>
-                              <Sparkles size={12} color="#38BDF8" />
-                              <Text style={[styles.chatboxPromptBannerText, { color: '#D4D4D8' }]}>
-                                Guided Field: <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>{msg.interactiveQuestion.question}</Text> (Choose in chat box below)
-                              </Text>
-                            </View>
-                          )}
+                          
 
                           {msg.interactiveQuestion?.isAnswered && msg.interactiveQuestion.selectedValue && (
                             <View style={styles.inMessageAnsweredBadge}>
@@ -1079,39 +1067,62 @@ export default function AiAssistantScreen() {
           )}
 
           {/* Context-Aware Smart Workflow Chips (Hidden when question active or no active draft) */}
-          {hasUserMessages && activeDraft && !activeQuestion && (
+          {hasUserMessages && (activeQuestion || activeDraft) && (
             <View style={styles.chipsContainer}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScrollContent}>
-                {getSmartWorkflowChips(activeDraft).map((chip, idx) => (
-                  <Pressable
-                    key={idx}
-                    style={[styles.chipButton, { backgroundColor: '#1E1F23', borderColor: 'rgba(255, 255, 255, 0.08)' }]}
-                    onPress={() => {
-                      if (chip.label.startsWith('⎙')) {
-                        if (activeDraft) handlePrintDocument(activeDraft);
-                      } else {
-                        handleSendMessage(chip.prompt);
-                      }
-                    }}
-                  >
-                    <Text style={[styles.chipText, { color: '#D4D4D8' }]}>{chip.label}</Text>
-                  </Pressable>
-                ))}
+                {activeQuestion ? (
+                  activeQuestion.options.map((opt) => (
+                    <Pressable
+                      key={opt.id}
+                      style={[
+                        styles.chipButton,
+                        {
+                          backgroundColor: opt.isOther ? 'rgba(56, 189, 248, 0.12)' : '#1E1F23',
+                          borderColor: opt.isOther ? 'rgba(56, 189, 248, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                        },
+                      ]}
+                      onPress={() => {
+                        if (opt.isOther) {
+                          handleSelectQuestionOther();
+                        } else {
+                          handleSelectQuestionOption(opt);
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          { color: opt.isOther ? '#38BDF8' : '#D4D4D8', fontWeight: opt.isOther ? '600' : '400' },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  ))
+                ) : activeDraft ? (
+                  getSmartWorkflowChips(activeDraft).map((chip, idx) => (
+                    <Pressable
+                      key={idx}
+                      style={[styles.chipButton, { backgroundColor: '#1E1F23', borderColor: 'rgba(255, 255, 255, 0.08)' }]}
+                      onPress={() => {
+                        if (chip.label.startsWith('⎙')) {
+                          if (activeDraft) handlePrintDocument(activeDraft);
+                        } else {
+                          handleSendMessage(chip.prompt);
+                        }
+                      }}
+                    >
+                      <Text style={[styles.chipText, { color: '#D4D4D8' }]}>{chip.label}</Text>
+                    </Pressable>
+                  ))
+                ) : null}
               </ScrollView>
             </View>
           )}
 
           {/* Floating Input Bar & In-Chatbox Question Elicitor */}
           <View style={styles.bottomBarWrapper}>
-            {/* Animated Guided MCQ Question Card Rises Up Animately in Chatbox */}
-            {activeQuestion && (
-              <ChatboxAnimatedMcq
-                question={activeQuestion}
-                theme={theme}
-                onSelectOption={handleSelectQuestionOption}
-                onSelectOther={handleSelectQuestionOther}
-              />
-            )}
+            
 
             <View style={styles.floatingInputPill}>
               <Pressable
@@ -1879,6 +1890,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
     borderWidth: 1.5,
     borderColor: '#000000',
+  },
+    emptyBrandWordmark: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#52525B',
+    letterSpacing: 1.5,
+    textAlign: 'center',
+  },
+  emptyBrandTagline: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#3F3F46',
+    letterSpacing: 0.2,
+    marginTop: 6,
+    textAlign: 'center',
   },
   emptyContainer: {
     flex: 1,
