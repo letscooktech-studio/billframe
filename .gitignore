@@ -25,3 +25,9 @@ expo-env.d.ts
 
 *.apk
 *.aab
+
+# Environment & Secrets
+.env
+.env.*
+*.keystore
+scratch/
