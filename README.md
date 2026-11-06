@@ -178,7 +178,7 @@ You can talk to the Billframe Copilot just like a human senior accountant. Tap t
 
 - *"Draft a GST Tax Invoice for Acme Corp for 5 enterprise laptops at 60000 each with 18% GST"*
 - *"Create a quotation and a delivery challan for Acme Corp for 5 enterprise laptops at 60000 each"*
-- *"Build me complete highest ATS scoring resume for Farhan Noor for AI engineer"*
+- *"Build me complete highest ATS scoring resume for an AI Engineer"*
 - *"Create a salary slip for John Doe, Senior Architect, basic 65,000, HRA 25,000, PF 3,600 for October 2026"*
 - *"Generate a House Rent Receipt for tenant Rahul Sharma for 28,000 INR"*
 - *"Draft me a complete grocery store cash memo with 10 random items"*

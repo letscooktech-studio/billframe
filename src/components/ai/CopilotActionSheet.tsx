@@ -176,7 +176,7 @@ export const CopilotActionSheet: React.FC<CopilotActionSheetProps> = ({
               style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
               onPress={() => {
                 onClose();
-                onSelectPrompt('build me complete highest ats scoring resume for farhan noor for ai engineer');
+                onSelectPrompt('Build me a complete highest ATS scoring resume for an AI Engineer');
               }}
             >
               <View style={styles.actionIconCol}>

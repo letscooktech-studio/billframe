@@ -203,7 +203,7 @@ export class UniversalAgentEngine {
           if (candidate && candidate.length > 1) return candidate;
         }
 
-        // Header match like "# Farhan Noor"
+        // Header match like "# Candidate Name"
         const nameHeader = content.match(/(?:^|\n)#*\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/);
         if (nameHeader && nameHeader[1] && !nameHeader[1].toLowerCase().includes('billframe')) {
           return nameHeader[1].trim();

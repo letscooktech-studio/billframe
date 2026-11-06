@@ -249,7 +249,7 @@ export const RAG_DOCUMENT_ARCHETYPES: DocumentArchetypeInfo[] = [
     familyLabel: 'HR & Talent Acquisition',
     statutoryRule: 'Standard ISO/IEC ATS-Compliant Candidate Dossier & Resume Structure',
     partyRoleLabel: 'Candidate',
-    samplePartyName: 'Farhan Noor',
+    samplePartyName: 'Candidate Name',
     keywords: [
       'resume',
       'cv',
@@ -292,9 +292,9 @@ export const RAG_DOCUMENT_ARCHETYPES: DocumentArchetypeInfo[] = [
       'certifications',
     ],
     sampleStructure: {
-      candidateName: 'Farhan Noor',
+      candidateName: 'Candidate Name',
       targetRole: 'AI Engineer | Machine Learning Specialist',
-      email: 'farhan.noor@email.com',
+      email: 'candidate@email.com',
       phone: '+1 (555) 123-4567',
       location: 'New York, NY, USA',
       summary: 'Results-driven AI Engineer with 5+ years of experience designing, developing, and deploying end-to-end machine learning and LLM solutions.',

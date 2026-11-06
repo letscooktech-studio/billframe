@@ -728,7 +728,7 @@ export class AiTemplateBridge {
       draft.partyName !== 'Walk-in Retail Customer' &&
       draft.partyName !== 'Candidate Dossier'
         ? draft.partyName
-        : meta.candidateName || 'Farhan Noor';
+        : meta.candidateName || business?.contact_person || business?.signatory_name || business?.name || 'Candidate Name';
 
     const targetRole = meta.targetRole || meta.position || meta.designation || 'AI Engineer | Machine Learning Specialist';
     const phone = meta.phone || '+1 (555) 123-4567';

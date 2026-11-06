@@ -133,7 +133,7 @@ function getSmartWorkflowChips(draft: ParsedDocumentDraft | null): Array<{ label
       { label: '📊 Business Overview', prompt: 'What is my current business overview and total receivables?' },
       { label: '⏰ Check Overdue Invoices', prompt: 'List all overdue invoices and unpaid customer balances' },
       { label: '✦ GST Tax Invoice', prompt: 'Draft a GST Tax Invoice for Acme Corp with 18% GST' },
-      { label: '✦ ATS Resume (Farhan Noor)', prompt: 'build me complete highest ats scoring resume for farhan noor for ai engineer' },
+      { label: '✦ ATS Resume', prompt: 'Build me a complete highest ATS scoring resume for an AI Engineer' },
       { label: '✦ Salary Slip', prompt: 'Create a salary slip for John Doe, Senior Architect, basic 65,000, HRA 25,000, PF 3,600 for October 2026' },
       { label: '✦ Grocery Bill (10 items)', prompt: 'draft me a complete bill for my grocery store and fille 10 random items' },
       { label: '✦ House Rent Receipt', prompt: 'Generate a House Rent Receipt for tenant Rahul Sharma for 28,000 INR' },
