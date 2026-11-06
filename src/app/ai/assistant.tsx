@@ -57,6 +57,7 @@ import {
   Check,
   Maximize2,
   RotateCcw,
+  Plus,
 } from 'lucide-react-native';
 import { useTheme } from '../../design/ThemeContext';
 import { colors, radii, spacing, typography } from '../../design/tokens';
@@ -71,6 +72,8 @@ import { ActionApprovalSheet } from '../../components/ai/ActionApprovalSheet';
 import { RecommendationEngine, RecommendationItem } from '../../services/ai/RecommendationEngine';
 import { BusinessProfile } from '../../domain/profile/types';
 import { ClaudeThinkingIndicator } from '../../components/animations/ClaudeThinkingIndicator';
+import { AuraWavesVisualizer } from '../../components/animations/AuraWavesVisualizer';
+import { CopilotActionSheet } from '../../components/ai/CopilotActionSheet';
 import { IntelligentMessageRenderer } from '../../components/ai/IntelligentMessageRenderer';
 import { FluidStreamingText } from '../../components/ai/FluidStreamingText';
 import { AnimatedArtifactTile } from '../../components/ai/AnimatedArtifactTile';
@@ -300,7 +303,7 @@ export default function AiAssistantScreen() {
       id: 'welcome_msg',
       role: 'assistant',
       content:
-        'What would you like to draft today?\n\nTell me what document you need in plain words, or tap a quick starter below.',
+        'Welcome to Billframe Copilot. What document or statutory calculation would you like to prepare today?',
       timestamp: Date.now(),
     },
   ]);
@@ -308,6 +311,7 @@ export default function AiAssistantScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeDraft, setActiveDraft] = useState<ParsedDocumentDraft | null>(null);
   const [activeDrafts, setActiveDrafts] = useState<ParsedDocumentDraft[]>([]);
+  const [showActionSheet, setShowActionSheet] = useState(false);
 
   // Codex Real-Time Streaming & Thinking State
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -530,7 +534,7 @@ export default function AiAssistantScreen() {
         id: `welcome_${Date.now()}`,
         role: 'assistant',
         content:
-          'What would you like to draft today?\n\nTell me what document you need in plain words, or tap a quick starter below.',
+          'Welcome to Billframe Copilot. What document or statutory calculation would you like to prepare today?',
         timestamp: Date.now(),
       },
     ]);
@@ -934,6 +938,9 @@ export default function AiAssistantScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
+          {/* Ambient Holographic Aura Waves Upper Side (Active during inference/streaming) */}
+          <AuraWavesVisualizer isProcessing={isProcessing} height={140} />
+
           <ScrollView
           ref={scrollViewRef}
           style={{ flex: 1 }}
@@ -1002,38 +1009,53 @@ export default function AiAssistantScreen() {
 
                       {/* Initial Welcome Quick Suggestions */}
                       {msg.id === 'welcome_msg' && (
-                        <View style={styles.welcomeGrid}>
-                          <Pressable
-                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                            onPress={() => handleSendMessage('What is my current business overview and total receivables?')}
-                          >
-                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📊 Business Overview</Text>
-                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Live balance, receivables, and ledger summary</Text>
-                          </Pressable>
+                        <View style={{ width: '100%', marginTop: 8 }}>
+                          <View style={styles.copilotHeroBanner}>
+                            <View style={styles.copilotHeroBadge}>
+                              <Sparkles size={11} color="#38BDF8" />
+                              <Text style={styles.copilotHeroBadgeText}>BILLFRAME COPILOT</Text>
+                            </View>
+                            <Text style={[styles.copilotHeroTitle, { color: theme.textPrimary }]}>
+                              Autonomous Financial Engine
+                            </Text>
+                            <Text style={[styles.copilotHeroSubtitle, { color: theme.textMuted }]}>
+                              Draft CBIC-compliant GST invoices, HR salary slips, ATS resumes, and verified commercial agreements.
+                            </Text>
+                          </View>
 
-                          <Pressable
-                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                            onPress={() => handleSendMessage('List all overdue invoices and unpaid customer balances')}
-                          >
-                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>⏰ Check Overdue</Text>
-                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Find unpaid invoices and outstanding payments</Text>
-                          </Pressable>
+                          <View style={styles.welcomeGrid}>
+                            <Pressable
+                              style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                              onPress={() => handleSendMessage('Draft a GST Tax Invoice for Acme Corp with 18% GST')}
+                            >
+                              <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>✦ GST Tax Invoice</Text>
+                              <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Compliant B2B invoice with CBIC tax calculations</Text>
+                            </Pressable>
 
-                          <Pressable
-                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                            onPress={() => handleSendMessage('Draft a GST Tax Invoice for Acme Corp with 18% GST')}
-                          >
-                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>✦ GST Tax Invoice</Text>
-                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Compliant B2B invoice with CBIC tax calculations</Text>
-                          </Pressable>
+                            <Pressable
+                              style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                              onPress={() => handleSendMessage('Create a salary slip for John Doe, Senior Architect, basic 65,000, HRA 25,000, PF 3,600 for October 2026')}
+                            >
+                              <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>✦ Salary Slip</Text>
+                              <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>Statutory monthly earnings and deductions</Text>
+                            </Pressable>
 
-                          <Pressable
-                            style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
-                            onPress={() => handleSendMessage('build me complete highest ats scoring resume for farhan noor for ai engineer')}
-                          >
-                            <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📄 ATS Resume (Farhan Noor)</Text>
-                            <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>ATS-optimized curriculum vitae with 98% score</Text>
-                          </Pressable>
+                            <Pressable
+                              style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                              onPress={() => handleSendMessage('build me complete highest ats scoring resume for farhan noor for ai engineer')}
+                            >
+                              <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>📄 ATS Resume</Text>
+                              <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>ATS-optimized curriculum vitae with 98% score</Text>
+                            </Pressable>
+
+                            <Pressable
+                              style={[styles.welcomeCard, { backgroundColor: theme.surfaceSecondary, borderColor: theme.borderSubtle }]}
+                              onPress={() => handleSendMessage('Generate a House Rent Receipt for tenant Rahul Sharma for 28,000 INR')}
+                            >
+                              <Text style={[styles.welcomeCardTitle, { color: theme.textPrimary }]}>✦ Rent Receipt</Text>
+                              <Text style={[styles.welcomeCardSubtitle, { color: theme.textMuted }]}>HRA tax exemption proof with revenue stamp</Text>
+                            </Pressable>
+                          </View>
                         </View>
                       )}
 
@@ -1149,6 +1171,15 @@ export default function AiAssistantScreen() {
               },
             ]}
           >
+            <Pressable
+              style={styles.floatingPlusButton}
+              onPress={() => setShowActionSheet(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Open document action menu"
+            >
+              <Plus size={18} color="#F5F5F6" />
+            </Pressable>
             <TextInput
               ref={textInputRef}
               style={[
@@ -1157,7 +1188,7 @@ export default function AiAssistantScreen() {
                   color: theme.textPrimary,
                 },
               ]}
-              placeholder={activeDraft ? `Modify ${activeDraft.documentTitle} (e.g. "change price to 45000")...` : 'Ask Billframe to create or query any document...'}
+              placeholder={activeDraft ? `Modify ${activeDraft.documentTitle} (e.g. "change price to 45000")...` : 'Ask Billframe Copilot...'}
               placeholderTextColor={theme.textMuted}
               value={inputText}
               onChangeText={setInputText}
@@ -1804,6 +1835,18 @@ export default function AiAssistantScreen() {
         }}
         onDismiss={() => setPendingProposal(null)}
       />
+
+      {/* Sleek Monochrome Bottom Sheet Overlay (Image 4 Style) */}
+      <CopilotActionSheet
+        visible={showActionSheet}
+        onClose={() => setShowActionSheet(false)}
+        activeDraft={activeDraft}
+        onPreview={() => activeDraft && handleOpenPreview(activeDraft)}
+        onPrint={() => activeDraft && handlePrintDocument(activeDraft)}
+        onDownloadHtml={() => activeDraft && handleDownloadHtml(activeDraft)}
+        onOpenStudio={() => router.push('/templates/studio' as any)}
+        onSelectPrompt={(p) => handleSendMessage(p)}
+      />
     </SafeAreaView>
   );
 }
@@ -2041,6 +2084,42 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#10B981',
+  },
+  copilotHeroBanner: {
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  copilotHeroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  copilotHeroBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#38BDF8',
+    letterSpacing: 0.6,
+  },
+  copilotHeroTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    marginBottom: 4,
+  },
+  copilotHeroSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   welcomeGrid: {
     marginTop: 12,
@@ -2519,7 +2598,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 24,
     borderWidth: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     minHeight: 48,
     shadowColor: '#000',
@@ -2527,6 +2606,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  floatingPlusButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
   },
   floatingTextInput: {
     flex: 1,
