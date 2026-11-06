@@ -4,7 +4,7 @@
  * TalkBack-compliant accessibility and custom numeric keypad.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Lock, Delete } from 'lucide-react-native';
 import { colors, spacing, radii, typography, MIN_TOUCH_TARGET, MAX_CONTENT_WIDTH } from '../../design/tokens';
 import { useSecurity } from '../../services/security/SecurityContext';
+import { SecurityService } from '../../services/security/SecurityService';
 
 export function LockChallengeScreen() {
   const security = useSecurity();
@@ -30,9 +31,26 @@ export function LockChallengeScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
+  useEffect(() => {
+    async function checkLockout() {
+      if (await SecurityService.isLockedOut()) {
+        const remainingSec = Math.ceil((await SecurityService.getLockoutRemainingMs()) / 1000);
+        setErrorMsg(`Too many failed attempts. Locked out for ${remainingSec}s.`);
+      }
+    }
+    checkLockout();
+  }, []);
+
   const handleKeyPress = async (digit: string) => {
     if (isVerifying || pin.length >= 6) return;
     setErrorMsg('');
+
+    if (await SecurityService.isLockedOut()) {
+      const remainingSec = Math.ceil((await SecurityService.getLockoutRemainingMs()) / 1000);
+      setErrorMsg(`Locked out. Try again in ${remainingSec}s.`);
+      return;
+    }
+
     const newPin = pin + digit;
     setPin(newPin);
 
@@ -41,9 +59,14 @@ export function LockChallengeScreen() {
       setIsVerifying(true);
       const success = await security.unlockSessionAsync(newPin);
       if (!success) {
-        if (newPin.length === 6) {
+        if (await SecurityService.isLockedOut()) {
+          const remainingSec = Math.ceil((await SecurityService.getLockoutRemainingMs()) / 1000);
+          setErrorMsg(`Locked out for ${remainingSec}s.`);
+          setPin('');
+        } else if (newPin.length === 6) {
           Vibration.vibrate(200);
-          setErrorMsg('Incorrect Master PIN.');
+          const attempts = await SecurityService.getFailedAttempts();
+          setErrorMsg(`Incorrect Master PIN (${attempts}/5).`);
           setPin('');
         }
       }
@@ -63,11 +86,24 @@ export function LockChallengeScreen() {
       setErrorMsg('PIN must be at least 4 digits.');
       return;
     }
+
+    if (await SecurityService.isLockedOut()) {
+      const remainingSec = Math.ceil((await SecurityService.getLockoutRemainingMs()) / 1000);
+      setErrorMsg(`Locked out for ${remainingSec}s.`);
+      return;
+    }
+
     setIsVerifying(true);
     const success = await security.unlockSessionAsync(pin);
     if (!success) {
       Vibration.vibrate(200);
-      setErrorMsg('Incorrect Master PIN.');
+      if (await SecurityService.isLockedOut()) {
+        const remainingSec = Math.ceil((await SecurityService.getLockoutRemainingMs()) / 1000);
+        setErrorMsg(`Too many failed attempts. Locked out for ${remainingSec}s.`);
+      } else {
+        const attempts = await SecurityService.getFailedAttempts();
+        setErrorMsg(`Incorrect Master PIN (${attempts}/5).`);
+      }
       setPin('');
     }
     setIsVerifying(false);

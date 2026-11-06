@@ -103,10 +103,11 @@ export class LogoStorageService {
         }
       }
 
-      // Generate immutable durable filename scoped to business profile
+      // Generate immutable durable filename scoped to business profile (sanitized against path traversal)
+      const sanitizedProfileId = profileId.replace(/[^a-zA-Z0-9_-]/g, '_');
       const timestamp = Date.now();
       const sanitizedExt = detectedExtension.toLowerCase() === 'jpeg' ? 'jpg' : detectedExtension.toLowerCase();
-      const filename = `logo_${profileId}_${timestamp}.${sanitizedExt}`;
+      const filename = `logo_${sanitizedProfileId}_${timestamp}.${sanitizedExt}`;
       const destinationUri = `${this.BRANDING_DIR}${filename}`;
 
       // Copy file to app-private storage
@@ -210,7 +211,8 @@ export class LogoStorageService {
       if (!dirInfo.exists) return;
 
       const files = await FileSystem.readDirectoryAsync(this.BRANDING_DIR);
-      const prefix = `logo_${profileId}_`;
+      const sanitizedProfileId = profileId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const prefix = `logo_${sanitizedProfileId}_`;
 
       for (const file of files) {
         if (file.startsWith(prefix) && file !== excludeFilename) {

@@ -3000,5 +3000,29 @@ export const SYSTEM_SCHEMAS: readonly UniversalDocumentSchema[] = [
       authorizedSignatoryLabel: "Chief Procurement Officer",
       recipientAcceptanceLabel: "Vendor Acceptance & Confirmation"
     }
-  }
+  },
+  {
+    id: 'schema_resume',
+    code: 'resume',
+    name: 'Resume',
+    docClass: 'class_b_administrative',
+    category: 'hr_employment',
+    description: 'Single-column résumé using the candidate’s own work history and skills.',
+    icon: 'file-text',
+    defaultTemplate: 'universal',
+    isSystem: true,
+    footerConfig: { showSignatures: false, showTerms: false, showNotes: false },
+    sections: [
+      { id: 'contact', title: 'Candidate', fields: [
+        { id: 'candidate_name', label: 'Candidate Name', type: 'text', required: true },
+        { id: 'candidate_email', label: 'Email', type: 'text' },
+        { id: 'job_title', label: 'Target Role', type: 'text', required: true },
+      ] },
+      { id: 'qualifications', title: 'Qualifications', fields: [
+        { id: 'experience', label: 'Work Experience or Projects', type: 'textarea', required: true },
+        { id: 'skills', label: 'Skills', type: 'textarea', required: true },
+        { id: 'education', label: 'Education', type: 'textarea' },
+      ] },
+    ],
+  },
 ];

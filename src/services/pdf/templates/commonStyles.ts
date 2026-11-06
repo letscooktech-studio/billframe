@@ -92,9 +92,9 @@ export function renderResponsiveLogoHtml(
   `;
 }
 
-export function escapeHtml(str?: string | null): string {
-  if (!str) return '';
-  return str
+export function escapeHtml(str?: any): string {
+  if (str === null || str === undefined) return '';
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

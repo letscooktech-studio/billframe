@@ -20,8 +20,8 @@ import { UniversalDocumentInstance, UniversalDocumentSchema } from '../../../dom
 import { TemplateCustomization } from '../types';
 import { resolveDocumentTheme, escapeHtml } from './commonStyles';
 
-function cleanText(str?: string | null): string {
-  if (!str) return '';
+function cleanText(str?: any): string {
+  if (str === null || str === undefined) return '';
   return String(str)
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
@@ -596,7 +596,7 @@ export function renderUniversalCustomHtml(
         </div>` : ''}
 
         ${textareas.map((ta) => {
-          const val = content[ta.id] || ta.defaultValue || '';
+          const val = content[ta.id] ?? ta.defaultValue ?? '';
           if (!val) return '';
           return `
           <div class="narrative-card">
@@ -607,7 +607,7 @@ export function renderUniversalCustomHtml(
 
         ${tables.map((tbl) => {
           let rows: any[] = Array.isArray(content[tbl.id]) ? content[tbl.id] : [];
-          if (rows.length === 0) {
+          if (content[tbl.id] === undefined) {
             // Intelligent fallback mock rows for immediate high-fidelity preview
             const MOCK_ROWS: Record<string, any[]> = {
               equipment_table: [
@@ -792,6 +792,7 @@ export function renderUniversalCustomHtml(
     }).join('')}
 
     <!-- Signatures & Authorization Section -->
+    ${schema.footerConfig?.showSignatures === false ? '' : `
     <div class="section-banner">ACKNOWLEDGEMENT AND SIGNATURES</div>
     <div class="signatures-row">
       <div class="sig-col">
@@ -809,6 +810,7 @@ export function renderUniversalCustomHtml(
       </div>
     </div>
 
+    `}
     <!-- Gold Footer -->
     <div class="doc-footer">
       <div>${cleanText(companyName)} &bull; ${cleanText(companyEmail || companyPhone)}</div>

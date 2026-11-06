@@ -1372,6 +1372,7 @@ export default function AiAssistantScreen() {
                     <iframe
                       srcDoc={previewHtml}
                       title="Live Statutory Document Preview"
+                      sandbox="allow-same-origin"
                       style={{
                         width: '100%',
                         height: '100%',
@@ -1567,6 +1568,7 @@ export default function AiAssistantScreen() {
                 <iframe
                   srcDoc={previewHtml}
                   title="Statutory Document Preview"
+                  sandbox="allow-same-origin"
                   style={{
                     width: '100%',
                     height: '100%',

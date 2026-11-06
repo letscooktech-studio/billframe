@@ -85,9 +85,21 @@ export default function SecurityPinScreen() {
 
   const handleDisablePin = async () => {
     setErrorMsg('');
+    if (await SecurityService.isLockedOut()) {
+      const remainingSec = Math.ceil((await SecurityService.getLockoutRemainingMs()) / 1000);
+      setErrorMsg(`Too many failed attempts. Locked out for ${remainingSec} second(s).`);
+      return;
+    }
+
     const isValid = await SecurityService.verifyPin(currentPinToDisable);
     if (!isValid) {
-      setErrorMsg('Incorrect current PIN.');
+      if (await SecurityService.isLockedOut()) {
+        const remainingSec = Math.ceil((await SecurityService.getLockoutRemainingMs()) / 1000);
+        setErrorMsg(`Too many failed attempts. Locked out for ${remainingSec} second(s).`);
+      } else {
+        const attempts = await SecurityService.getFailedAttempts();
+        setErrorMsg(`Incorrect current PIN. (${attempts}/5 attempts used)`);
+      }
       return;
     }
 
